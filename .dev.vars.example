@@ -11,3 +11,7 @@ PADDLE_PRICE_CALENDARFLOW_PLUS=pri_replace
 PADDLE_PRICE_CAPTIONSHIFT_STANDARD=pri_replace
 PADDLE_PRICE_CAPTIONSHIFT_PLUS=pri_replace
 PADDLE_PRICE_SUITE_BUNDLE=pri_replace
+SUPPORT_RECIPIENT_EMAIL=localfiletools.support@gmail.com
+SUPPORT_EMAIL_API_URL=https://api.example-email-provider.invalid/send
+SUPPORT_EMAIL_API_KEY=replace-with-provider-api-key
+SUPPORT_EMAIL_FROM_ADDRESS=LocalFile Toolkit <noreply@example.com>

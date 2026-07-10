@@ -101,7 +101,7 @@
     const nav = document.createElement("nav");
     nav.className = "site-wide-links";
     nav.setAttribute("aria-label", "Site links");
-    [["Pricing","../pricing.html"],["Terms","../terms.html"],["Privacy","../privacy.html"],["Refunds","../refunds.html"],["Support","../support.html"]].forEach(([label, href], index) => {
+    [["Pricing","../pricing.html"],["Contact","../contact.html"],["Terms","../terms.html"],["Privacy","../privacy.html"],["Refunds","../refunds.html"],["Support","../support.html"]].forEach(([label, href], index) => {
       if (index) nav.append(" · ");
       const link = document.createElement("a");
       link.href = href;
@@ -109,6 +109,7 @@
       nav.append(link);
     });
     footer.append(nav);
+    const email = document.createElement("a"); email.href = "mailto:localfiletools.support@gmail.com"; email.textContent = "localfiletools.support@gmail.com"; footer.append(email);
   }
   function sanitizePlusMessaging() {
     document.querySelectorAll("#plus-plan").forEach(card => {

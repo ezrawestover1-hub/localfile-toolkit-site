@@ -26,6 +26,7 @@ migrations/**
 package.json
 package-lock.json
 LICENSING_SETUP.md
+SUPPORT_EMAIL_SETUP.md
 .gitignore
 .assetsignore
 wrangler.jsonc

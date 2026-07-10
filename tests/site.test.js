@@ -5,7 +5,7 @@ import path from "node:path";
 
 const root = path.resolve(new URL("..", import.meta.url).pathname);
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
-const requiredRoutes = ["index.html", "pricing.html", "terms.html", "privacy.html", "refunds.html", "support.html", "ledgerlift/index.html", "pixelport/index.html", "contactcraft/index.html", "calendarflow/index.html", "captionshift/index.html", "checkout-portal/index.html", "checkout-portal/purchase-success.html", "license/activate.html", "license/restore.html", "license/manage.html"];
+const requiredRoutes = ["index.html", "pricing.html", "terms.html", "privacy.html", "refunds.html", "support.html", "contact.html", "refund-request.html", "robots.txt", "sitemap.xml", "ledgerlift/index.html", "pixelport/index.html", "contactcraft/index.html", "calendarflow/index.html", "captionshift/index.html", "checkout-portal/index.html", "checkout-portal/purchase-success.html", "license/activate.html", "license/restore.html", "license/manage.html"];
 const choices = [
   ["ledgerlift", "standard"], ["ledgerlift", "plus"], ["pixelport", "standard"], ["pixelport", "plus"],
   ["contactcraft", "standard"], ["contactcraft", "plus"], ["calendarflow", "standard"], ["calendarflow", "plus"],
@@ -59,9 +59,27 @@ test("public pricing does not present unfinished Plus features as current", () =
   assert.match(pricing, /Planned — not included in the current release/);
   assert.doesNotMatch(pricing, /Reusable bank and account profiles|Batch image queue|Duplicate contact detection|Merge multiple calendars|Bulk text cleanup rules/);
   ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"].forEach((product) => assert.match(read(`${product}/common.js`), /sanitizePlusMessaging/));
+  ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"].forEach((product) => { const page = read(`${product}/index.html`); assert.doesNotMatch(page, /<th>Reusable presets<\/th><td>—<\/td><td>Planned<\/td><td[^>]*>Yes/); assert.doesNotMatch(page, /<th>Advanced workflow tools<\/th><td>—<\/td><td>Planned<\/td><td[^>]*>Yes/); });
 });
 
 test("no committed secret material is present", () => {
   const files = ["worker.js", "checkout-portal/paddle-config.js", "wrangler.jsonc", ".dev.vars.example"];
   files.forEach((file) => assert.doesNotMatch(read(file), /sk_(live|test)|whsec_|BEGIN (RSA|OPENSSH|PRIVATE) KEY/));
+});
+
+test("support contact, form disclosures, and setup documentation are public-safe", () => {
+  ["index.html", "pricing.html", "terms.html", "privacy.html", "refunds.html", "support.html", "contact.html", "refund-request.html", "checkout-portal/index.html", "checkout-portal/purchase-success.html", "license/activate.html", "license/restore.html", "license/manage.html"].forEach((file) => assert.match(read(file), /localfiletools\.support@gmail\.com/));
+  assert.match(read("privacy.html"), /message content|request metadata|email-delivery provider/);
+  assert.match(read("terms.html"), /supported commercial life|does not guarantee.*indefinitely/);
+  assert.match(read("SUPPORT_EMAIL_SETUP.md"), /localfiletools\.support@gmail\.com/);
+  assert.doesNotMatch(read("contact.js"), /API_KEY|SUPPORT_EMAIL_API/);
+  assert.doesNotMatch(read("refund-request.js"), /API_KEY|SUPPORT_EMAIL_API/);
+});
+
+test("SEO foundations are present and sitemap excludes private routes", () => {
+  const important = ["index.html", "pricing.html", "terms.html", "privacy.html", "refunds.html", "support.html", "contact.html", "refund-request.html", "checkout-portal/index.html", "ledgerlift/index.html", "pixelport/index.html", "contactcraft/index.html", "calendarflow/index.html", "captionshift/index.html"];
+  const titles = new Set(); const descriptions = new Set();
+  important.forEach((file) => { const content = read(file); const title = content.match(/<title[^>]*>([^<]+)</i)?.[1]; const description = content.match(/name="description" content="([^"]+)/i)?.[1] || content.match(/content="([^"]+)" name="description"/i)?.[1]; assert.ok(title && description, file); assert.match(content, /https:\/\/localfiletoolkit\.com\//); titles.add(title); descriptions.add(description); });
+  assert.equal(titles.size, important.length); assert.equal(descriptions.size, important.length);
+  const sitemap = read("sitemap.xml"); assert.doesNotMatch(sitemap, /\/api\/|checkout-portal|license|purchase-success|tests|migrations/); assert.match(read("robots.txt"), /Sitemap: https:\/\/localfiletoolkit\.com\/sitemap\.xml/);
 });

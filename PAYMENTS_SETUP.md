@@ -80,7 +80,9 @@ The included success page deliberately does not unlock anything. This prevents p
 
 ## Public verification pages
 
-The public verification surface is `/pricing.html`, `/terms.html`, `/privacy.html`, `/refunds.html`, and `/support.html`. Replace the support-email, governing-law, and operator placeholders after legal review. `/checkout-portal/purchase-success.html` is a confirmation page only; it does not grant access.
+The public verification surface is `/pricing.html`, `/terms.html`, `/privacy.html`, `/refunds.html`, `/refund-request.html`, `/contact.html`, and `/support.html`. Customer support is [localfiletools.support@gmail.com](mailto:localfiletools.support@gmail.com). `/checkout-portal/purchase-success.html` is a confirmation page only; it does not grant access.
+
+Support and refund forms are delivered by the existing Worker and are documented in `SUPPORT_EMAIL_SETUP.md`. Until a provider is configured and tested, they show setup mode and a direct mail fallback; they do not falsely report delivery.
 
 ## Privacy boundary
 

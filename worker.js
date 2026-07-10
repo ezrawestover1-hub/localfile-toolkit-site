@@ -1,6 +1,8 @@
 const SUPPORTED_EVENTS = new Set(["transaction.completed"]);
 const MAX_SIGNATURE_AGE_SECONDS = 300;
 const PRODUCTS = ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"];
+const SUPPORT_EMAIL = "localfiletools.support@gmail.com";
+const rateBuckets = new Map();
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -10,6 +12,78 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 const nowIso = () => new Date().toISOString();
 const id = (prefix) => `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const cleanText = (value, max) => String(value ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim().slice(0, max);
+const validEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254;
+const clientKey = (request) => request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+
+async function allowSubmission(request, env) {
+  const key = clientKey(request);
+  if (env.RATE_LIMITER?.limit) {
+    try { if (!(await env.RATE_LIMITER.limit({ key })).success) return false; } catch { /* Optional binding failure must not expose details. */ }
+  }
+  const now = Date.now();
+  const bucket = rateBuckets.get(key);
+  if (!bucket || now - bucket.startedAt > 10 * 60 * 1000) { rateBuckets.set(key, { startedAt: now, count: 1 }); return true; }
+  bucket.count += 1;
+  return bucket.count <= 8;
+}
+
+async function readJsonObject(request) {
+  if (!request.headers.get("content-type")?.toLowerCase().includes("application/json")) return null;
+  const body = await request.json().catch(() => null);
+  return body && typeof body === "object" && !Array.isArray(body) ? body : null;
+}
+
+function hasOnlyKeys(body, allowed) {
+  return Object.keys(body).every((key) => allowed.has(key));
+}
+
+async function sendSupportEmail(env, subject, fields) {
+  const apiUrl = env.SUPPORT_EMAIL_API_URL;
+  const apiKey = env.SUPPORT_EMAIL_API_KEY;
+  const from = env.SUPPORT_EMAIL_FROM_ADDRESS;
+  const recipient = env.SUPPORT_RECIPIENT_EMAIL || SUPPORT_EMAIL;
+  if (!apiUrl || !apiKey || !from || !recipient) return { ok: false, setup: true };
+  const text = Object.entries(fields).map(([key, value]) => `${key}: ${cleanText(value, 5000)}`).join("\n\n");
+  try {
+    const response = await fetch(apiUrl, { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "content-type": "application/json" }, body: JSON.stringify({ from, to: [recipient], subject, text }) });
+    return { ok: response.ok, setup: false };
+  } catch { return { ok: false, setup: false }; }
+}
+
+function deliveryResponse(result) {
+  if (result.ok) return json({ ok: true, message: "Your message has been sent to LocalFile Toolkit support." }, 202);
+  if (result.setup) return json({ ok: false, setup_mode: true, message: "Support email delivery is not configured yet.", fallback: `mailto:${SUPPORT_EMAIL}` }, 503);
+  return json({ ok: false, message: "We could not send the request right now. Please try again or use the support email link." }, 502);
+}
+
+async function handleContact(request, env) {
+  if (!(await allowSubmission(request, env))) return json({ ok: false, message: "Too many requests. Please try again later." }, 429);
+  const body = await readJsonObject(request);
+  const allowed = new Set(["name", "email", "topic", "product", "subject", "message", "transaction_id", "consent", "honeypot"]);
+  if (!body || !hasOnlyKeys(body, allowed)) return json({ ok: false, message: "Please check the form and try again." }, 400);
+  if (body.honeypot) return new Response(null, { status: 204 });
+  const fields = { name: cleanText(body.name, 120), email: normalizeEmail(body.email), topic: cleanText(body.topic, 80), product: cleanText(body.product, 80), subject: cleanText(body.subject, 180), message: cleanText(body.message, 5000), transaction_id: cleanText(body.transaction_id, 140) };
+  const topics = new Set(["General question", "Technical support", "Purchase or billing", "License activation", "Privacy question", "Refund request", "Other"]);
+  const products = new Set(["LocalFile Toolkit", "LedgerLift", "PixelPort", "ContactCraft", "CalendarFlow", "CaptionShift", "Five-product bundle"]);
+  if (!fields.name || !validEmail(fields.email) || !topics.has(fields.topic) || !products.has(fields.product) || !fields.subject || !fields.message || body.consent !== true) return json({ ok: false, message: "Please check the form and try again." }, 400);
+  const result = await sendSupportEmail(env, "[LocalFile Toolkit Contact] " + fields.subject, fields);
+  return deliveryResponse(result);
+}
+
+async function handleRefundRequest(request, env) {
+  if (!(await allowSubmission(request, env))) return json({ ok: false, message: "Too many requests. Please try again later." }, 429);
+  const body = await readJsonObject(request);
+  const allowed = new Set(["name", "email", "transaction_id", "product", "plan", "purchase_date", "reason", "details", "accurate", "honeypot"]);
+  if (!body || !hasOnlyKeys(body, allowed)) return json({ ok: false, message: "Please check the form and try again." }, 400);
+  if (body.honeypot) return new Response(null, { status: 204 });
+  const fields = { name: cleanText(body.name, 120), email: normalizeEmail(body.email), transaction_id: cleanText(body.transaction_id, 140), product: cleanText(body.product, 80), plan: cleanText(body.plan, 80), purchase_date: cleanText(body.purchase_date, 40), reason: cleanText(body.reason, 160), details: cleanText(body.details, 5000) };
+  const products = new Set(["LedgerLift", "PixelPort", "ContactCraft", "CalendarFlow", "CaptionShift", "Five-product bundle"]);
+  const plans = new Set(["Standard", "Plus", "Five-product bundle"]);
+  if (!fields.name || !validEmail(fields.email) || !fields.transaction_id || !products.has(fields.product) || !plans.has(fields.plan) || !/^\d{4}-\d{2}-\d{2}$/.test(fields.purchase_date) || !fields.reason || !fields.details || body.accurate !== true) return json({ ok: false, message: "Please check the form and try again." }, 400);
+  const result = await sendSupportEmail(env, "[LocalFile Toolkit Refund Request] " + fields.reason, fields);
+  return deliveryResponse(result);
+}
 
 function bytesToBase64Url(bytes) {
   let binary = "";
@@ -201,6 +275,8 @@ export async function handleRequest(request, env) {
   if (request.method === "POST" && url.pathname === "/api/license/claim") return handleClaim(request, env);
   if (request.method === "POST" && url.pathname === "/api/license/restore/request") return handleRestore(request, env);
   if (request.method === "POST" && url.pathname === "/api/license/verify") return handleVerify(request, env);
+  if (request.method === "POST" && url.pathname === "/api/contact") return handleContact(request, env);
+  if (request.method === "POST" && url.pathname === "/api/refund-request") return handleRefundRequest(request, env);
   return env.ASSETS.fetch(request);
 }
 

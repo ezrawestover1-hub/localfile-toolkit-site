@@ -39,6 +39,7 @@ Set these encrypted Worker secrets. They must never be placed in HTML, JavaScrip
 ```sh
 npx wrangler secret put PADDLE_WEBHOOK_SECRET
 npx wrangler secret put LICENSE_SIGNING_SECRET
+npx wrangler secret put SUPPORT_EMAIL_API_KEY
 ```
 
 Use a long random value for `LICENSE_SIGNING_SECRET`. For local development, copy `.dev.vars.example` to `.dev.vars` and replace every placeholder. `.dev.vars` is ignored by Git.
@@ -46,6 +47,8 @@ Use a long random value for `LICENSE_SIGNING_SECRET`. For local development, cop
 Set these non-secret Worker variables in the dashboard or a local `.dev.vars` file, using the exact Paddle sandbox price IDs:
 
 `PADDLE_PRICE_LEDGERLIFT_STANDARD`, `PADDLE_PRICE_LEDGERLIFT_PLUS`, `PADDLE_PRICE_PIXELPORT_STANDARD`, `PADDLE_PRICE_PIXELPORT_PLUS`, `PADDLE_PRICE_CONTACTCRAFT_STANDARD`, `PADDLE_PRICE_CONTACTCRAFT_PLUS`, `PADDLE_PRICE_CALENDARFLOW_STANDARD`, `PADDLE_PRICE_CALENDARFLOW_PLUS`, `PADDLE_PRICE_CAPTIONSHIFT_STANDARD`, `PADDLE_PRICE_CAPTIONSHIFT_PLUS`, and `PADDLE_PRICE_SUITE_BUNDLE`.
+
+For the support and refund form delivery bindings and the intended recipient `localfiletools.support@gmail.com`, follow [SUPPORT_EMAIL_SETUP.md](SUPPORT_EMAIL_SETUP.md). Do not enable production delivery until the provider endpoint and sender domain have been tested.
 
 ## 3. Configure Paddle sandbox
 
