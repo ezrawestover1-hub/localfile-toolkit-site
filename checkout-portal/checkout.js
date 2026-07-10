@@ -1,12 +1,12 @@
 (() => {
   "use strict";
   const PRODUCTS = Object.freeze({
-    ledgerlift:{name:"LedgerLift",description:"Private CSV-to-IIF conversion for recurring QuickBooks Desktop workflows.",home:"../ledgerlift/index.html",benefits:{standard:["Unlimited core conversions","Preview and basic validation","No ads inside the converter"],plus:["Everything in Standard","Reusable bank and account profiles","Saved mappings and advanced workflow tools"]}},
-    pixelport:{name:"PixelPort",description:"Private image conversion for PNG, JPG, WebP and supported AVIF files.",home:"../pixelport/index.html",benefits:{standard:["Unlimited core image conversions","Quality and output controls","No ads inside the converter"],plus:["Everything in Standard","Reusable conversion presets","Batch-oriented Plus workflow tools"]}},
-    contactcraft:{name:"ContactCraft",description:"Private contact conversion between VCF/vCard and CSV.",home:"../contactcraft/index.html",benefits:{standard:["Unlimited core contact conversions","Preview before export","No ads inside the converter"],plus:["Everything in Standard","Reusable field mappings","Deduplication and advanced organization tools"]}},
-    calendarflow:{name:"CalendarFlow",description:"Private calendar conversion between ICS/iCalendar and CSV.",home:"../calendarflow/index.html",benefits:{standard:["Unlimited core calendar conversions","Preview before export","No ads inside the converter"],plus:["Everything in Standard","Reusable timezone and field presets","Advanced calendar workflow tools"]}},
-    captionshift:{name:"CaptionShift",description:"Private subtitle conversion among SRT, VTT, SBV and ASS.",home:"../captionshift/index.html",benefits:{standard:["Unlimited core subtitle conversions","Timing preview and export","No ads inside the converter"],plus:["Everything in Standard","Reusable timing presets","Advanced cleanup and batch workflow tools"]}},
-    suite:{name:"Five-product Plus bundle",description:"Lifetime Plus access to all five private converter products.",home:"../index.html",benefits:{bundle:["LedgerLift Plus","PixelPort Plus","ContactCraft Plus","CalendarFlow Plus and CaptionShift Plus","Save $19.96 versus five separate Plus licenses"]}}
+    ledgerlift:{name:"LedgerLift",icon:"../ledgerlift/favicon.svg",description:"Private CSV-to-IIF conversion for recurring QuickBooks Desktop workflows.",home:"../ledgerlift/index.html",benefits:{standard:["Unlimited core conversions","Preview and basic validation","No ads inside the converter"],plus:["Everything in Standard","Reusable bank and account profiles","Saved mappings and advanced workflow tools"]}},
+    pixelport:{name:"PixelPort",icon:"../pixelport/favicon.svg",description:"Private image conversion for PNG, JPG, WebP and supported AVIF files.",home:"../pixelport/index.html",benefits:{standard:["Unlimited core image conversions","Quality and output controls","No ads inside the converter"],plus:["Everything in Standard","Reusable conversion presets","Batch-oriented Plus workflow tools"]}},
+    contactcraft:{name:"ContactCraft",icon:"../contactcraft/favicon.svg",description:"Private contact conversion between VCF/vCard and CSV.",home:"../contactcraft/index.html",benefits:{standard:["Unlimited core contact conversions","Preview before export","No ads inside the converter"],plus:["Everything in Standard","Reusable field mappings","Deduplication and advanced organization tools"]}},
+    calendarflow:{name:"CalendarFlow",icon:"../calendarflow/favicon.svg",description:"Private calendar conversion between ICS/iCalendar and CSV.",home:"../calendarflow/index.html",benefits:{standard:["Unlimited core calendar conversions","Preview before export","No ads inside the converter"],plus:["Everything in Standard","Reusable timezone and field presets","Advanced calendar workflow tools"]}},
+    captionshift:{name:"CaptionShift",icon:"../captionshift/favicon.svg",description:"Private subtitle conversion among SRT, VTT, SBV and ASS.",home:"../captionshift/index.html",benefits:{standard:["Unlimited core subtitle conversions","Timing preview and export","No ads inside the converter"],plus:["Everything in Standard","Reusable timing presets","Advanced cleanup and batch workflow tools"]}},
+    suite:{name:"Five-product Plus bundle",icons:["../ledgerlift/favicon.svg","../pixelport/favicon.svg","../contactcraft/favicon.svg","../calendarflow/favicon.svg","../captionshift/favicon.svg"],description:"Lifetime Plus access to all five private converter products.",home:"../index.html",benefits:{bundle:["LedgerLift Plus","PixelPort Plus","ContactCraft Plus","CalendarFlow Plus and CaptionShift Plus","Save $19.96 versus five separate Plus licenses"]}}
   });
   const PLANS=Object.freeze({standard:{label:"Standard",price:"$9.99"},plus:{label:"Plus",price:"$11.99"},bundle:{label:"Complete bundle",price:"$39.99"}});
   const params=new URLSearchParams(location.search);
@@ -19,6 +19,16 @@
   const button=$("checkoutButton"), msg=$("setupMessage");
   if(!valid){location.replace("../index.html");return;}
   $("returnLink").href=product.home;
+  const emblemSources = product.icons || (product.icon ? [product.icon] : []);
+  emblemSources.forEach(src=>{
+    const image=document.createElement("img");
+    image.src=src;
+    image.alt="";
+    image.width=48;
+    image.height=48;
+    image.setAttribute("aria-hidden","true");
+    $("productEmblems").appendChild(image);
+  });
   $("productKind").textContent=product.name;
   $("purchaseTitle").textContent=productKey==="suite"?product.name:`${product.name} ${plan.label}`;
   $("purchaseDescription").textContent=product.description;
