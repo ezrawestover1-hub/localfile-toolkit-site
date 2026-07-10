@@ -85,7 +85,7 @@
   function message(text) { if (!toast) return; toast.textContent = text; toast.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>toast.classList.remove("show"),3200); }
   function checkoutPlan(plan) {
     const url = checkout[plan];
-    if (typeof url === "string" && /^https:\/\//i.test(url)) location.assign(url);
+    if (typeof url === "string" && /checkout-portal\/index\.html\?product=(ledgerlift|pixelport|contactcraft|calendarflow|captionshift|suite)&plan=(standard|plus|bundle)/.test(url)) location.assign(url);
     else message(`Secure checkout is not configured yet. Complete the Paddle setup in PAYMENTS_SETUP.md.`);
   }
   function update(sample=false) {
@@ -95,6 +95,49 @@
     else if (used()) trial.textContent = "Free document used: choose Standard, Plus, or the five-product bundle to continue.";
     else trial.textContent = "Free demo: convert and export one complete document.";
   }
+  function addSiteLinks() {
+    const footer = document.querySelector(".footer");
+    if (!footer || footer.querySelector(".site-wide-links")) return;
+    const nav = document.createElement("nav");
+    nav.className = "site-wide-links";
+    nav.setAttribute("aria-label", "Site links");
+    [["Pricing","../pricing.html"],["Terms","../terms.html"],["Privacy","../privacy.html"],["Refunds","../refunds.html"],["Support","../support.html"]].forEach(([label, href], index) => {
+      if (index) nav.append(" · ");
+      const link = document.createElement("a");
+      link.href = href;
+      link.textContent = label;
+      nav.append(link);
+    });
+    footer.append(nav);
+  }
+  function sanitizePlusMessaging() {
+    document.querySelectorAll("#plus-plan").forEach(card => {
+      const badge = card.querySelector(".badge");
+      const description = card.querySelector(".muted");
+      const list = card.querySelector("ul");
+      const button = card.querySelector("[data-checkout]");
+      if (badge) badge.textContent = "Planned release · one-time license";
+      if (description) description.textContent = "Plus-specific controls are planned and are not included in the current release.";
+      if (list) list.innerHTML = "<li>Everything in Standard</li><li>Future Plus controls — planned</li><li>Not included in the current release</li>";
+      if (button) button.textContent = "View Plus";
+    });
+    document.querySelectorAll(".compare tr").forEach(row => {
+      const label = row.querySelector("th")?.textContent || "";
+      if (/Reusable presets|Advanced workflow tools/.test(label)) {
+        const cells = row.querySelectorAll("td");
+        if (cells[1]) cells[1].textContent = "Planned";
+        if (cells[2]) cells[2].textContent = "Planned";
+      }
+    });
+    document.querySelectorAll(".faq details").forEach(detail => {
+      if (detail.querySelector("summary")?.textContent.includes("subscription")) {
+        const answer = detail.querySelector("p");
+        if (answer) answer.textContent = "No. It is a one-time license price; Plus-specific controls are planned and are not included in the current release.";
+      }
+    });
+  }
+  addSiteLinks();
+  sanitizePlusMessaging();
   applyCanonicalProductEmblems();
   document.querySelectorAll("[data-checkout]").forEach(b=>b.addEventListener("click",()=>checkoutPlan(b.dataset.checkout)));
   $("closeUpgradeBtn")?.addEventListener("click", closeUpgrade);

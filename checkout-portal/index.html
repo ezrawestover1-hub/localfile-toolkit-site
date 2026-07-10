@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Secure Checkout · LocalFile Tools</title>
-  <meta name="description" content="Secure LocalFile Tools checkout processed by Paddle.">
+  <meta name="description" content="One-time LocalFile Tools purchase checkout for a selected product and plan, processed securely by Paddle.">
+  <link rel="canonical" href="https://localfiletoolkit.com/checkout-portal/">
   <meta name="robots" content="noindex,nofollow">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.paddle.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.paddle.com; connect-src https://*.paddle.com; frame-src https://*.paddle.com; font-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'; worker-src 'none'">
@@ -14,14 +15,14 @@
   <script defer src="checkout.js"></script>
 </head>
 <body>
-  <header class="topbar"><a href="../index.html">LocalFile Tools</a><span>Secure purchase portal</span></header>
+  <header class="topbar"><a href="../index.html">LocalFile Tools</a><span>One shared secure purchase portal</span></header>
   <main class="shell">
-    <a class="back" id="returnLink" href="../index.html">← Return to product</a>
+    <nav class="portal-links" aria-label="Checkout navigation"><a class="back" id="returnLink" href="../index.html">← Return to product</a><a class="back" href="../pricing.html">View complete pricing</a></nav>
     <section class="checkout-card">
-      <div class="trust-kicker">PAYMENT PAGE · NO CONVERTER FILE ACCESS</div>
+      <div class="trust-kicker">ONE-TIME PURCHASE · NO CONVERTER FILE ACCESS</div>
       <div class="grid">
         <div>
-          <div class="product-emblems" id="productEmblems" aria-hidden="true"></div><p class="eyebrow" id="productKind">LocalFile Tools</p>
+          <div class="product-emblems" id="productEmblems"></div><p class="eyebrow" id="productKind">LocalFile Tools</p>
           <h1 id="purchaseTitle">Loading purchase…</h1>
           <p class="lead" id="purchaseDescription"></p>
           <ul id="benefitList"></ul>
@@ -37,11 +38,12 @@
       <div class="methods" aria-label="Payment methods"><strong>Checkout may offer</strong><span>Cards</span><span>Apple Pay</span><span>Google Pay</span><span>PayPal</span><span>Regional methods</span></div>
     </section>
     <section class="security-grid">
-      <article><strong>Paddle-hosted payment form</strong><p>Card and wallet details are entered into Paddle Checkout, not into the converter website.</p></article>
+      <article><strong>Securely processed by Paddle</strong><p>Card and wallet details are entered into Paddle Checkout, not into the converter website.</p></article>
       <article><strong>Tax and receipts</strong><p>Paddle calculates applicable indirect taxes and provides compliant purchase documentation.</p></article>
       <article><strong>Files stay separate</strong><p>This portal never receives the document or image you opened in a converter.</p></article>
     </section>
-    <p class="legal">Payment options depend on device, browser, currency, and location. Final taxes and terms appear inside checkout.</p>
+    <p class="legal">This is a one-time purchase, not a subscription. Payment options depend on device, browser, currency, and location. Final taxes and terms appear inside checkout.</p>
+    <footer class="portal-footer"><a href="../pricing.html">Pricing</a><a href="../terms.html">Terms</a><a href="../privacy.html">Privacy</a><a href="../refunds.html">Refunds</a><a href="../support.html">Support</a></footer>
   </main>
 </body>
 </html>

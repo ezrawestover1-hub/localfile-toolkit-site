@@ -24,11 +24,29 @@ Create one additional one-time price:
 
 Copy the resulting `pri_...` identifiers into `checkout-portal/paddle-config.js`.
 
+## One shared checkout portal
+
+There is one payment surface at `/checkout-portal/`. Every product and plan routes there with explicit query parameters:
+
+- `/checkout-portal/index.html?product=ledgerlift&plan=standard`
+- `/checkout-portal/index.html?product=ledgerlift&plan=plus`
+- `/checkout-portal/index.html?product=pixelport&plan=standard`
+- `/checkout-portal/index.html?product=pixelport&plan=plus`
+- `/checkout-portal/index.html?product=contactcraft&plan=standard`
+- `/checkout-portal/index.html?product=contactcraft&plan=plus`
+- `/checkout-portal/index.html?product=calendarflow&plan=standard`
+- `/checkout-portal/index.html?product=calendarflow&plan=plus`
+- `/checkout-portal/index.html?product=captionshift&plan=standard`
+- `/checkout-portal/index.html?product=captionshift&plan=plus`
+- `/checkout-portal/index.html?product=suite&plan=bundle`
+
+The official public comparison page is `/pricing.html`. It links to the same shared portal and identifies the exact product, plan, one-time price, and current feature status before checkout.
+
 ## Client-side token
 
 Create a Paddle client-side token and paste it into `checkout-portal/paddle-config.js`. Client-side tokens are intended for frontend code. Never put a Paddle API key, webhook secret, password, or private signing key into the website files.
 
-Start with `environment: "sandbox"` and a `test_...` token. After your seller account, website, products, prices, and domain are approved, switch to `environment: "production"` and a `live_...` token.
+Keep `environment: "sandbox"`, `checkoutEnabled: false`, and a `test_...` token. Real checkout is intentionally disabled until the licensing and fulfillment foundation, public legal pages, support contact, and feature implementation are complete. Do not switch to production or use a `live_...` token in this phase. Only set `checkoutEnabled: true` after the complete sandbox purchase and verified fulfillment flow has been tested.
 
 ## Payment methods
 
@@ -59,6 +77,10 @@ A successful browser redirect is not proof of payment. Before automatically unlo
 6. Never store the webhook secret, API key, or license-signing private key in frontend files.
 
 The included success page deliberately does not unlock anything. This prevents people from obtaining paid access by visiting a success URL manually.
+
+## Public verification pages
+
+The public verification surface is `/pricing.html`, `/terms.html`, `/privacy.html`, `/refunds.html`, and `/support.html`. Replace the support-email, governing-law, and operator placeholders after legal review. `/checkout-portal/purchase-success.html` is a confirmation page only; it does not grant access.
 
 ## Privacy boundary
 
