@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Secure Checkout · LocalFile Tools</title>
+  <meta name="description" content="Secure LocalFile Tools checkout processed by Paddle.">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.paddle.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.paddle.com; connect-src https://*.paddle.com; frame-src https://*.paddle.com; font-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'; worker-src 'none'">
+  <link rel="stylesheet" href="checkout.css">
+  <script defer src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+  <script defer src="paddle-config.js"></script>
+  <script defer src="checkout.js"></script>
+</head>
+<body>
+  <header class="topbar"><a href="../index.html">LocalFile Tools</a><span>Secure purchase portal</span></header>
+  <main class="shell">
+    <a class="back" id="returnLink" href="../index.html">← Return to product</a>
+    <section class="checkout-card">
+      <div class="trust-kicker">PAYMENT PAGE · NO CONVERTER FILE ACCESS</div>
+      <div class="grid">
+        <div>
+          <p class="eyebrow" id="productKind">LocalFile Tools</p>
+          <h1 id="purchaseTitle">Loading purchase…</h1>
+          <p class="lead" id="purchaseDescription"></p>
+          <ul id="benefitList"></ul>
+        </div>
+        <aside class="summary">
+          <span>One-time purchase</span>
+          <strong id="purchasePrice">—</strong>
+          <small>No recurring subscription</small>
+          <button id="checkoutButton" type="button" disabled>Continue to secure checkout</button>
+          <p id="setupMessage" class="message" role="status"></p>
+        </aside>
+      </div>
+      <div class="methods" aria-label="Payment methods"><strong>Checkout may offer</strong><span>Cards</span><span>Apple Pay</span><span>Google Pay</span><span>PayPal</span><span>Regional methods</span></div>
+    </section>
+    <section class="security-grid">
+      <article><strong>Paddle-hosted payment form</strong><p>Card and wallet details are entered into Paddle Checkout, not into the converter website.</p></article>
+      <article><strong>Tax and receipts</strong><p>Paddle calculates applicable indirect taxes and provides compliant purchase documentation.</p></article>
+      <article><strong>Files stay separate</strong><p>This portal never receives the document or image you opened in a converter.</p></article>
+    </section>
+    <p class="legal">Payment options depend on device, browser, currency, and location. Final taxes and terms appear inside checkout.</p>
+  </main>
+</body>
+</html>

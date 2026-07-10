@@ -1,0 +1,1 @@
+(()=>{"use strict";const p=new URLSearchParams(location.search).get("product");const allowed=new Set(["ledgerlift","pixelport","contactcraft","calendarflow","captionshift"]);document.getElementById("productLink").href=allowed.has(p)?`../${p}/index.html`:"../index.html";})();
