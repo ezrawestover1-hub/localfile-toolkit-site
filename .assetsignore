@@ -17,3 +17,14 @@ contactcraft/_headers
 calendarflow/_headers
 captionshift/_headers
 checkout-portal/_headers
+.git/**
+.wrangler/**
+.gitignore
+.assetsignore
+wrangler.jsonc
+README.md
+RESEARCH.md
+LAUNCH_CHECKLIST.md
+SITE_STRUCTURE.md
+PAYMENTS_SETUP.md
+SECURE_FULFILLMENT.md
