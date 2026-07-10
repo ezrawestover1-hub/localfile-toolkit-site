@@ -18,7 +18,7 @@ Five static, privacy-first converter website prototypes:
 ## Important before launch
 
 - Add Stripe Payment Links to each checkout-config.js.
-- Implement server-verified signed licenses. The current browser demo flag is privacy-friendly but is not strong anti-piracy.
+- Configure the Phase 1 server-verified licensing backend described in [LICENSING_SETUP.md](LICENSING_SETUP.md) before launch. The current browser demo flag is privacy-friendly but is not strong anti-piracy.
 - Complete operator identity, contact email, refunds, taxes and final legal terms.
 - Test each converter with diverse real-world files. These are production-oriented prototypes, not certified universal format implementations.
 - For separate domains, replace relative product links with final public URLs.
