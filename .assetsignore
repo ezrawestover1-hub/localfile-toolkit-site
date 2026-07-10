@@ -19,6 +19,13 @@ captionshift/_headers
 checkout-portal/_headers
 .git/**
 .wrangler/**
+.dev.vars*
+worker.js
+tests/**
+migrations/**
+package.json
+package-lock.json
+LICENSING_SETUP.md
 .gitignore
 .assetsignore
 wrangler.jsonc
