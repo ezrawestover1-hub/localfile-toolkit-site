@@ -172,6 +172,19 @@ test("ContactCraft Plus promises are implemented and license-gated", () => {
   assert.match(read("checkout-portal/checkout.js"), /Duplicate detection and merge review/);
 });
 
+test("CalendarFlow Plus promises are implemented and license-gated", () => {
+  const plus = read("calendarflow/plus.js");
+  assert.match(plus, /Merge calendars/);
+  assert.match(plus, /Filter events/);
+  assert.match(plus, /Normalize recurrence/);
+  assert.match(plus, /Download validation report/);
+  assert.match(plus, /getCapabilities/);
+  assert.match(plus, /canUsePlus\("calendarflow"\)/);
+  assert.match(read("calendarflow/app.js"), /window\.CalendarFlowCore/);
+  assert.match(read("calendarflow/common.js"), /calendar merging, filtering, recurrence normalization, saved presets, and validation reporting/i);
+  assert.match(read("checkout-portal/checkout.js"), /Calendar merging, filtering, and duplicate removal/);
+});
+
 test("LedgerLift trial survives refresh and only counts a real export", () => {
   const common = read("ledgerlift/common.js");
   const app = read("ledgerlift/app.js");
