@@ -57,7 +57,7 @@
       success.searchParams.set("plan",planKey);
       window.Paddle.Checkout.open({
         items:[{priceId,quantity:1}],
-        settings:{displayMode:"overlay",theme:"light",locale:"en",successUrl:success.href}
+        settings:{displayMode:"overlay",variant:"one-page",theme:"light",locale:"en",successUrl:success.href}
       });
     });
   }catch(error){
