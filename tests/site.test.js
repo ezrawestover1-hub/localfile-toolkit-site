@@ -174,4 +174,8 @@ test("cross-device account surface is wired to durable entitlements", () => {
   assert.match(read("worker.js"), /portal-sessions/);
   assert.match(read("migrations/0002_accounts.sql"), /account_sessions/);
   assert.match(read("ACCOUNT_SETUP.md"), /PADDLE_API_KEY/);
+  assert.match(read("worker.js"), /__Host-lft_account_session/);
+  assert.match(read("worker.js"), /used_at IS NULL AND expires_at >/);
+  assert.match(read("_headers"), /\/account\/\*/);
+  assert.doesNotMatch(read("account/account.js"), /innerHTML/);
 });

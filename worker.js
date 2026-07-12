@@ -15,7 +15,7 @@ const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 const cleanText = (value, max) => String(value ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim().slice(0, max);
 const validEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254;
 const clientKey = (request) => request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-const ACCOUNT_COOKIE = "lft_account_session";
+const ACCOUNT_COOKIE = "__Host-lft_account_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 
 function randomToken(prefix) {
@@ -31,6 +31,15 @@ function cookieValue(request, name) {
 
 function setAccountCookie(response, token, maxAge = SESSION_MAX_AGE) {
   response.headers.set("Set-Cookie", `${ACCOUNT_COOKIE}=${token}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=Lax`);
+  response.headers.set("Cache-Control", "no-store");
+  response.headers.set("Referrer-Policy", "no-referrer");
+  return response;
+}
+
+function accountRedirect(url) {
+  const response = Response.redirect(url, 303);
+  response.headers.set("Cache-Control", "no-store");
+  response.headers.set("Referrer-Policy", "no-referrer");
   return response;
 }
 
@@ -76,14 +85,15 @@ async function handleLoginRequest(request, env) {
 
 async function handleLoginVerify(request, env) {
   const token = new URL(request.url).searchParams.get("token") || "";
-  if (!token || !env.LICENSE_DB) return Response.redirect(`${new URL(request.url).origin}/account/login.html?error=invalid`, 303);
+  if (!token || !env.LICENSE_DB) return accountRedirect(`${new URL(request.url).origin}/account/login.html?error=invalid`);
   const row = await env.LICENSE_DB.prepare("SELECT id,user_id,expires_at,used_at FROM account_login_tokens WHERE token_hash = ?").bind(await sha256(token)).first();
-  if (!row || row.used_at || new Date(row.expires_at).getTime() <= Date.now()) return Response.redirect(`${new URL(request.url).origin}/account/login.html?error=expired`, 303);
+  if (!row || row.used_at || new Date(row.expires_at).getTime() <= Date.now()) return accountRedirect(`${new URL(request.url).origin}/account/login.html?error=expired`);
   const now = nowIso();
-  await env.LICENSE_DB.prepare("UPDATE account_login_tokens SET used_at = ? WHERE id = ? AND used_at IS NULL").bind(now, row.id).run();
+  const consumed = await env.LICENSE_DB.prepare("UPDATE account_login_tokens SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?").bind(now, row.id, now).run();
+  if (!consumed?.meta?.changes) return accountRedirect(`${new URL(request.url).origin}/account/login.html?error=used`);
   const rawSession = randomToken("session");
   await env.LICENSE_DB.prepare("INSERT INTO account_sessions (id,user_id,session_hash,expires_at,created_at,last_seen_at) VALUES (?,?,?,?,?,?)").bind(id("session"), row.user_id, await sha256(rawSession), new Date(Date.now() + SESSION_MAX_AGE * 1000).toISOString(), now, now).run();
-  return setAccountCookie(Response.redirect(`${new URL(request.url).origin}/account/`, 303), rawSession);
+  return setAccountCookie(accountRedirect(`${new URL(request.url).origin}/account/`), rawSession);
 }
 
 async function handleAccountMe(request, env) {
@@ -121,7 +131,7 @@ async function handleAccountRestore(request, env) {
 async function handleLogout(request, env) {
   const raw = cookieValue(request, ACCOUNT_COOKIE);
   if (raw && env.LICENSE_DB) await env.LICENSE_DB.prepare("DELETE FROM account_sessions WHERE session_hash = ?").bind(await sha256(raw)).run();
-  return setAccountCookie(Response.redirect(`${new URL(request.url).origin}/account/login.html`, 303), "", 0);
+  return setAccountCookie(accountRedirect(`${new URL(request.url).origin}/account/login.html`), "", 0);
 }
 
 async function handlePortalSession(request, env) {

@@ -11,7 +11,7 @@ function render() {
   details.replaceChildren();
   [["Email", account.email], ["Access", "Permanent one-time licenses"]].forEach(([name, value]) => { const row = document.createElement("div"); row.className = "detail"; const labelNode = document.createElement("span"); labelNode.textContent = name; const valueNode = document.createElement("strong"); valueNode.textContent = value; row.append(labelNode, valueNode); details.append(row); });
   products.replaceChildren();
-  if (!account.entitlements.length) { products.innerHTML = `<p class="empty">No purchases are linked to this email yet. If you just completed checkout, wait for the confirmation webhook and try again.</p>`; return; }
+  if (!account.entitlements.length) { const empty = document.createElement("p"); empty.className = "empty"; empty.textContent = "No purchases are linked to this email yet. If you just completed checkout, wait for the confirmation webhook and try again."; products.append(empty); return; }
   const latest = new Map(); account.entitlements.forEach((item) => { if (!latest.has(item.product_key) || item.plan_key === "plus") latest.set(item.product_key, item); });
   latest.forEach((item) => { const row = document.createElement("div"); row.className = "product"; const copy = document.createElement("div"); const name = document.createElement("strong"); name.textContent = names[item.product_key] || label(item.product_key); const purchase = document.createElement("small"); purchase.textContent = `${label(item.plan_key)} access · Purchased ${new Date(item.created_at).toLocaleDateString()}`; copy.append(name, purchase); const status = document.createElement("strong"); status.textContent = "Active"; row.append(copy, status); products.append(row); });
 }
