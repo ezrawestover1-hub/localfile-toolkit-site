@@ -144,3 +144,12 @@ test("checkout requests exactly one unit", () => {
   assert.match(read("checkout-portal/checkout.js"), /items:\[\{priceId,quantity:1\}\]/);
   assert.match(read("PAYMENTS_SETUP.md"), /minimum of `1` and a maximum of `1`/);
 });
+
+test("LedgerLift Plus promises are implemented and license-gated", () => {
+  const plus = read("ledgerlift/plus.js");
+  ["Save current", "Separate Debit and Credit columns", "Categorization rules", "Mark duplicates", "Download review report", "getCapabilities"].forEach((value) => assert.match(plus, new RegExp(value.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&"))));
+  assert.match(plus, /canUsePlus\("ledgerlift"\)/);
+  assert.match(read("ledgerlift/app.js"), /window\.LedgerLiftCore/);
+  assert.match(read("ledgerlift/common.js"), /reusable profiles, advanced mapping, categorization, duplicate review, and reports/);
+  assert.match(read("checkout-portal/checkout.js"), /Saved mapping and account profiles/);
+});

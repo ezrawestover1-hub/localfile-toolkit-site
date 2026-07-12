@@ -106,6 +106,30 @@
     const email = document.createElement("a"); email.href = "mailto:localfiletools.support@gmail.com"; email.textContent = "localfiletools.support@gmail.com"; footer.append(email);
   }
   function sanitizePlusMessaging() {
+    if (product === "ledgerlift") {
+      document.querySelectorAll("#plus-plan").forEach(card => {
+        const description = card.querySelector(".muted");
+        const list = card.querySelector("ul");
+        const button = card.querySelector("[data-checkout]");
+        if (description) description.textContent = "For repeat workflows that need reusable mappings, categorization, duplicate review, and reports.";
+        if (list) list.innerHTML = "<li>Everything in Standard</li><li>Saved mapping and account profiles</li><li>Debit / credit mapping, categorization, duplicate review, and reports</li>";
+        if (button) button.textContent = "Get LedgerLift Plus";
+      });
+      document.querySelectorAll(".compare tr").forEach(row => {
+        const label = row.querySelector("th")?.textContent || "";
+        const cells = row.querySelectorAll("td");
+        if (/Local processing|Core conversion and export/.test(label)) { if (cells[0]) cells[0].textContent = "Yes"; if (cells[1]) cells[1].textContent = "Yes"; if (cells[2]) cells[2].textContent = "Yes"; }
+        if (/Reusable presets/.test(label)) { if (cells[0]) cells[0].textContent = "—"; if (cells[1]) cells[1].textContent = "Yes"; if (cells[2]) cells[2].textContent = "Yes"; }
+        if (/Advanced workflow tools/.test(label)) { if (cells[0]) cells[0].textContent = "—"; if (cells[1]) cells[1].textContent = "Yes"; if (cells[2]) cells[2].textContent = "Yes"; }
+      });
+      document.querySelectorAll(".faq details").forEach(detail => {
+        if (detail.querySelector("summary")?.textContent.includes("subscription")) {
+          const answer = detail.querySelector("p");
+          if (answer) answer.textContent = "No. It is a one-time license with no recurring subscription or automatic renewal. LedgerLift Plus includes the saved profiles, advanced mapping, categorization, duplicate review, and reporting controls shown on this page.";
+        }
+      });
+      return;
+    }
     document.querySelectorAll("#plus-plan").forEach(card => {
       const badge = card.querySelector(".badge");
       const description = card.querySelector(".muted");
@@ -142,7 +166,7 @@
     const plusCard = document.querySelector("#plus-plan");
     if (plusCard) {
       const note = plusCard.querySelector(".muted");
-      if (note) note.textContent = `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Plus-specific controls are planned and are not included in the current release.`;
+      if (note) note.textContent = product === "ledgerlift" ? `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Unlock reusable profiles, advanced mapping, categorization, duplicate review, and reports.` : `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Plus-specific controls are planned and are not included in the current release.`;
     }
     const bundleCard = document.querySelector("#bundle-offer");
     if (bundleCard) {
@@ -173,4 +197,5 @@
   document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeUpgrade(); });
   window.SuiteGate = { used, markUsed, mayOpenRealDocument, showUpgrade, closeUpgrade, message, update, setActive: v=>{activeRealDocument=!!v;update();}, product };
   update();
+  if (product === "ledgerlift") import("./plus.js").catch(() => {});
 })();
