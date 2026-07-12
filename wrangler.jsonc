@@ -2,6 +2,19 @@
   "name": "localfile-toolkit-site",
   "compatibility_date": "2026-07-10",
   "main": "worker.js",
+  "vars": {
+    "PADDLE_PRICE_LEDGERLIFT_STANDARD": "pri_01kxbnrr880w3zyzznnfhc153h",
+    "PADDLE_PRICE_LEDGERLIFT_PLUS": "pri_01kxbnrrjv6b6fr4m5p55pg75v",
+    "PADDLE_PRICE_PIXELPORT_STANDARD": "pri_01kxbnrrxjb758mwa6x2gjkhna",
+    "PADDLE_PRICE_PIXELPORT_PLUS": "pri_01kxbnrs79exw36hg6w69cq27e",
+    "PADDLE_PRICE_CONTACTCRAFT_STANDARD": "pri_01kxbnrshd2h7stwjgbnc9eyrt",
+    "PADDLE_PRICE_CONTACTCRAFT_PLUS": "pri_01kxbnrsw2fnjsejndvahz25j1",
+    "PADDLE_PRICE_CALENDARFLOW_STANDARD": "pri_01kxbnrt5dr469wk6naevt2dh4",
+    "PADDLE_PRICE_CALENDARFLOW_PLUS": "pri_01kxbnrthvj72219amwy5wpa70",
+    "PADDLE_PRICE_CAPTIONSHIFT_STANDARD": "pri_01kxbnrtv57ejmy6b0nvp6pfvp",
+    "PADDLE_PRICE_CAPTIONSHIFT_PLUS": "pri_01kxbnrv3ewpe5rff8nh33cctg",
+    "PADDLE_PRICE_SUITE_BUNDLE": "pri_01kxbnrvd8mf8edt7gbcqh96hv"
+  },
   "assets": {
     "directory": ".",
     "html_handling": "auto-trailing-slash",
@@ -21,7 +34,7 @@
     {
       "binding": "LICENSE_DB",
       "database_name": "localfile-toolkit-licenses",
-      "database_id": "REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID",
+      "database_id": "27539e48-ad0c-4441-b552-e94b5f448db1",
       "migrations_dir": "migrations"
     }
   ]
