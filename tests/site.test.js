@@ -154,6 +154,15 @@ test("LedgerLift Plus promises are implemented and license-gated", () => {
   assert.match(read("checkout-portal/checkout.js"), /Saved mapping and account profiles/);
 });
 
+test("PixelPort Plus promises are implemented and license-gated", () => {
+  const plus = read("pixelport/plus.js");
+  ["Batch image queue", "Save preset", "Filename prefix", "Filename suffix", "Custom color", "Optimize for web", "getCapabilities"].forEach((value) => assert.match(plus, new RegExp(value.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&"))));
+  assert.match(plus, /canUsePlus\("pixelport"\)/);
+  assert.match(read("pixelport/app.js"), /window\.PixelPortCore/);
+  assert.match(read("pixelport/common.js"), /Batch conversion, reusable presets, controlled filenames/);
+  assert.match(read("checkout-portal/checkout.js"), /Batch image queue and reusable presets/);
+});
+
 test("LedgerLift trial survives refresh and only counts a real export", () => {
   const common = read("ledgerlift/common.js");
   const app = read("ledgerlift/app.js");

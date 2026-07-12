@@ -2,7 +2,7 @@
   "use strict";
   const PRODUCTS = Object.freeze({
     ledgerlift:{name:"LedgerLift",icon:window.PRODUCT_ICONS.ledgerlift.icon,description:"Private CSV-to-IIF conversion for recurring QuickBooks Desktop workflows.",home:"../ledgerlift/index.html",benefits:{standard:["Unlimited core conversions","Preview and basic validation","No ads inside the converter"],plus:["Everything in Standard","Saved mapping and account profiles","Advanced debit / credit mapping, categorization, duplicate review, and reports"]}},
-    pixelport:{name:"PixelPort",icon:window.PRODUCT_ICONS.pixelport.icon,description:"Private image conversion for PNG, JPG, WebP and supported AVIF files.",home:"../pixelport/index.html",benefits:{standard:["Unlimited core image conversions","Quality and output controls","No ads inside the converter"],plus:["Everything in Standard","Plus-specific controls — planned","Not included in the current release"]}},
+    pixelport:{name:"PixelPort",icon:window.PRODUCT_ICONS.pixelport.icon,description:"Private image conversion for PNG, JPG, WebP and supported AVIF files.",home:"../pixelport/index.html",benefits:{standard:["Unlimited core image conversions","Quality and output controls","No ads inside the converter"],plus:["Everything in Standard","Batch image queue and reusable presets","Background, filename, and web optimization controls"]}},
     contactcraft:{name:"ContactCraft",icon:window.PRODUCT_ICONS.contactcraft.icon,description:"Private contact conversion between VCF/vCard and CSV.",home:"../contactcraft/index.html",benefits:{standard:["Unlimited core contact conversions","Preview before export","No ads inside the converter"],plus:["Everything in Standard","Plus-specific controls — planned","Not included in the current release"]}},
     calendarflow:{name:"CalendarFlow",icon:window.PRODUCT_ICONS.calendarflow.icon,description:"Private calendar conversion between ICS/iCalendar and CSV.",home:"../calendarflow/index.html",benefits:{standard:["Unlimited core calendar conversions","Preview before export","No ads inside the converter"],plus:["Everything in Standard","Plus-specific controls — planned","Not included in the current release"]}},
     captionshift:{name:"CaptionShift",icon:window.PRODUCT_ICONS.captionshift.icon,description:"Private subtitle conversion among SRT, VTT, SBV and ASS.",home:"../captionshift/index.html",benefits:{standard:["Unlimited core subtitle conversions","Timing preview and export","No ads inside the converter"],plus:["Everything in Standard","Plus-specific controls — planned","Not included in the current release"]}},
@@ -10,7 +10,7 @@
   });
   const pricing=window.LOCALFILE_PRICING;
   const PLANS=Object.freeze({standard:{label:"Standard"},plus:{label:"Plus"},bundle:{label:"Complete Plus Bundle"}});
-  Object.values(PRODUCTS).forEach(item=>{if(item.benefits.plus && item.name !== "LedgerLift")item.benefits.plus=["Everything in Standard","Plus-specific controls — planned","Not included in the current release"];});
+  Object.values(PRODUCTS).forEach(item=>{if(item.benefits.plus && !["LedgerLift","PixelPort"].includes(item.name))item.benefits.plus=["Everything in Standard","Plus-specific controls — planned","Not included in the current release"];});
   const params=new URLSearchParams(location.search);
   const productKey=params.get("product")||"suite";
   const planKey=params.get("plan")||"bundle";

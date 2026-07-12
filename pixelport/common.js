@@ -106,6 +106,20 @@
     const email = document.createElement("a"); email.href = "mailto:localfiletools.support@gmail.com"; email.textContent = "localfiletools.support@gmail.com"; footer.append(email);
   }
   function sanitizePlusMessaging() {
+    if (product === "pixelport") {
+      document.querySelectorAll("#plus-plan").forEach(card => {
+        const description = card.querySelector(".muted"), list = card.querySelector("ul"), button = card.querySelector("[data-checkout]");
+        if (description) description.textContent = "Batch conversion, reusable presets, controlled filenames, custom backgrounds, and web-size optimization.";
+        if (list) { list.replaceChildren(...["Everything in Standard", "Batch image queue", "Reusable presets", "Background, filename, and optimization controls"].map(text => { const item = document.createElement("li"); item.textContent = text; return item; })); }
+        if (button) button.textContent = "Get PixelPort Plus";
+      });
+      document.querySelectorAll(".compare tr").forEach(row => {
+        const label = row.querySelector("th")?.textContent || "";
+        if (/Local processing|Core conversion and export|Reusable presets|Advanced workflow tools/.test(label)) { const cells = row.querySelectorAll("td"); if (cells[1]) cells[1].textContent = "Yes"; if (cells[2]) cells[2].textContent = "Yes"; }
+      });
+      document.querySelectorAll(".faq details").forEach(detail => { if (detail.querySelector("summary")?.textContent.includes("subscription")) { const answer = detail.querySelector("p"); if (answer) answer.textContent = "No. It is a one-time license with no recurring subscription or automatic renewal. PixelPort Plus includes batch conversion, reusable presets, background and filename controls, and web optimization."; } });
+      return;
+    }
     document.querySelectorAll("#plus-plan").forEach(card => {
       const badge = card.querySelector(".badge");
       const description = card.querySelector(".muted");
@@ -140,7 +154,7 @@
     setPrice("#plus-plan .price", prices.plus);
     setPrice("#bundle-offer .price", bundle.plus);
     const plusCard = document.querySelector("#plus-plan");
-    if (plusCard) { const note = plusCard.querySelector(".muted"); if (note) note.textContent = `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Plus-specific controls are planned and are not included in the current release.`; }
+    if (plusCard) { const note = plusCard.querySelector(".muted"); if (note) note.textContent = product === "pixelport" ? `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Add batch conversion, reusable presets, custom backgrounds, filename rules, and web optimization.` : `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Plus-specific controls are planned and are not included in the current release.`; }
     const bundleCard = document.querySelector("#bundle-offer");
     if (bundleCard) { const badge = bundleCard.querySelector(".badge"); if (badge) badge.textContent = "Best Value"; const button = bundleCard.querySelector("[data-checkout]"); if (button) button.textContent = `Get every Plus tool for ${window.formatLocalFilePrice(bundle.plus)}`; const copy = bundleCard.querySelector(".muted"); if (copy) copy.textContent = `Save ${window.formatLocalFilePrice(bundle.savings)} compared with buying separately · Approximately ${bundle.savingsPercent}% off.`; }
     document.querySelectorAll(".dialog [data-checkout]").forEach(button => { const plan = button.dataset.checkout; if (plan === "standard") button.textContent = `Standard · ${window.formatLocalFilePrice(prices.standard)}`; if (plan === "plus") button.textContent = `Plus · ${window.formatLocalFilePrice(prices.plus)}`; if (plan === "bundle") button.textContent = `All five · ${window.formatLocalFilePrice(bundle.plus)}`; });
@@ -156,4 +170,5 @@
   document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeUpgrade(); });
   window.SuiteGate = { used, markUsed, mayOpenRealDocument, showUpgrade, closeUpgrade, message, update, setActive: v=>{activeRealDocument=!!v;update();}, product };
   update();
+  if (product === "pixelport") import("./plus.js").catch(() => {});
 })();
