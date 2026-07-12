@@ -1,5 +1,6 @@
 const SUPPORTED_EVENTS = new Set(["transaction.completed"]);
 const MAX_SIGNATURE_AGE_SECONDS = 300;
+const WEBHOOK_PROCESSING_LEASE_SECONDS = 60;
 const PRODUCTS = ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"];
 const SUPPORT_EMAIL = "localfiletools.support@gmail.com";
 const rateBuckets = new Map();
@@ -17,6 +18,7 @@ const validEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.
 const clientKey = (request) => request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 const ACCOUNT_COOKIE = "__Host-lft_account_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
+const SESSION_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 
 function randomToken(prefix) {
   const bytes = new Uint8Array(32);
@@ -47,9 +49,11 @@ async function accountUser(request, env) {
   const raw = cookieValue(request, ACCOUNT_COOKIE);
   if (!raw || !env.LICENSE_DB) return null;
   const sessionHash = await sha256(raw);
-  const row = await env.LICENSE_DB.prepare("SELECT s.id AS session_id, s.user_id, s.expires_at, u.normalized_email FROM account_sessions s JOIN account_users u ON u.id = s.user_id WHERE s.session_hash = ?").bind(sessionHash).first();
+  const row = await env.LICENSE_DB.prepare("SELECT s.id AS session_id, s.user_id, s.expires_at, s.last_seen_at, u.normalized_email FROM account_sessions s JOIN account_users u ON u.id = s.user_id WHERE s.session_hash = ?").bind(sessionHash).first();
   if (!row || new Date(row.expires_at).getTime() <= Date.now()) return null;
-  await env.LICENSE_DB.prepare("UPDATE account_sessions SET last_seen_at = ? WHERE id = ?").bind(nowIso(), row.session_id).run();
+  if (!row.last_seen_at || Date.now() - new Date(row.last_seen_at).getTime() >= SESSION_TOUCH_INTERVAL_MS) {
+    await env.LICENSE_DB.prepare("UPDATE account_sessions SET last_seen_at = ? WHERE id = ?").bind(nowIso(), row.session_id).run();
+  }
   return row;
 }
 
@@ -99,9 +103,9 @@ async function handleLoginVerify(request, env) {
 async function handleAccountMe(request, env) {
   const user = await accountUser(request, env);
   if (!user) return json({ authenticated: false }, 401);
-  const customer = await env.LICENSE_DB.prepare("SELECT id,paddle_customer_id,normalized_email,created_at FROM customers WHERE normalized_email = ?").bind(user.normalized_email).first();
+  const customer = await env.LICENSE_DB.prepare("SELECT id,normalized_email,created_at FROM customers WHERE normalized_email = ?").bind(user.normalized_email).first();
   const entitlements = customer ? await env.LICENSE_DB.prepare("SELECT product_key,plan_key,status,transaction_id,created_at FROM entitlements WHERE customer_id = ? AND status = 'active' ORDER BY created_at DESC").bind(customer.id).all() : { results: [] };
-  return json({ authenticated: true, email: user.normalized_email, customer: customer ? { paddle_customer_id: customer.paddle_customer_id, created_at: customer.created_at } : null, entitlements: entitlements.results || [] });
+  return json({ authenticated: true, email: user.normalized_email, customer: customer ? { created_at: customer.created_at } : null, entitlements: entitlements.results || [] });
 }
 
 async function handleAccountRestore(request, env) {
@@ -309,6 +313,122 @@ function activationCode() {
   return `LFT-${bytesToBase64Url(random).toUpperCase()}`;
 }
 
+class WebhookFailure extends Error {
+  constructor(code, status = 503, retryable = true) {
+    super(code);
+    this.code = code;
+    this.status = status;
+    this.retryable = retryable;
+  }
+}
+
+async function paddleCustomerEmail(customerId, env) {
+  if (!env.PADDLE_API_KEY || !env.PADDLE_API_BASE_URL) throw new WebhookFailure("customer_lookup_unavailable");
+  const url = `${env.PADDLE_API_BASE_URL.replace(/\/$/, "")}/customers/${encodeURIComponent(customerId)}`;
+  let response;
+  try {
+    response = await fetch(url, { headers: { Authorization: `Bearer ${env.PADDLE_API_KEY}`, "content-type": "application/json" } });
+  } catch {
+    throw new WebhookFailure("customer_lookup_failed");
+  }
+  if (!response.ok) throw new WebhookFailure("customer_lookup_failed");
+  let result;
+  try { result = await response.json(); } catch { throw new WebhookFailure("customer_lookup_failed"); }
+  const email = normalizeEmail(result?.data?.email);
+  if (!validEmail(email)) throw new WebhookFailure("invalid_customer_email", 422, false);
+  return email;
+}
+
+function webhookErrorResponse(error) {
+  return json({ error: error.code }, error.status);
+}
+
+async function registerWebhookEvent(env, event, transactionId, payloadHash, processingToken, startedAt) {
+  let inserted = false;
+  try {
+    const result = await env.LICENSE_DB.prepare("INSERT INTO paddle_events (event_id,event_type,occurred_at,processed_at,transaction_id,payload_hash,status,processing_token,processing_started_at,last_error) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(event_id) DO NOTHING").bind(event.event_id, event.event_type, event.occurred_at || null, startedAt, transactionId, payloadHash, "processing", processingToken, startedAt, null).run();
+    inserted = Boolean(result?.meta?.changes);
+  } catch {
+    throw new WebhookFailure("event_registration_failed");
+  }
+  let existing;
+  try {
+    existing = await env.LICENSE_DB.prepare("SELECT status,processing_token,processing_started_at FROM paddle_events WHERE event_id = ?").bind(event.event_id).first();
+  } catch {
+    throw new WebhookFailure("event_lookup_failed");
+  }
+  if (!existing) throw new WebhookFailure("event_lookup_failed");
+  if (existing.status === "fulfilled") return { duplicate: true };
+  if (!inserted) {
+    const activeProcessing = existing.status === "processing" && existing.processing_token && existing.processing_started_at && Date.now() - new Date(existing.processing_started_at).getTime() < WEBHOOK_PROCESSING_LEASE_SECONDS * 1000;
+    if (activeProcessing && existing.processing_token !== processingToken) return { busy: true };
+    try {
+      const claimed = await env.LICENSE_DB.prepare("UPDATE paddle_events SET status = 'processing', processing_token = ?, processing_started_at = ?, last_error = NULL WHERE event_id = ? AND (status = 'failed' OR (status = 'processing' AND (processing_token IS NULL OR processing_started_at IS NULL OR processing_started_at < ?)))").bind(processingToken, startedAt, event.event_id, new Date(Date.now() - WEBHOOK_PROCESSING_LEASE_SECONDS * 1000).toISOString()).run();
+      if (!claimed?.meta?.changes) return { busy: true };
+    } catch {
+      throw new WebhookFailure("event_claim_failed");
+    }
+  }
+  return { duplicate: false, busy: false };
+}
+
+async function markWebhookFailed(env, eventId, processingToken, errorCode) {
+  try {
+    await env.LICENSE_DB.prepare("UPDATE paddle_events SET status = 'failed', processing_token = NULL, processing_started_at = NULL, last_error = ?, processed_at = ? WHERE event_id = ? AND processing_token = ?").bind(errorCode, nowIso(), eventId, processingToken).run();
+  } catch {
+    // The original failure remains retriable even if recording failed state is unavailable.
+  }
+}
+
+async function fulfillWebhook(env, event, grants, email, transactionId, processedAt) {
+  let customer;
+  try {
+    customer = await env.LICENSE_DB.prepare("SELECT id FROM customers WHERE paddle_customer_id = ?").bind(String(event.data.customer_id)).first();
+  } catch {
+    throw new WebhookFailure("customer_lookup_db_failed");
+  }
+  const customerId = customer?.id || id("cus");
+  const statements = [];
+  if (!customer) statements.push(env.LICENSE_DB.prepare("INSERT OR IGNORE INTO customers (id,paddle_customer_id,normalized_email,created_at,updated_at) VALUES (?,?,?,?,?)").bind(customerId, String(event.data.customer_id), email, processedAt, processedAt));
+  else statements.push(env.LICENSE_DB.prepare("UPDATE customers SET normalized_email = ?, updated_at = ? WHERE id = ?").bind(email, processedAt, customerId));
+  try {
+    await env.LICENSE_DB.batch(statements);
+  } catch {
+    throw new WebhookFailure("customer_write_failed");
+  }
+  const actualCustomer = await env.LICENSE_DB.prepare("SELECT id FROM customers WHERE paddle_customer_id = ?").bind(String(event.data.customer_id)).first();
+  if (!actualCustomer?.id) throw new WebhookFailure("customer_write_failed");
+  const entitlementRows = [];
+  for (const [product, plan] of grants) {
+    const existing = await env.LICENSE_DB.prepare("SELECT id FROM entitlements WHERE transaction_id = ? AND product_key = ? AND plan_key = ?").bind(transactionId, product, plan).first();
+    if (existing?.id) entitlementRows.push({ id: existing.id, product, plan, newCode: false });
+    else entitlementRows.push({ id: id("ent"), product, plan, newCode: true });
+  }
+  const entitlementWrites = entitlementRows.filter((row) => row.newCode).map((row) => env.LICENSE_DB.prepare("INSERT OR IGNORE INTO entitlements (id,customer_id,transaction_id,product_key,plan_key,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)").bind(row.id, actualCustomer.id, transactionId, row.product, row.plan, "active", processedAt, processedAt));
+  try {
+    if (entitlementWrites.length) await env.LICENSE_DB.batch(entitlementWrites);
+  } catch {
+    throw new WebhookFailure("entitlement_write_failed");
+  }
+  const codes = [];
+  for (const row of entitlementRows) {
+    const entitlement = await env.LICENSE_DB.prepare("SELECT id FROM entitlements WHERE transaction_id = ? AND product_key = ? AND plan_key = ?").bind(transactionId, row.product, row.plan).first();
+    if (!entitlement?.id) throw new WebhookFailure("entitlement_write_failed");
+    const existingCode = await env.LICENSE_DB.prepare("SELECT id FROM activation_codes WHERE entitlement_id = ?").bind(entitlement.id).first();
+    if (existingCode) continue;
+    const code = activationCode();
+    const codeId = id("code");
+    try {
+      await env.LICENSE_DB.prepare("INSERT OR IGNORE INTO activation_codes (id,entitlement_id,code_hash,expires_at,redeemed_at,created_at) VALUES (?,?,?,?,?,?)").bind(codeId, entitlement.id, await sha256(code), null, null, processedAt).run();
+    } catch {
+      throw new WebhookFailure("activation_code_write_failed");
+    }
+    const confirmed = await env.LICENSE_DB.prepare("SELECT id FROM activation_codes WHERE entitlement_id = ?").bind(entitlement.id).first();
+    if (confirmed?.id === codeId) codes.push(code);
+  }
+  return { fulfilled: grants.length, codes };
+}
+
 async function handleWebhook(request, env) {
   const raw = await request.text();
   const { timestamp, hash } = parsePaddleSignature(request.headers.get("Paddle-Signature"));
@@ -317,37 +437,43 @@ async function handleWebhook(request, env) {
   try { event = JSON.parse(raw); } catch { return json({ error: "invalid_json" }, 400); }
   if (!event.event_id || !SUPPORTED_EVENTS.has(event.event_type)) return json({ accepted: false }, 202);
   const priceIds = lineItemPriceIds(event.data);
+  if (!priceIds.length) return json({ error: "unsupported_price" }, 422);
   let grants;
   try { grants = entitlementsForPrices(priceIds, env); } catch { return json({ error: "unsupported_price" }, 422); }
+  if (!grants.length) return json({ error: "unsupported_price" }, 422);
   if (!event.data?.id || !event.data?.customer_id) return json({ error: "invalid_transaction" }, 422);
   const processedAt = nowIso();
   const payloadHash = await sha256(raw);
-  const customerId = id("cus");
   const transactionId = String(event.data.id);
-  const email = normalizeEmail(event.data?.customer?.email || event.data?.customer_email);
+  const processingToken = id("proc");
+  let registration;
   try {
-    await env.LICENSE_DB.prepare("INSERT INTO paddle_events (event_id,event_type,occurred_at,processed_at,transaction_id,payload_hash) VALUES (?,?,?,?,?,?)").bind(event.event_id, event.event_type, event.occurred_at || null, processedAt, transactionId, payloadHash).run();
-  } catch {
-    return json({ accepted: true, duplicate: true }, 200);
+    registration = await registerWebhookEvent(env, event, transactionId, payloadHash, processingToken, processedAt);
+  } catch (error) {
+    return webhookErrorResponse(error);
   }
-  const customer = await env.LICENSE_DB.prepare("SELECT id FROM customers WHERE paddle_customer_id = ?").bind(String(event.data.customer_id)).first();
-  const actualCustomerId = customer?.id || customerId;
-  const statements = [];
-  if (!customer) statements.push(env.LICENSE_DB.prepare("INSERT INTO customers (id,paddle_customer_id,normalized_email,created_at,updated_at) VALUES (?,?,?,?,?)").bind(actualCustomerId, String(event.data.customer_id), email || null, processedAt, processedAt));
-  else statements.push(env.LICENSE_DB.prepare("UPDATE customers SET normalized_email = ?, updated_at = ? WHERE id = ?").bind(email || null, processedAt, actualCustomerId));
-  const codes = [];
-  for (const [product, plan] of grants) {
-    const entitlementId = id("ent");
-    const codeId = id("code");
-    const code = activationCode();
-    codes.push(code);
-    statements.push(env.LICENSE_DB.prepare("INSERT INTO entitlements (id,customer_id,transaction_id,product_key,plan_key,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)").bind(entitlementId, actualCustomerId, transactionId, product, plan, "active", processedAt, processedAt));
-    statements.push(env.LICENSE_DB.prepare("INSERT INTO activation_codes (id,entitlement_id,code_hash,expires_at,redeemed_at,created_at) VALUES (?,?,?,?,?,?)").bind(codeId, entitlementId, await sha256(code), null, null, processedAt));
+  if (registration.duplicate) return json({ accepted: true, duplicate: true });
+  if (registration.busy) return json({ error: "fulfillment_in_progress" }, 409);
+  let email = normalizeEmail(event.data?.customer?.email || event.data?.customer_email);
+  if (!validEmail(email)) {
+    try { email = await paddleCustomerEmail(String(event.data.customer_id), env); } catch (error) {
+      const failure = error instanceof WebhookFailure ? error : new WebhookFailure("customer_lookup_failed");
+      await markWebhookFailed(env, event.event_id, processingToken, failure.code);
+      return webhookErrorResponse(failure);
+    }
   }
-  await env.LICENSE_DB.batch(statements);
-  const response = { accepted: true, fulfilled: grants.length };
-  if (env.DEVELOPMENT === "true") response.development_activation_codes = codes;
-  return json(response);
+  try {
+    const result = await fulfillWebhook(env, event, grants, email, transactionId, processedAt);
+    const finalized = await env.LICENSE_DB.prepare("UPDATE paddle_events SET status = 'fulfilled', processing_token = NULL, processing_started_at = NULL, last_error = NULL, processed_at = ? WHERE event_id = ? AND processing_token = ?").bind(nowIso(), event.event_id, processingToken).run();
+    if (!finalized?.meta?.changes) throw new WebhookFailure("event_finalize_failed");
+    const response = { accepted: true, fulfilled: result.fulfilled };
+    if (env.DEVELOPMENT === "true") response.development_activation_codes = result.codes;
+    return json(response);
+  } catch (error) {
+    const failure = error instanceof WebhookFailure ? error : new WebhookFailure("fulfillment_failed");
+    await markWebhookFailed(env, event.event_id, processingToken, failure.code);
+    return webhookErrorResponse(failure);
+  }
 }
 
 async function handleClaim(request, env) {

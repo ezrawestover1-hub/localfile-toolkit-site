@@ -50,7 +50,7 @@ The official public comparison page is `/pricing.html`. It links to the same sha
 
 Create a Paddle client-side token and paste it into `checkout-portal/paddle-config.js`. Client-side tokens are intended for frontend code. Never put a Paddle API key, webhook secret, password, or private signing key into the website files.
 
-Keep `environment: "sandbox"` and a `test_...` token during this verification phase. Sandbox checkout is now enabled for end-to-end testing only. Do not switch to production or use a `live_...` token. Return `checkoutEnabled` to `false` after testing until the complete fulfillment and launch review is approved.
+Keep `environment: "sandbox"` and a `test_...` token during this verification phase. Keep `checkoutEnabled: false` while fulfillment and launch review are incomplete. Do not switch to production or use a `live_...` token.
 
 ## Payment methods
 
@@ -74,10 +74,10 @@ Each product is a separate homepage and link, while sharing one domain and check
 A successful browser redirect is not proof of payment. Before automatically unlocking paid features:
 
 1. Create a Paddle webhook destination for `transaction.completed`.
-2. Verify every `Paddle-Signature` against the raw request body and the webhook secret.
+2. Verify every `Paddle-Signature` against the raw request body and the webhook secret. Fulfillment events move through `processing`, `failed`, and `fulfilled`; only `fulfilled` events are acknowledged as duplicates.
 3. Reject stale timestamps and duplicate event IDs.
 4. Map the completed Paddle price ID to the purchased product and plan.
-5. Issue a server-signed entitlement or license.
+5. Issue a server-signed entitlement or license only after the D1 fulfillment batch succeeds, and keep the event retryable when any D1 or Paddle customer lookup fails.
 6. Never store the webhook secret, API key, or license-signing private key in frontend files.
 
 The included success page deliberately does not unlock anything. This prevents people from obtaining paid access by visiting a success URL manually.

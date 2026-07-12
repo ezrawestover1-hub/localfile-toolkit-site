@@ -58,7 +58,9 @@ For the support and refund form delivery bindings and the intended recipient `lo
 4. Subscribe it to `transaction.completed` and copy the destination secret into `PADDLE_WEBHOOK_SECRET`.
 5. Do not configure live prices, live tokens, or live webhook destinations during Phase 1.
 
-The webhook reads the raw body, validates the official `ts:raw_body` HMAC-SHA-256 signature, rejects timestamps older than five minutes, stores event IDs for idempotency, and maps only server-configured line-item price IDs. Browser query parameters, success URLs, email, product names, and plan names never determine entitlement.
+The webhook reads the raw body, validates the official `ts:raw_body` HMAC-SHA-256 signature, rejects timestamps older than five minutes, and maps only server-configured line-item price IDs. Each event moves through `processing`, `failed`, or `fulfilled` state. Only a confirmed `fulfilled` state is treated as a successful duplicate; failed or stale processing states remain retryable. D1 batches and unique constraints make entitlement and activation-code writes safe to resume. Browser query parameters, success URLs, email, product names, and plan names never determine entitlement.
+
+If the completed transaction does not contain a valid customer email, the Worker retrieves the Paddle customer by `customer_id` using the server-only `PADDLE_API_KEY` and `PADDLE_API_BASE_URL`, then validates and normalizes the returned email. A temporary Paddle or D1 failure returns a non-2xx response so Paddle retries. An invalid or missing email never creates an account-linked entitlement.
 
 ## 4. Test locally
 
@@ -76,14 +78,16 @@ In development-only mode (`DEVELOPMENT=true`), the test fixture receives activat
 1. Configure the sandbox token and price IDs in `checkout-portal/paddle-config.js`.
 2. Open the checkout portal, select a product and plan, and complete a Paddle sandbox purchase.
 3. Confirm the webhook destination receives `transaction.completed` and that `/api/health` returns only `{ "status": "ok" }`.
-4. Confirm the D1 `paddle_events`, `customers`, `entitlements`, and `activation_codes` rows exist. Confirm a replay of the same event does not add another entitlement.
+4. Confirm the D1 `paddle_events` row reaches `fulfilled` only after the `customers`, `entitlements`, and `activation_codes` rows exist. A temporary fulfillment failure must leave the event `failed` or retryable `processing`, and a replay must finish fulfillment without adding another entitlement or activation code.
 5. Deliver the generated activation code through the pending email integration, open `/license/activate.html`, and activate it on a browser.
 6. Open `/license/manage.html` and verify the signed entitlement. Remove it locally and confirm that it is no longer used by the shared frontend module.
 
 ## Security limitations and launch blockers
 
-- Transactional email is not configured. Restore requests are recorded generically but no production email is sent yet.
+- Transactional email is not configured. Restore requests are recorded generically but no production email is sent yet. The Paddle API key is required for customer-email fallback and customer-portal sessions, with the Paddle `customer.read` and `customer_portal_session.write` permissions needed for those operations.
 - Refund, chargeback, cancellation, and subscription lifecycle events are not fulfilled in Phase 1; only `transaction.completed` is supported.
 - There is no customer-facing remote deactivation or device-management UI. Browser removal only removes the local token.
+- The Worker uses an in-memory rate limiter only as a development fallback. Configure a Cloudflare-backed `RATE_LIMITER` binding or equivalent edge protection before production; this fallback is not production-grade across Worker isolates.
 - Plus converter controls remain unchanged and are intentionally not unlocked in this phase.
 - A production launch still requires reviewing retention, support, refunds, tax/legal wording, rate limiting/WAF rules, secret rotation, D1 backup/restore practice, and sandbox-to-live rollout controls.
+- Migration `0003_webhook_fulfillment_state.sql` must be applied after the earlier migrations on every configured D1 database before enabling webhook delivery. Paddle notification logs may safely replay `transaction.completed`; the handler ignores only events already marked `fulfilled` and retries `processing` or `failed` events.
