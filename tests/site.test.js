@@ -153,3 +153,13 @@ test("LedgerLift Plus promises are implemented and license-gated", () => {
   assert.match(read("ledgerlift/common.js"), /reusable profiles, advanced mapping, categorization, duplicate review, and reports/);
   assert.match(read("checkout-portal/checkout.js"), /Saved mapping and account profiles/);
 });
+
+test("LedgerLift trial survives refresh and only counts a real export", () => {
+  const common = read("ledgerlift/common.js");
+  const app = read("ledgerlift/app.js");
+  assert.match(common, /localStorage\.getItem\(key\) === "used"/);
+  assert.match(common, /localStorage\.setItem\(key, "used"\)/);
+  assert.match(app, /if \(!sample && !window\.SuiteGate\.mayOpenRealDocument\(\)\)/);
+  assert.match(app, /if \(!state\.source\) window\.SuiteGate\.markUsed\(\)/);
+  assert.match(common, /Sample mode does not consume your free document/);
+});
