@@ -55,7 +55,7 @@ test("Paddle is loaded only by the shared checkout portal", () => {
     assert.doesNotMatch(content, /cdn\.paddle\.com|Paddle\.Initialize|Paddle\.Checkout/);
   });
   assert.match(read("checkout-portal/index.html"), /cdn\.paddle\.com/);
-  assert.match(read("checkout-portal/paddle-config.js"), /checkoutEnabled: false/);
+  assert.match(read("checkout-portal/paddle-config.js"), /checkoutEnabled: true/);
 });
 
 test("portal safely handles invalid query values", () => {
@@ -134,7 +134,7 @@ test("approved product icon assets and canonical mappings are complete", () => {
 test("Paddle configuration is sandbox-only for verification", () => {
   const config = read("checkout-portal/paddle-config.js");
   assert.match(config, /environment: "sandbox"/);
-  assert.match(config, /checkoutEnabled: false/);
+  assert.match(config, /checkoutEnabled: true/);
   assert.match(config, /clientToken: "test_[a-z\d]+"/);
   assert.match(config, /pri_[a-z\d]{26}/);
   assert.doesNotMatch(config, /live_/);
