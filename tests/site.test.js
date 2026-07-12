@@ -135,7 +135,7 @@ test("Paddle configuration remains sandbox-disabled", () => {
   const config = read("checkout-portal/paddle-config.js");
   assert.match(config, /environment: "sandbox"/);
   assert.match(config, /checkoutEnabled: false/);
-  assert.match(config, /clientToken: ""/);
+  assert.match(config, /clientToken: "test_[a-z\d]+"/);
   assert.match(config, /pri_[a-z\d]{26}/);
   assert.doesNotMatch(config, /live_/);
 });
