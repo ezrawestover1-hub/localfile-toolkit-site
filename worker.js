@@ -15,6 +15,127 @@ const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 const cleanText = (value, max) => String(value ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim().slice(0, max);
 const validEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254;
 const clientKey = (request) => request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+const ACCOUNT_COOKIE = "lft_account_session";
+const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
+
+function randomToken(prefix) {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return `${prefix}_${bytesToBase64Url(bytes)}`;
+}
+
+function cookieValue(request, name) {
+  const cookies = request.headers.get("Cookie") || "";
+  return cookies.split(";").map((part) => part.trim().split("=", 2)).find(([key]) => key === name)?.[1] || "";
+}
+
+function setAccountCookie(response, token, maxAge = SESSION_MAX_AGE) {
+  response.headers.set("Set-Cookie", `${ACCOUNT_COOKIE}=${token}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=Lax`);
+  return response;
+}
+
+async function accountUser(request, env) {
+  const raw = cookieValue(request, ACCOUNT_COOKIE);
+  if (!raw || !env.LICENSE_DB) return null;
+  const sessionHash = await sha256(raw);
+  const row = await env.LICENSE_DB.prepare("SELECT s.id AS session_id, s.user_id, s.expires_at, u.normalized_email FROM account_sessions s JOIN account_users u ON u.id = s.user_id WHERE s.session_hash = ?").bind(sessionHash).first();
+  if (!row || new Date(row.expires_at).getTime() <= Date.now()) return null;
+  await env.LICENSE_DB.prepare("UPDATE account_sessions SET last_seen_at = ? WHERE id = ?").bind(nowIso(), row.session_id).run();
+  return row;
+}
+
+async function sendLoginEmail(env, email, link) {
+  const apiUrl = env.AUTH_EMAIL_API_URL;
+  const apiKey = env.AUTH_EMAIL_API_KEY;
+  const from = env.AUTH_EMAIL_FROM_ADDRESS;
+  if (!apiUrl || !apiKey || !from) return { ok: false, setup: true };
+  try {
+    const response = await fetch(apiUrl, { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "content-type": "application/json" }, body: JSON.stringify({ from, to: [email], subject: "Your LocalFile Toolkit sign-in link", text: `Use this secure link to sign in to LocalFile Toolkit:\n\n${link}\n\nThis link expires in 15 minutes. If you did not request it, you can ignore this email.` }) });
+    return { ok: response.ok, setup: false };
+  } catch { return { ok: false, setup: false }; }
+}
+
+async function handleLoginRequest(request, env) {
+  if (!(await allowSubmission(request, env))) return json({ ok: false, message: "Too many requests. Please try again later." }, 429);
+  const body = await readJsonObject(request);
+  const email = normalizeEmail(body?.email);
+  if (!validEmail(email)) return json({ ok: false, message: "Enter a valid email address." }, 400);
+  const createdAt = nowIso();
+  const userId = id("user");
+  await env.LICENSE_DB.prepare("INSERT INTO account_users (id,normalized_email,created_at,updated_at) VALUES (?,?,?,?) ON CONFLICT(normalized_email) DO UPDATE SET updated_at = excluded.updated_at").bind(userId, email, createdAt, createdAt).run();
+  const user = await env.LICENSE_DB.prepare("SELECT id FROM account_users WHERE normalized_email = ?").bind(email).first();
+  const rawToken = randomToken("login");
+  await env.LICENSE_DB.prepare("INSERT INTO account_login_tokens (id,user_id,token_hash,expires_at,used_at,created_at) VALUES (?,?,?,?,?,?)").bind(id("login"), user.id, await sha256(rawToken), new Date(Date.now() + 15 * 60 * 1000).toISOString(), null, createdAt).run();
+  const origin = new URL(request.url).origin;
+  const delivery = await sendLoginEmail(env, email, `${origin}/api/account/verify?token=${encodeURIComponent(rawToken)}`);
+  const response = { ok: true, message: "If that address can receive mail, a sign-in link is on its way." };
+  if (env.DEVELOPMENT === "true" && delivery.setup) response.development_login_url = `${origin}/api/account/verify?token=${encodeURIComponent(rawToken)}`;
+  if (!delivery.ok && !delivery.setup) return json({ ok: false, message: "We could not send the sign-in email right now." }, 502);
+  return json(response, 202);
+}
+
+async function handleLoginVerify(request, env) {
+  const token = new URL(request.url).searchParams.get("token") || "";
+  if (!token || !env.LICENSE_DB) return Response.redirect(`${new URL(request.url).origin}/account/login.html?error=invalid`, 303);
+  const row = await env.LICENSE_DB.prepare("SELECT id,user_id,expires_at,used_at FROM account_login_tokens WHERE token_hash = ?").bind(await sha256(token)).first();
+  if (!row || row.used_at || new Date(row.expires_at).getTime() <= Date.now()) return Response.redirect(`${new URL(request.url).origin}/account/login.html?error=expired`, 303);
+  const now = nowIso();
+  await env.LICENSE_DB.prepare("UPDATE account_login_tokens SET used_at = ? WHERE id = ? AND used_at IS NULL").bind(now, row.id).run();
+  const rawSession = randomToken("session");
+  await env.LICENSE_DB.prepare("INSERT INTO account_sessions (id,user_id,session_hash,expires_at,created_at,last_seen_at) VALUES (?,?,?,?,?,?)").bind(id("session"), row.user_id, await sha256(rawSession), new Date(Date.now() + SESSION_MAX_AGE * 1000).toISOString(), now, now).run();
+  return setAccountCookie(Response.redirect(`${new URL(request.url).origin}/account/`, 303), rawSession);
+}
+
+async function handleAccountMe(request, env) {
+  const user = await accountUser(request, env);
+  if (!user) return json({ authenticated: false }, 401);
+  const customer = await env.LICENSE_DB.prepare("SELECT id,paddle_customer_id,normalized_email,created_at FROM customers WHERE normalized_email = ?").bind(user.normalized_email).first();
+  const entitlements = customer ? await env.LICENSE_DB.prepare("SELECT product_key,plan_key,status,transaction_id,created_at FROM entitlements WHERE customer_id = ? AND status = 'active' ORDER BY created_at DESC").bind(customer.id).all() : { results: [] };
+  return json({ authenticated: true, email: user.normalized_email, customer: customer ? { paddle_customer_id: customer.paddle_customer_id, created_at: customer.created_at } : null, entitlements: entitlements.results || [] });
+}
+
+async function handleAccountRestore(request, env) {
+  const user = await accountUser(request, env);
+  if (!user) return json({ error: "not_authenticated" }, 401);
+  const body = await readJsonObject(request);
+  const installationId = String(body?.installation_id || "").trim();
+  if (installationId.length < 16 || installationId.length > 256) return json({ error: "invalid_installation" }, 400);
+  const customer = await env.LICENSE_DB.prepare("SELECT id FROM customers WHERE normalized_email = ?").bind(user.normalized_email).first();
+  if (!customer) return json({ entitlements: [] });
+  const rows = await env.LICENSE_DB.prepare("SELECT e.id,e.product_key,e.plan_key,a.token_id FROM entitlements e LEFT JOIN activations a ON a.entitlement_id = e.id AND a.installation_id_hash = ? AND a.revoked_at IS NULL WHERE e.customer_id = ? AND e.status = 'active'").bind(await sha256(installationId), customer.id).all();
+  const tokens = [];
+  const createdAt = nowIso();
+  for (const row of rows.results || []) {
+    let tokenId = row.token_id;
+    if (!tokenId) {
+      const candidate = id("tok");
+      await env.LICENSE_DB.prepare("INSERT INTO activations (id,entitlement_id,installation_id_hash,token_id,created_at,last_seen_at,revoked_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(entitlement_id,installation_id_hash) DO NOTHING").bind(id("act"), row.id, await sha256(installationId), candidate, createdAt, createdAt, null).run();
+      const activation = await env.LICENSE_DB.prepare("SELECT token_id FROM activations WHERE entitlement_id = ? AND installation_id_hash = ? AND revoked_at IS NULL").bind(row.id, await sha256(installationId)).first();
+      tokenId = activation?.token_id;
+    }
+    if (tokenId) tokens.push(await signEntitlement(env.LICENSE_SIGNING_SECRET, { v: 1, token_id: tokenId, product: row.product_key, plan: row.plan_key, iat: Math.floor(Date.now() / 1000), exp: null }));
+  }
+  return json({ entitlements: tokens });
+}
+
+async function handleLogout(request, env) {
+  const raw = cookieValue(request, ACCOUNT_COOKIE);
+  if (raw && env.LICENSE_DB) await env.LICENSE_DB.prepare("DELETE FROM account_sessions WHERE session_hash = ?").bind(await sha256(raw)).run();
+  return setAccountCookie(Response.redirect(`${new URL(request.url).origin}/account/login.html`, 303), "", 0);
+}
+
+async function handlePortalSession(request, env) {
+  const user = await accountUser(request, env);
+  if (!user) return json({ error: "not_authenticated" }, 401);
+  const customer = await env.LICENSE_DB.prepare("SELECT paddle_customer_id FROM customers WHERE normalized_email = ?").bind(user.normalized_email).first();
+  if (!customer?.paddle_customer_id) return json({ error: "no_paddle_customer", message: "Complete a purchase with this email before opening billing management." }, 404);
+  if (!env.PADDLE_API_KEY || !env.PADDLE_API_BASE_URL) return json({ error: "billing_setup_incomplete", message: "Paddle account management is not configured yet." }, 503);
+  const response = await fetch(`${env.PADDLE_API_BASE_URL.replace(/\/$/, "")}/customers/${encodeURIComponent(customer.paddle_customer_id)}/portal-sessions`, { method: "POST", headers: { Authorization: `Bearer ${env.PADDLE_API_KEY}`, "content-type": "application/json" }, body: JSON.stringify({}) });
+  if (!response.ok) return json({ error: "billing_unavailable" }, 502);
+  const result = await response.json();
+  const url = result?.data?.urls?.general?.overview;
+  return url ? json({ url }) : json({ error: "billing_unavailable" }, 502);
+}
 
 async function allowSubmission(request, env) {
   const key = clientKey(request);
@@ -271,6 +392,12 @@ async function handleVerify(request, env) {
 export async function handleRequest(request, env) {
   const url = new URL(request.url);
   if (request.method === "GET" && url.pathname === "/api/health") return json({ status: "ok" });
+  if (request.method === "POST" && url.pathname === "/api/account/login") return handleLoginRequest(request, env);
+  if (request.method === "GET" && url.pathname === "/api/account/verify") return handleLoginVerify(request, env);
+  if (request.method === "GET" && url.pathname === "/api/account/me") return handleAccountMe(request, env);
+  if (request.method === "POST" && url.pathname === "/api/account/restore") return handleAccountRestore(request, env);
+  if (request.method === "POST" && url.pathname === "/api/account/portal") return handlePortalSession(request, env);
+  if ((request.method === "GET" || request.method === "POST") && url.pathname === "/api/account/logout") return handleLogout(request, env);
   if (request.method === "POST" && url.pathname === "/api/paddle/webhook") return handleWebhook(request, env);
   if (request.method === "POST" && url.pathname === "/api/license/claim") return handleClaim(request, env);
   if (request.method === "POST" && url.pathname === "/api/license/restore/request") return handleRestore(request, env);

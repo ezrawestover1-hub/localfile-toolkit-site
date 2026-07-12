@@ -3,6 +3,7 @@
   "compatibility_date": "2026-07-10",
   "main": "worker.js",
   "vars": {
+    "PADDLE_API_BASE_URL": "https://sandbox-api.paddle.com",
     "PADDLE_PRICE_LEDGERLIFT_STANDARD": "pri_01kxbnrr880w3zyzznnfhc153h",
     "PADDLE_PRICE_LEDGERLIFT_PLUS": "pri_01kxbnrrjv6b6fr4m5p55pg75v",
     "PADDLE_PRICE_PIXELPORT_STANDARD": "pri_01kxbnrrxjb758mwa6x2gjkhna",

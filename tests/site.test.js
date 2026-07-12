@@ -165,3 +165,13 @@ test("LedgerLift trial survives refresh and only counts a real export", () => {
   assert.match(common, /function mayOpenRealDocument\(\) \{ return !used\(\); \}/);
   assert.match(common, /Sample mode does not consume your free document/);
 });
+
+test("cross-device account surface is wired to durable entitlements", () => {
+  assert.match(read("account/login.html"), /secure email link/);
+  assert.match(read("account/index.html"), /Restore products on this device/);
+  assert.match(read("account/account.js"), /\/api\/account\/restore/);
+  assert.match(read("worker.js"), /account_users/);
+  assert.match(read("worker.js"), /portal-sessions/);
+  assert.match(read("migrations/0002_accounts.sql"), /account_sessions/);
+  assert.match(read("ACCOUNT_SETUP.md"), /PADDLE_API_KEY/);
+});
