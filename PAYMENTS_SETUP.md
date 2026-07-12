@@ -50,7 +50,7 @@ The official public comparison page is `/pricing.html`. It links to the same sha
 
 Create a Paddle client-side token and paste it into `checkout-portal/paddle-config.js`. Client-side tokens are intended for frontend code. Never put a Paddle API key, webhook secret, password, or private signing key into the website files.
 
-Keep `environment: "sandbox"`, `checkoutEnabled: false`, and a `test_...` token. Real checkout is intentionally disabled until the licensing and fulfillment foundation, public legal pages, support contact, and feature implementation are complete. Do not switch to production or use a `live_...` token in this phase. Only set `checkoutEnabled: true` after the complete sandbox purchase and verified fulfillment flow has been tested.
+Keep `environment: "sandbox"` and a `test_...` token during this verification phase. Sandbox checkout is now enabled for end-to-end testing only. Do not switch to production or use a `live_...` token. Return `checkoutEnabled` to `false` after testing until the complete fulfillment and launch review is approved.
 
 ## Payment methods
 
