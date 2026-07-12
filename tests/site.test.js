@@ -83,3 +83,26 @@ test("SEO foundations are present and sitemap excludes private routes", () => {
   assert.equal(titles.size, important.length); assert.equal(descriptions.size, important.length);
   const sitemap = read("sitemap.xml"); assert.doesNotMatch(sitemap, /\/api\/|checkout-portal|license|purchase-success|tests|migrations/); assert.match(read("robots.txt"), /Sitemap: https:\/\/localfiletoolkit\.com\/sitemap\.xml/);
 });
+
+test("approved product icon assets and canonical mappings are complete", () => {
+  const products = ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"];
+  const required = ["source-master.png", "favicon-16.png", "favicon-32.png", "icon-48.png", "icon-64.png", "icon-128.png", "apple-touch-icon.png", "icon-192.png", "icon-256.png", "icon-512.png"];
+  products.forEach((product) => { required.forEach((file) => assert.ok(fs.existsSync(path.join(root, "assets/product-icons", product, file)), `${product}/${file}`)); assert.ok(fs.statSync(path.join(root, "assets/product-icons", product, "source-master.png")).size > 0); });
+  assert.ok(!fs.existsSync(path.join(root, "assets/product-icons/ledgerlift/icon-1024.png")));
+  const config = read("assets/product-icons/config.js"); products.forEach((product) => assert.match(config, new RegExp(`assets/product-icons/${product}/icon-512\\.png`)));
+  products.forEach((product) => { assert.match(read(`${product}/index.html`), new RegExp(`assets/product-icons/${product}/icon-64\\.png`)); assert.match(read(`${product}/common.js`), /item\.icon/); fs.readdirSync(path.join(root, product)).filter((name) => name.endsWith(".html")).forEach((name) => assert.match(read(`${product}/${name}`), new RegExp(`assets/product-icons/${product}/favicon-16\\.png`))); });
+  products.forEach((product) => { assert.match(read("index.html"), new RegExp(`/assets/product-icons/${product}/icon-128\\.png`)); assert.match(read("pricing.html"), new RegExp(`/assets/product-icons/${product}/icon-128\\.png`)); });
+  const checkout = read("checkout-portal/checkout.js"); products.forEach((product) => assert.match(checkout, new RegExp(`PRODUCT_ICONS\\.${product}\\.icon`)));
+  assert.match(checkout, /Object\.values\(window\.PRODUCT_ICONS\)/);
+  assert.match(read("license/manage.js"), /window\.PRODUCT_ICONS/);
+  ["terms.html", "privacy.html", "refunds.html", "contact.html", "refund-request.html"].forEach((file) => assert.doesNotMatch(read(file), /assets\/product-icons\/(ledgerlift|pixelport|contactcraft|calendarflow|captionshift)\/icon/));
+  const publicFiles = ["index.html", "pricing.html", "terms.html", "privacy.html", "refunds.html", "support.html", "contact.html", "refund-request.html", "checkout-portal/index.html", "checkout-portal/purchase-success.html"];
+  publicFiles.forEach((file) => assert.doesNotMatch(read(file), /file:\/\/|\/Users\//));
+});
+
+test("Paddle configuration remains sandbox-disabled", () => {
+  const config = read("checkout-portal/paddle-config.js");
+  assert.match(config, /environment: "sandbox"/);
+  assert.match(config, /checkoutEnabled: false/);
+  assert.match(config, /test_/);
+});

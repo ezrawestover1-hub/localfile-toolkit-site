@@ -4,16 +4,10 @@
   const key = body.dataset.demoKey;
   const product = body.dataset.product;
   const checkout = window.PRODUCT_CHECKOUTS || {};
-  const PRODUCT_EMBLEMS = Object.freeze({
-    ledgerlift: { name: "LedgerLift", src: "../ledgerlift/favicon.svg" },
-    pixelport: { name: "PixelPort", src: "../pixelport/favicon.svg" },
-    contactcraft: { name: "ContactCraft", src: "../contactcraft/favicon.svg" },
-    calendarflow: { name: "CalendarFlow", src: "../calendarflow/favicon.svg" },
-    captionshift: { name: "CaptionShift", src: "../captionshift/favicon.svg" }
-  });
+  const PRODUCT_ICON_REFS = Object.freeze(Object.fromEntries(Object.entries(window.PRODUCT_ICONS || {}).map(([key, item]) => [key, { name: item.name, src: item.icon }])));
 
-  function makeProductEmblem(productKey, className = "product-reference-emblem") {
-    const definition = PRODUCT_EMBLEMS[productKey];
+  function makeProductIcon(productKey, className = "product-icon-reference") {
+    const definition = PRODUCT_ICON_REFS[productKey];
     if (!definition) return null;
     const image = document.createElement("img");
     image.src = definition.src;
@@ -25,10 +19,10 @@
     return image;
   }
 
-  // Keep one canonical emblem per product everywhere it appears: headers,
+  // Keep one canonical product icon per product everywhere it appears: headers,
   // proof blocks, product menus, related-product cards, and checkout links.
-  function applyCanonicalProductEmblems() {
-    const own = PRODUCT_EMBLEMS[product];
+  function applyCanonicalProductIcons() {
+    const own = PRODUCT_ICON_REFS[product];
     const brand = document.querySelector(".brand");
     if (brand && own) {
       let mark = brand.querySelector(".mark");
@@ -37,35 +31,35 @@
         mark.className = "mark";
         brand.prepend(mark);
       }
-      const emblem = makeProductEmblem(product, "product-emblem");
+      const emblem = makeProductIcon(product, "product-icon");
       if (emblem) mark.replaceChildren(emblem);
     }
 
     const proofIcon = document.querySelector(".proof-grid > div:first-child .icon");
     if (proofIcon && own) {
-      const emblem = makeProductEmblem(product, "product-emblem");
+      const emblem = makeProductIcon(product, "product-icon");
       if (emblem) proofIcon.replaceChildren(emblem);
     }
 
     document.querySelectorAll(".product-menu-item").forEach(link => {
-      const key = link.dataset.productLink || Object.keys(PRODUCT_EMBLEMS).find(name => {
+      const key = link.dataset.productLink || Object.keys(PRODUCT_ICON_REFS).find(name => {
         const href = link.getAttribute("href") || "";
         return href.includes(`../${name}/`) || href.includes(`/${name}/`);
       });
-      if (!key || link.querySelector(".product-reference-emblem")) return;
-      const emblem = makeProductEmblem(key);
+      if (!key || link.querySelector(".product-icon-reference")) return;
+      const emblem = makeProductIcon(key);
       if (!emblem) return;
-      link.dataset.emblemReady = "true";
+      link.dataset.iconReady = "true";
       link.prepend(emblem);
     });
 
     document.querySelectorAll("a.product-card").forEach(link => {
       const href = link.getAttribute("href") || "";
-      const key = Object.keys(PRODUCT_EMBLEMS).find(name => href.includes(`../${name}/`) || href.includes(`/${name}/`));
-      if (!key || link.querySelector(".product-reference-emblem")) return;
-      const emblem = makeProductEmblem(key);
+      const key = Object.keys(PRODUCT_ICON_REFS).find(name => href.includes(`../${name}/`) || href.includes(`/${name}/`));
+      if (!key || link.querySelector(".product-icon-reference")) return;
+      const emblem = makeProductIcon(key);
       if (!emblem) return;
-      link.dataset.emblemReady = "true";
+      link.dataset.iconReady = "true";
       link.prepend(emblem);
     });
   }
@@ -139,7 +133,7 @@
   }
   addSiteLinks();
   sanitizePlusMessaging();
-  applyCanonicalProductEmblems();
+  applyCanonicalProductIcons();
   document.querySelectorAll("[data-checkout]").forEach(b=>b.addEventListener("click",()=>checkoutPlan(b.dataset.checkout)));
   $("closeUpgradeBtn")?.addEventListener("click", closeUpgrade);
   dialog?.addEventListener("click", e=>{ if (e.target===dialog) closeUpgrade(); });
