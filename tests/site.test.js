@@ -135,5 +135,12 @@ test("Paddle configuration remains sandbox-disabled", () => {
   const config = read("checkout-portal/paddle-config.js");
   assert.match(config, /environment: "sandbox"/);
   assert.match(config, /checkoutEnabled: false/);
-  assert.match(config, /test_/);
+  assert.match(config, /clientToken: ""/);
+  assert.doesNotMatch(config, /pri_[a-z\d]{26}/);
+  assert.doesNotMatch(config, /live_/);
+});
+
+test("checkout requests exactly one unit", () => {
+  assert.match(read("checkout-portal/checkout.js"), /items:\[\{priceId,quantity:1\}\]/);
+  assert.match(read("PAYMENTS_SETUP.md"), /minimum of `1` and a maximum of `1`/);
 });

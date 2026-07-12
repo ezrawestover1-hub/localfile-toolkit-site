@@ -24,6 +24,10 @@ Create one additional one-time price:
 
 Copy the resulting `pri_...` identifiers into `checkout-portal/paddle-config.js`.
 
+## One-unit purchase limit
+
+Set every one-time Paddle price quantity range to a minimum of `1` and a maximum of `1`. The shared checkout also sends `quantity: 1` explicitly. This prevents a customer from buying multiple units of the same price in one checkout. It does not prevent a customer from starting separate checkouts, so production fulfillment must deduplicate completed transactions before issuing an entitlement.
+
 ## One shared checkout portal
 
 There is one payment surface at `/checkout-portal/`. Every product and plan routes there with explicit query parameters:

@@ -2,8 +2,8 @@
 // Never place a Paddle API key or webhook secret in this file.
 window.LOCALFILE_PADDLE = Object.freeze({
   environment: "sandbox", // change to "production" after live approval
-  checkoutEnabled: false, // keep false until licensing, fulfillment, legal, and support setup are complete
-  clientToken: "", // Paddle client-side token: test_... or live_...
+  checkoutEnabled: false, // keep disabled until licensing, fulfillment, legal, and support setup are complete
+  clientToken: "", // Add an operator-supplied sandbox token only when sandbox checkout is ready to test.
   prices: Object.freeze({
     ledgerlift: Object.freeze({ standard: "", plus: "" }),
     pixelport: Object.freeze({ standard: "", plus: "" }),
