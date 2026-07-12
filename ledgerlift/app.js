@@ -123,7 +123,7 @@
   $("sampleBtn").addEventListener("click", () => load(new File(["Date,Description,Amount\n07/01/2026,Coffee Shop,-6.45\n07/02/2026,Client Payment,725.00\n07/03/2026,Coffee Shop,-6.45"], "sample.csv", { type: "text/csv" }), true));
   $("clearBtn").addEventListener("click", () => { input.value = ""; state.rows = []; state.tx = []; work.classList.add("hidden"); status.textContent = "No file selected"; window.SuiteGate.setActive(false); window.dispatchEvent(new CustomEvent("ledgerlift:cleared")); });
   $("analyze").addEventListener("click", analyze);
-  $("download").addEventListener("click", () => { try { const blob = new Blob([iif()], { type: "text/plain" }), anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob); anchor.download = `${state.name}.iif`; anchor.click(); setTimeout(() => URL.revokeObjectURL(anchor.href), 1000); if (!state.source) window.SuiteGate.markUsed(); } catch (error) { window.SuiteGate.message(error.message); } });
+  $("download").addEventListener("click", () => { try { if (!state.source && window.SuiteGate.used()) { window.SuiteGate.showUpgrade(); return; } const blob = new Blob([iif()], { type: "text/plain" }), anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob); anchor.download = `${state.name}.iif`; anchor.click(); setTimeout(() => URL.revokeObjectURL(anchor.href), 1000); if (!state.source) window.SuiteGate.markUsed(); } catch (error) { window.SuiteGate.message(error.message); } });
   window.LedgerLiftCore = { state, analyze, renderRows, exportIif: iif };
   window.dispatchEvent(new Event("ledgerlift:ready"));
 })();

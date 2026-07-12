@@ -161,5 +161,7 @@ test("LedgerLift trial survives refresh and only counts a real export", () => {
   assert.match(common, /localStorage\.setItem\(key, "used"\)/);
   assert.match(app, /if \(!sample && !window\.SuiteGate\.mayOpenRealDocument\(\)\)/);
   assert.match(app, /if \(!state\.source\) window\.SuiteGate\.markUsed\(\)/);
+  assert.match(app, /if \(!state\.source && window\.SuiteGate\.used\(\)\)/);
+  assert.match(common, /function mayOpenRealDocument\(\) \{ return !used\(\); \}/);
   assert.match(common, /Sample mode does not consume your free document/);
 });

@@ -73,7 +73,7 @@
 
   function used() { try { return localStorage.getItem(key) === "used"; } catch { return false; } }
   function markUsed() { try { localStorage.setItem(key, "used"); } catch {} activeRealDocument = true; update(); }
-  function mayOpenRealDocument() { return !used() || activeRealDocument; }
+  function mayOpenRealDocument() { return !used(); }
   function showUpgrade() { dialog?.classList.remove("hidden"); body.classList.add("dialog-open"); $("closeUpgradeBtn")?.focus(); }
   function closeUpgrade() { dialog?.classList.add("hidden"); body.classList.remove("dialog-open"); }
   function message(text) { if (!toast) return; toast.textContent = text; toast.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>toast.classList.remove("show"),3200); }
@@ -85,7 +85,6 @@
   function update(sample=false) {
     if (!trial) return;
     if (sample) trial.textContent = "Sample mode does not consume your free document.";
-    else if (used() && activeRealDocument) trial.textContent = "Free document active: you may export this open document again. A new document requires a paid license.";
     else if (used()) trial.textContent = "Free document used: choose Standard, Plus, or the five-product bundle to continue.";
     else trial.textContent = "Free demo: convert and export one complete document.";
   }
