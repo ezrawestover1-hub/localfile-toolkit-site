@@ -106,6 +106,29 @@
     const email = document.createElement("a"); email.href = "mailto:localfiletools.support@gmail.com"; email.textContent = "localfiletools.support@gmail.com"; footer.append(email);
   }
   function sanitizePlusMessaging() {
+    if (product === "captionshift") {
+      document.querySelectorAll("#plus-plan").forEach(card => {
+        const description = card.querySelector(".muted");
+        const list = card.querySelector("ul");
+        const button = card.querySelector("[data-checkout]");
+        if (description) description.textContent = "For batch conversion, reusable timing presets, cleanup, and subtitle QA reports.";
+        if (list) list.innerHTML = "<li>Everything in Standard</li><li>Batch conversion and saved timing presets</li><li>Find-and-replace cleanup and timing validation reports</li>";
+        if (button) button.textContent = "Get CaptionShift Plus";
+      });
+      document.querySelectorAll(".compare tr").forEach(row => {
+        const label = row.querySelector("th")?.textContent || "";
+        const cells = row.querySelectorAll("td");
+        if (/Local processing|Core conversion and export/.test(label)) { if (cells[0]) cells[0].textContent = "Yes"; if (cells[1]) cells[1].textContent = "Yes"; if (cells[2]) cells[2].textContent = "Yes"; }
+        if (/Reusable presets|Advanced workflow tools/.test(label)) { if (cells[0]) cells[0].textContent = "—"; if (cells[1]) cells[1].textContent = "Yes"; if (cells[2]) cells[2].textContent = "Yes"; }
+      });
+      document.querySelectorAll(".faq details").forEach(detail => {
+        if (detail.querySelector("summary")?.textContent.includes("subscription")) {
+          const answer = detail.querySelector("p");
+          if (answer) answer.textContent = "No. It is a one-time license with no recurring subscription or automatic renewal. CaptionShift Plus includes batch conversion, saved timing presets, cleanup, and timing validation reporting.";
+        }
+      });
+      return;
+    }
     document.querySelectorAll("#plus-plan").forEach(card => {
       const badge = card.querySelector(".badge");
       const description = card.querySelector(".muted");
@@ -136,7 +159,7 @@
     if (!prices || !window.formatLocalFilePrice) return;
     const setPrice = (selector, cents) => { const node = document.querySelector(selector); if (node) node.replaceChildren(document.createTextNode(`${window.formatLocalFilePrice(cents)} `), Object.assign(document.createElement("small"), { textContent: "one time" })); };
     setPrice("#standard-plan .price", prices.standard); setPrice("#plus-plan .price", prices.plus); setPrice("#bundle-offer .price", bundle.plus);
-    const plusCard = document.querySelector("#plus-plan"); if (plusCard?.querySelector(".muted")) plusCard.querySelector(".muted").textContent = `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Plus-specific controls are planned and are not included in the current release.`;
+    const plusCard = document.querySelector("#plus-plan"); if (plusCard?.querySelector(".muted")) plusCard.querySelector(".muted").textContent = product === "captionshift" ? `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Unlock batch conversion, saved timing presets, cleanup, and validation reports.` : `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Plus-specific controls are planned and are not included in the current release.`;
     const bundleCard = document.querySelector("#bundle-offer"); if (bundleCard) { bundleCard.querySelector(".badge")?.replaceChildren("Best Value"); const button = bundleCard.querySelector("[data-checkout]"); if (button) button.textContent = `Get every Plus tool for ${window.formatLocalFilePrice(bundle.plus)}`; const copy = bundleCard.querySelector(".muted"); if (copy) copy.textContent = `Save ${window.formatLocalFilePrice(bundle.savings)} compared with buying separately · Approximately ${bundle.savingsPercent}% off.`; }
     document.querySelectorAll(".dialog [data-checkout]").forEach(button => { const plan = button.dataset.checkout; if (plan === "standard") button.textContent = `Standard · ${window.formatLocalFilePrice(prices.standard)}`; if (plan === "plus") button.textContent = `Plus · ${window.formatLocalFilePrice(prices.plus)}`; if (plan === "bundle") button.textContent = `All five · ${window.formatLocalFilePrice(bundle.plus)}`; });
     document.querySelectorAll(".faq details p").forEach(answer => { if (answer.textContent.includes("$39.99")) answer.textContent = answer.textContent.replaceAll("$39.99", window.formatLocalFilePrice(bundle.plus)); });
@@ -150,5 +173,6 @@
   dialog?.addEventListener("click", e=>{ if (e.target===dialog) closeUpgrade(); });
   document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeUpgrade(); });
   window.SuiteGate = { used, markUsed, mayOpenRealDocument, showUpgrade, closeUpgrade, message, update, setActive: v=>{activeRealDocument=!!v;update();}, product };
+  if (product === "captionshift") import("./plus.js").catch(() => {});
   update();
 })();
