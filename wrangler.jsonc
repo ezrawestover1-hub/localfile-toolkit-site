@@ -19,17 +19,7 @@
   "assets": {
     "directory": ".",
     "html_handling": "auto-trailing-slash",
-    "not_found_handling": "none",
-    "exclude": [
-      ".git/**",
-      ".wrangler/**",
-      "node_modules/**",
-      "worker.js",
-      "tests/**",
-      "migrations/**",
-      "package.json",
-      "package-lock.json"
-    ]
+    "not_found_handling": "none"
   },
   "d1_databases": [
     {
