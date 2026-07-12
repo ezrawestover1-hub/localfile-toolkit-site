@@ -135,22 +135,22 @@
       const list = card.querySelector("ul");
       const button = card.querySelector("[data-checkout]");
       if (badge) badge.textContent = "Most Popular";
-      if (description) description.textContent = "Plus-specific controls are planned and are not included in the current release.";
-      if (list) list.innerHTML = "<li>Everything in Standard</li><li>Future Plus controls — planned</li><li>Not included in the current release</li>";
+      if (description) description.textContent = "Plus includes calendar merging, filtering, recurrence controls, saved presets, and validation reports.";
+      if (list) list.innerHTML = "<li>Everything in Standard</li><li>Merge calendars and remove duplicate events</li><li>Saved filters, recurrence normalization, and validation reports</li>";
       if (button) button.textContent = "View Plus";
     });
     document.querySelectorAll(".compare tr").forEach(row => {
       const label = row.querySelector("th")?.textContent || "";
       if (/Reusable presets|Advanced workflow tools/.test(label)) {
         const cells = row.querySelectorAll("td");
-        if (cells[1]) cells[1].textContent = "Planned";
-        if (cells[2]) cells[2].textContent = "Planned";
+        if (cells[1]) cells[1].textContent = "Yes";
+        if (cells[2]) cells[2].textContent = "Yes";
       }
     });
     document.querySelectorAll(".faq details").forEach(detail => {
       if (detail.querySelector("summary")?.textContent.includes("subscription")) {
         const answer = detail.querySelector("p");
-        if (answer) answer.textContent = "No. It is a one-time license price; Plus-specific controls are planned and are not included in the current release.";
+        if (answer) answer.textContent = "No. It is a one-time license with no recurring subscription or automatic renewal. CalendarFlow Plus includes calendar merging, filtering, recurrence normalization, saved presets, and validation reporting.";
       }
     });
   }
@@ -159,7 +159,7 @@
     if (!prices || !window.formatLocalFilePrice) return;
     const setPrice = (selector, cents) => { const node = document.querySelector(selector); if (node) node.replaceChildren(document.createTextNode(`${window.formatLocalFilePrice(cents)} `), Object.assign(document.createElement("small"), { textContent: "one time" })); };
     setPrice("#standard-plan .price", prices.standard); setPrice("#plus-plan .price", prices.plus); setPrice("#bundle-offer .price", bundle.plus);
-    const plusCard = document.querySelector("#plus-plan"); if (plusCard?.querySelector(".muted")) plusCard.querySelector(".muted").textContent = product === "calendarflow" ? `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Unlock calendar merging, saved filters, recurrence tools, and validation reports.` : `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Plus-specific controls are planned and are not included in the current release.`;
+    const plusCard = document.querySelector("#plus-plan"); if (plusCard?.querySelector(".muted")) plusCard.querySelector(".muted").textContent = product === "calendarflow" ? `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Unlock calendar merging, saved filters, recurrence tools, and validation reports.` : `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Plus includes the advanced workflow tools described on this page.`;
     const bundleCard = document.querySelector("#bundle-offer"); if (bundleCard) { bundleCard.querySelector(".badge")?.replaceChildren("Best Value"); const button = bundleCard.querySelector("[data-checkout]"); if (button) button.textContent = `Get every Plus tool for ${window.formatLocalFilePrice(bundle.plus)}`; const copy = bundleCard.querySelector(".muted"); if (copy) copy.textContent = `Save ${window.formatLocalFilePrice(bundle.savings)} compared with buying separately · Approximately ${bundle.savingsPercent}% off.`; }
     document.querySelectorAll(".dialog [data-checkout]").forEach(button => { const plan = button.dataset.checkout; if (plan === "standard") button.textContent = `Standard · ${window.formatLocalFilePrice(prices.standard)}`; if (plan === "plus") button.textContent = `Plus · ${window.formatLocalFilePrice(prices.plus)}`; if (plan === "bundle") button.textContent = `All five · ${window.formatLocalFilePrice(bundle.plus)}`; });
     document.querySelectorAll(".faq details p").forEach(answer => { if (answer.textContent.includes("$39.99")) answer.textContent = answer.textContent.replaceAll("$39.99", window.formatLocalFilePrice(bundle.plus)); });

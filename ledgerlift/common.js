@@ -135,22 +135,22 @@
       const list = card.querySelector("ul");
       const button = card.querySelector("[data-checkout]");
       if (badge) badge.textContent = "Most Popular";
-      if (description) description.textContent = "Plus-specific controls are planned and are not included in the current release.";
-      if (list) list.innerHTML = "<li>Everything in Standard</li><li>Future Plus controls — planned</li><li>Not included in the current release</li>";
+      if (description) description.textContent = "Plus includes the advanced workflow tools described on this page.";
+      if (list) list.innerHTML = "<li>Everything in Standard</li><li>Saved mapping and account profiles</li><li>Debit / credit mapping, categorization, duplicate review, and reports</li>";
       if (button) button.textContent = "View Plus";
     });
     document.querySelectorAll(".compare tr").forEach(row => {
       const label = row.querySelector("th")?.textContent || "";
       if (/Reusable presets|Advanced workflow tools/.test(label)) {
         const cells = row.querySelectorAll("td");
-        if (cells[1]) cells[1].textContent = "Planned";
-        if (cells[2]) cells[2].textContent = "Planned";
+        if (cells[1]) cells[1].textContent = "Yes";
+        if (cells[2]) cells[2].textContent = "Yes";
       }
     });
     document.querySelectorAll(".faq details").forEach(detail => {
       if (detail.querySelector("summary")?.textContent.includes("subscription")) {
         const answer = detail.querySelector("p");
-        if (answer) answer.textContent = "No. It is a one-time license price; Plus-specific controls are planned and are not included in the current release.";
+        if (answer) answer.textContent = "No. It is a one-time license with no recurring subscription or automatic renewal. Plus includes the advanced workflow tools described on this page.";
       }
     });
   }
@@ -165,7 +165,7 @@
     const plusCard = document.querySelector("#plus-plan");
     if (plusCard) {
       const note = plusCard.querySelector(".muted");
-      if (note) note.textContent = product === "ledgerlift" ? `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Unlock reusable profiles, advanced mapping, categorization, duplicate review, and reports.` : `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Plus-specific controls are planned and are not included in the current release.`;
+      if (note) note.textContent = product === "ledgerlift" ? `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Unlock reusable profiles, advanced mapping, categorization, duplicate review, and reports.` : `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Plus includes the advanced workflow tools described on this page.`;
     }
     const bundleCard = document.querySelector("#bundle-offer");
     if (bundleCard) {

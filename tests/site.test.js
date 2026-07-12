@@ -70,10 +70,10 @@ test("public legal and support pages contain required navigation", () => {
   });
 });
 
-test("public pricing does not present unfinished Plus features as current", () => {
+test("public pricing describes implemented Plus features", () => {
   const pricing = read("pricing.html");
-  assert.match(pricing, /Plus-specific controls are planned and are not included in the current release/);
-  assert.doesNotMatch(pricing, /Reusable bank and account profiles|Batch image queue|Duplicate contact detection|Merge multiple calendars|Bulk text cleanup rules/);
+  assert.match(pricing, /Plus features are included with each Plus license/);
+  assert.doesNotMatch(pricing, /Plus-specific controls are planned|Future Plus controls|planned Plus tier|Not included in the current release/);
   ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"].forEach((product) => assert.match(read(`${product}/common.js`), /sanitizePlusMessaging/));
   ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"].forEach((product) => { const page = read(`${product}/index.html`); assert.doesNotMatch(page, /<th>Reusable presets<\/th><td>—<\/td><td>Planned<\/td><td[^>]*>Yes/); assert.doesNotMatch(page, /<th>Advanced workflow tools<\/th><td>—<\/td><td>Planned<\/td><td[^>]*>Yes/); });
 });

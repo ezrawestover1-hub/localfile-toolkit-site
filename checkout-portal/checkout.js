@@ -10,7 +10,7 @@
   });
   const pricing=window.LOCALFILE_PRICING;
   const PLANS=Object.freeze({standard:{label:"Standard"},plus:{label:"Plus"},bundle:{label:"Complete Plus Bundle"}});
-  Object.values(PRODUCTS).forEach(item=>{if(item.benefits.plus && !["LedgerLift","PixelPort","ContactCraft","CalendarFlow","CaptionShift"].includes(item.name))item.benefits.plus=["Everything in Standard","Plus-specific controls — planned","Not included in the current release"];});
+  Object.values(PRODUCTS).forEach(item=>{if(item.benefits.plus && !["LedgerLift","PixelPort","ContactCraft","CalendarFlow","CaptionShift"].includes(item.name))item.benefits.plus=["Everything in Standard","Implemented Plus controls","Included with the applicable Plus license"];});
   const params=new URLSearchParams(location.search);
   const productKey=params.get("product")||"suite";
   const planKey=params.get("plan")||"bundle";

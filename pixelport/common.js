@@ -126,22 +126,22 @@
       const list = card.querySelector("ul");
       const button = card.querySelector("[data-checkout]");
       if (badge) badge.textContent = "Most Popular";
-      if (description) description.textContent = "Plus-specific controls are planned and are not included in the current release.";
-      if (list) list.innerHTML = "<li>Everything in Standard</li><li>Future Plus controls — planned</li><li>Not included in the current release</li>";
+      if (description) description.textContent = "Plus includes batch conversion, presets, filename controls, custom backgrounds, and web optimization.";
+      if (list) list.innerHTML = "<li>Everything in Standard</li><li>Batch image queue and reusable presets</li><li>Background, filename, and web optimization controls</li>";
       if (button) button.textContent = "View Plus";
     });
     document.querySelectorAll(".compare tr").forEach(row => {
       const label = row.querySelector("th")?.textContent || "";
       if (/Reusable presets|Advanced workflow tools/.test(label)) {
         const cells = row.querySelectorAll("td");
-        if (cells[1]) cells[1].textContent = "Planned";
-        if (cells[2]) cells[2].textContent = "Planned";
+        if (cells[1]) cells[1].textContent = "Yes";
+        if (cells[2]) cells[2].textContent = "Yes";
       }
     });
     document.querySelectorAll(".faq details").forEach(detail => {
       if (detail.querySelector("summary")?.textContent.includes("subscription")) {
         const answer = detail.querySelector("p");
-        if (answer) answer.textContent = "No. It is a one-time license price; Plus-specific controls are planned and are not included in the current release.";
+        if (answer) answer.textContent = "No. It is a one-time license with no recurring subscription or automatic renewal. PixelPort Plus includes batch conversion, reusable presets, background and filename controls, and web optimization.";
       }
     });
   }
@@ -154,7 +154,7 @@
     setPrice("#plus-plan .price", prices.plus);
     setPrice("#bundle-offer .price", bundle.plus);
     const plusCard = document.querySelector("#plus-plan");
-    if (plusCard) { const note = plusCard.querySelector(".muted"); if (note) note.textContent = product === "pixelport" ? `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Add batch conversion, reusable presets, custom backgrounds, filename rules, and web optimization.` : `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Plus-specific controls are planned and are not included in the current release.`; }
+    if (plusCard) { const note = plusCard.querySelector(".muted"); if (note) note.textContent = product === "pixelport" ? `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Add batch conversion, reusable presets, custom backgrounds, filename rules, and web optimization.` : `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Plus includes the advanced workflow tools described on this page.`; }
     const bundleCard = document.querySelector("#bundle-offer");
     if (bundleCard) { const badge = bundleCard.querySelector(".badge"); if (badge) badge.textContent = "Best Value"; const button = bundleCard.querySelector("[data-checkout]"); if (button) button.textContent = `Get every Plus tool for ${window.formatLocalFilePrice(bundle.plus)}`; const copy = bundleCard.querySelector(".muted"); if (copy) copy.textContent = `Save ${window.formatLocalFilePrice(bundle.savings)} compared with buying separately · Approximately ${bundle.savingsPercent}% off.`; }
     document.querySelectorAll(".dialog [data-checkout]").forEach(button => { const plan = button.dataset.checkout; if (plan === "standard") button.textContent = `Standard · ${window.formatLocalFilePrice(prices.standard)}`; if (plan === "plus") button.textContent = `Plus · ${window.formatLocalFilePrice(prices.plus)}`; if (plan === "bundle") button.textContent = `All five · ${window.formatLocalFilePrice(bundle.plus)}`; });
