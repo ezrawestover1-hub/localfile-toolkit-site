@@ -14,6 +14,7 @@ const choices = [
 
 test("all required public route files exist", () => {
   requiredRoutes.forEach((route) => assert.equal(fs.existsSync(path.join(root, route)), true, route));
+  assert.ok(fs.existsSync(path.join(root, "favicon.ico")));
 });
 
 test("pricing page sends every choice to the one shared portal", () => {
@@ -97,6 +98,21 @@ test("SEO foundations are present and sitemap excludes private routes", () => {
   important.forEach((file) => { const content = read(file); const title = content.match(/<title[^>]*>([^<]+)</i)?.[1]; const description = content.match(/name="description" content="([^"]+)/i)?.[1] || content.match(/content="([^"]+)" name="description"/i)?.[1]; assert.ok(title && description, file); assert.match(content, /https:\/\/localfiletoolkit\.com\//); titles.add(title); descriptions.add(description); });
   assert.equal(titles.size, important.length); assert.equal(descriptions.size, important.length);
   const sitemap = read("sitemap.xml"); assert.doesNotMatch(sitemap, /\/api\/|checkout-portal|license|purchase-success|tests|migrations/); assert.match(read("robots.txt"), /Sitemap: https:\/\/localfiletoolkit\.com\/sitemap\.xml/);
+});
+
+test("product pages and legal subpages have SEO descriptions", () => {
+  ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"].forEach((product) => {
+    fs.readdirSync(path.join(root, product)).filter((name) => name.endsWith(".html")).forEach((name) => {
+      const content = read(`${product}/${name}`);
+      assert.match(content, /<title[^>]*>/i, `${product}/${name} title`);
+      assert.match(content, /<meta(?: name="description" content="[^"]+"| content="[^"]+" name="description")/i, `${product}/${name} description`);
+    });
+  });
+});
+
+test("root favicon is linked by suite pages", () => {
+  ["index.html", "pricing.html", "terms.html", "privacy.html", "refunds.html", "support.html", "contact.html", "refund-request.html"].forEach((file) => assert.match(read(file), /href="favicon\.ico"/));
+  assert.ok(fs.statSync(path.join(root, "favicon.ico")).size > 0);
 });
 
 test("approved product icon assets and canonical mappings are complete", () => {
