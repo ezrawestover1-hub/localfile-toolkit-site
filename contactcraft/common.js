@@ -106,6 +106,17 @@
     const email = document.createElement("a"); email.href = "mailto:localfiletools.support@gmail.com"; email.textContent = "localfiletools.support@gmail.com"; footer.append(email);
   }
   function sanitizePlusMessaging() {
+    if (product === "contactcraft") {
+      document.querySelectorAll("#plus-plan").forEach(card => {
+        const description = card.querySelector(".muted"), list = card.querySelector("ul"), button = card.querySelector("[data-checkout]");
+        if (description) description.textContent = "Duplicate detection, merge review, field cleanup, output mapping, and validation reports.";
+        if (list) { list.replaceChildren(...["Everything in Standard", "Duplicate detection and merge review", "Field cleanup and output mapping", "Validation reports"].map(text => { const item = document.createElement("li"); item.textContent = text; return item; })); }
+        if (button) button.textContent = "Get ContactCraft Plus";
+      });
+      document.querySelectorAll(".compare tr").forEach(row => { const label = row.querySelector("th")?.textContent || ""; if (/Local processing|Core conversion and export|Reusable presets|Advanced workflow tools/.test(label)) { const cells = row.querySelectorAll("td"); if (cells[1]) cells[1].textContent = "Yes"; if (cells[2]) cells[2].textContent = "Yes"; } });
+      document.querySelectorAll(".faq details").forEach(detail => { if (detail.querySelector("summary")?.textContent.includes("subscription")) { const answer = detail.querySelector("p"); if (answer) answer.textContent = "No. It is a one-time license with no recurring subscription or automatic renewal. ContactCraft Plus includes duplicate review, merging, cleanup, output mapping, and validation reports."; } });
+      return;
+    }
     document.querySelectorAll("#plus-plan").forEach(card => {
       const badge = card.querySelector(".badge");
       const description = card.querySelector(".muted");
@@ -136,7 +147,7 @@
     if (!prices || !window.formatLocalFilePrice) return;
     const setPrice = (selector, cents) => { const node = document.querySelector(selector); if (node) node.replaceChildren(document.createTextNode(`${window.formatLocalFilePrice(cents)} `), Object.assign(document.createElement("small"), { textContent: "one time" })); };
     setPrice("#standard-plan .price", prices.standard); setPrice("#plus-plan .price", prices.plus); setPrice("#bundle-offer .price", bundle.plus);
-    const plusCard = document.querySelector("#plus-plan"); if (plusCard?.querySelector(".muted")) plusCard.querySelector(".muted").textContent = `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Plus-specific controls are planned and are not included in the current release.`;
+    const plusCard = document.querySelector("#plus-plan"); if (plusCard?.querySelector(".muted")) plusCard.querySelector(".muted").textContent = product === "contactcraft" ? `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Add duplicate review, cleanup, mapping, merging, and validation reports.` : `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Plus-specific controls are planned and are not included in the current release.`;
     const bundleCard = document.querySelector("#bundle-offer"); if (bundleCard) { bundleCard.querySelector(".badge")?.replaceChildren("Best Value"); const button = bundleCard.querySelector("[data-checkout]"); if (button) button.textContent = `Get every Plus tool for ${window.formatLocalFilePrice(bundle.plus)}`; const copy = bundleCard.querySelector(".muted"); if (copy) copy.textContent = `Save ${window.formatLocalFilePrice(bundle.savings)} compared with buying separately · Approximately ${bundle.savingsPercent}% off.`; }
     document.querySelectorAll(".dialog [data-checkout]").forEach(button => { const plan = button.dataset.checkout; if (plan === "standard") button.textContent = `Standard · ${window.formatLocalFilePrice(prices.standard)}`; if (plan === "plus") button.textContent = `Plus · ${window.formatLocalFilePrice(prices.plus)}`; if (plan === "bundle") button.textContent = `All five · ${window.formatLocalFilePrice(bundle.plus)}`; });
     document.querySelectorAll(".faq details p").forEach(answer => { if (answer.textContent.includes("$39.99")) answer.textContent = answer.textContent.replaceAll("$39.99", window.formatLocalFilePrice(bundle.plus)); });
@@ -151,4 +162,5 @@
   document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeUpgrade(); });
   window.SuiteGate = { used, markUsed, mayOpenRealDocument, showUpgrade, closeUpgrade, message, update, setActive: v=>{activeRealDocument=!!v;update();}, product };
   update();
+  if (product === "contactcraft") import("./plus.js").catch(() => {});
 })();

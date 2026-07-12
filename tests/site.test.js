@@ -163,6 +163,15 @@ test("PixelPort Plus promises are implemented and license-gated", () => {
   assert.match(read("checkout-portal/checkout.js"), /Batch image queue and reusable presets/);
 });
 
+test("ContactCraft Plus promises are implemented and license-gated", () => {
+  const plus = read("contactcraft/plus.js");
+  ["Review duplicates", "Merge duplicates", "Clean fields", "Output field mapping", "Download validation report", "getCapabilities"].forEach((value) => assert.match(plus, new RegExp(value.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&"))));
+  assert.match(plus, /canUsePlus\("contactcraft"\)/);
+  assert.match(read("contactcraft/app.js"), /window\.ContactCraftCore/);
+  assert.match(read("contactcraft/common.js"), /Duplicate detection, merge review, field cleanup/);
+  assert.match(read("checkout-portal/checkout.js"), /Duplicate detection and merge review/);
+});
+
 test("LedgerLift trial survives refresh and only counts a real export", () => {
   const common = read("ledgerlift/common.js");
   const app = read("ledgerlift/app.js");
