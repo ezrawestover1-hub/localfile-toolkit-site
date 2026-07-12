@@ -12,15 +12,15 @@ Create these one-time products/prices in Paddle:
 
 | Product | Standard | Plus |
 |---|---:|---:|
-| LedgerLift | $9.99 | $11.99 |
-| PixelPort | $9.99 | $11.99 |
-| ContactCraft | $9.99 | $11.99 |
-| CalendarFlow | $9.99 | $11.99 |
-| CaptionShift | $9.99 | $11.99 |
+| LedgerLift | $19.99 | $24.99 |
+| PixelPort | $2.99 | $5.99 |
+| ContactCraft | $9.99 | $12.99 |
+| CalendarFlow | $9.99 | $12.99 |
+| CaptionShift | $6.99 | $9.99 |
 
 Create one additional one-time price:
 
-- LocalFile Tools Plus Bundle — $39.99
+- Complete Plus Bundle — $39.99 one time; five separate Plus products total $66.95, saving $26.96 (approximately 40% off).
 
 Copy the resulting `pri_...` identifiers into `checkout-portal/paddle-config.js`.
 

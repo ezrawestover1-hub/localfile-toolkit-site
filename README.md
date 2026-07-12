@@ -8,12 +8,17 @@ Five static, privacy-first converter website prototypes:
 4. CalendarFlow — ICS/iCalendar and CSV
 5. CaptionShift — SRT/VTT/SBV/ASS
 
-## Pricing built into every site
+## Final one-time pricing
 
-- One complete document free
-- Standard: $9.99 one time
-- Plus: $11.99 one time
-- Five-product Plus bundle: $39.99 one time
+| Product | Standard | Plus |
+|---|---:|---:|
+| LedgerLift | $19.99 | $24.99 |
+| PixelPort | $2.99 | $5.99 |
+| ContactCraft | $9.99 | $12.99 |
+| CalendarFlow | $9.99 | $12.99 |
+| CaptionShift | $6.99 | $9.99 |
+
+The Complete Plus Bundle is $39.99 one time. The five Plus products total $66.95 separately, so the bundle saves $26.96, approximately 40% off.
 
 ## Important before launch
 

@@ -111,7 +111,7 @@
       const description = card.querySelector(".muted");
       const list = card.querySelector("ul");
       const button = card.querySelector("[data-checkout]");
-      if (badge) badge.textContent = "Planned release · one-time license";
+      if (badge) badge.textContent = "Most Popular";
       if (description) description.textContent = "Plus-specific controls are planned and are not included in the current release.";
       if (list) list.innerHTML = "<li>Everything in Standard</li><li>Future Plus controls — planned</li><li>Not included in the current release</li>";
       if (button) button.textContent = "View Plus";
@@ -131,8 +131,41 @@
       }
     });
   }
+  function applyPricing() {
+    const prices = window.LOCALFILE_PRICING?.[product];
+    const bundle = window.LOCALFILE_PRICING?.bundle;
+    if (!prices || !window.formatLocalFilePrice) return;
+    const setPrice = (selector, cents) => { const node = document.querySelector(selector); if (node) node.replaceChildren(document.createTextNode(`${window.formatLocalFilePrice(cents)} `), Object.assign(document.createElement("small"), { textContent: "one time" })); };
+    setPrice("#standard-plan .price", prices.standard);
+    setPrice("#plus-plan .price", prices.plus);
+    setPrice("#bundle-offer .price", bundle.plus);
+    const plusCard = document.querySelector("#plus-plan");
+    if (plusCard) {
+      const note = plusCard.querySelector(".muted");
+      if (note) note.textContent = `Upgrade to Plus for only ${window.formatLocalFileDifference(prices.upgrade)} more. Plus-specific controls are planned and are not included in the current release.`;
+    }
+    const bundleCard = document.querySelector("#bundle-offer");
+    if (bundleCard) {
+      const badge = bundleCard.querySelector(".badge");
+      if (badge) badge.textContent = "Best Value";
+      const button = bundleCard.querySelector("[data-checkout]");
+      if (button) button.textContent = `Get every Plus tool for ${window.formatLocalFilePrice(bundle.plus)}`;
+      const copy = bundleCard.querySelector(".muted");
+      if (copy) copy.textContent = `Save ${window.formatLocalFilePrice(bundle.savings)} compared with buying separately · Approximately ${bundle.savingsPercent}% off.`;
+    }
+    document.querySelectorAll(".dialog [data-checkout]").forEach(button => {
+      const plan = button.dataset.checkout;
+      if (plan === "standard") button.textContent = `Standard · ${window.formatLocalFilePrice(prices.standard)}`;
+      if (plan === "plus") button.textContent = `Plus · ${window.formatLocalFilePrice(prices.plus)}`;
+      if (plan === "bundle") button.textContent = `All five · ${window.formatLocalFilePrice(bundle.plus)}`;
+    });
+    document.querySelectorAll(".faq details p").forEach(answer => {
+      if (answer.textContent.includes("$")) answer.textContent = answer.textContent.replace(/\$\d+\.\d{2}/g, match => match === "$39.99" ? window.formatLocalFilePrice(bundle.plus) : match);
+    });
+  }
   addSiteLinks();
   sanitizePlusMessaging();
+  applyPricing();
   applyCanonicalProductIcons();
   document.querySelectorAll("[data-checkout]").forEach(b=>b.addEventListener("click",()=>checkoutPlan(b.dataset.checkout)));
   $("closeUpgradeBtn")?.addEventListener("click", closeUpgrade);

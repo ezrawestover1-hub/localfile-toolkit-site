@@ -19,8 +19,23 @@ test("all required public route files exist", () => {
 test("pricing page sends every choice to the one shared portal", () => {
   const pricing = read("pricing.html");
   choices.forEach(([product, plan]) => assert.match(pricing, new RegExp(`checkout-portal/index\\.html\\?product=${product}&amp;plan=${plan}`)));
-  assert.match(pricing, /\$19\.96/);
+  assert.match(pricing, /\$26\.96/);
   assert.match(pricing, /Five-product Plus bundle/);
+});
+
+test("final pricing source of truth matches every displayed plan", () => {
+  const config = read("pricing-config.js");
+  ["standard: 1999", "plus: 2499", "standard: 299", "plus: 599", "standard: 999", "plus: 1299", "standard: 699", "plus: 999", "separatePlusTotal: 6695", "savings: 2696", "savingsPercent: 40"].forEach((value) => assert.match(config, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))));
+  assert.match(read("pricing.html"), /\$66\.95 total/);
+  assert.match(read("pricing.html"), /Approximately 40% off/);
+  assert.match(read("pricing.html"), /Best Value/);
+  ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"].forEach((product) => {
+    const page = read(`${product}/index.html`);
+    assert.match(page, /Most Popular/);
+    assert.match(page, /Get every Plus tool for \$39\.99/);
+    assert.match(read(`${product}/common.js`), /formatLocalFilePrice/);
+  });
+  assert.match(read("checkout-portal/checkout.js"), /pricing\.bundle\.plus/);
 });
 
 test("product checkout configs use explicit shared portal parameters", () => {
@@ -56,7 +71,7 @@ test("public legal and support pages contain required navigation", () => {
 
 test("public pricing does not present unfinished Plus features as current", () => {
   const pricing = read("pricing.html");
-  assert.match(pricing, /Planned — not included in the current release/);
+  assert.match(pricing, /Plus-specific controls are planned and are not included in the current release/);
   assert.doesNotMatch(pricing, /Reusable bank and account profiles|Batch image queue|Duplicate contact detection|Merge multiple calendars|Bulk text cleanup rules/);
   ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"].forEach((product) => assert.match(read(`${product}/common.js`), /sanitizePlusMessaging/));
   ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"].forEach((product) => { const page = read(`${product}/index.html`); assert.doesNotMatch(page, /<th>Reusable presets<\/th><td>—<\/td><td>Planned<\/td><td[^>]*>Yes/); assert.doesNotMatch(page, /<th>Advanced workflow tools<\/th><td>—<\/td><td>Planned<\/td><td[^>]*>Yes/); });

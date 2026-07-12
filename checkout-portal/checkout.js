@@ -6,9 +6,10 @@
     contactcraft:{name:"ContactCraft",icon:window.PRODUCT_ICONS.contactcraft.icon,description:"Private contact conversion between VCF/vCard and CSV.",home:"../contactcraft/index.html",benefits:{standard:["Unlimited core contact conversions","Preview before export","No ads inside the converter"],plus:["Everything in Standard","Plus-specific controls — planned","Not included in the current release"]}},
     calendarflow:{name:"CalendarFlow",icon:window.PRODUCT_ICONS.calendarflow.icon,description:"Private calendar conversion between ICS/iCalendar and CSV.",home:"../calendarflow/index.html",benefits:{standard:["Unlimited core calendar conversions","Preview before export","No ads inside the converter"],plus:["Everything in Standard","Plus-specific controls — planned","Not included in the current release"]}},
     captionshift:{name:"CaptionShift",icon:window.PRODUCT_ICONS.captionshift.icon,description:"Private subtitle conversion among SRT, VTT, SBV and ASS.",home:"../captionshift/index.html",benefits:{standard:["Unlimited core subtitle conversions","Timing preview and export","No ads inside the converter"],plus:["Everything in Standard","Plus-specific controls — planned","Not included in the current release"]}},
-    suite:{name:"Five-product Plus bundle",icons:Object.values(window.PRODUCT_ICONS).map(item=>item.icon),description:"One-time Plus entitlement for all five private converter products. Plus-specific controls are planned and are not included in the current release.",home:"../index.html",benefits:{bundle:["LedgerLift Plus","PixelPort Plus","ContactCraft Plus","CalendarFlow Plus","CaptionShift Plus","Save $19.96 versus five separate Plus licenses","Planned — Plus-specific controls are not included in the current release"]}}
+    suite:{name:"Complete Plus Bundle",icons:Object.values(window.PRODUCT_ICONS).map(item=>item.icon),description:"One-time Plus entitlement for all five private converter products. Plus-specific controls are planned and are not included in the current release.",home:"../index.html",benefits:{bundle:["LedgerLift Plus","PixelPort Plus","ContactCraft Plus","CalendarFlow Plus","CaptionShift Plus","Save $26.96 versus five separate Plus licenses","Planned — Plus-specific controls are not included in the current release"]}}
   });
-  const PLANS=Object.freeze({standard:{label:"Standard",price:"$9.99"},plus:{label:"Plus",price:"$11.99"},bundle:{label:"Complete bundle",price:"$39.99"}});
+  const pricing=window.LOCALFILE_PRICING;
+  const PLANS=Object.freeze({standard:{label:"Standard"},plus:{label:"Plus"},bundle:{label:"Complete Plus Bundle"}});
   Object.values(PRODUCTS).forEach(item=>{if(item.benefits.plus)item.benefits.plus=["Everything in Standard","Plus-specific controls — planned","Not included in the current release"];});
   const params=new URLSearchParams(location.search);
   const productKey=params.get("product")||"suite";
@@ -33,7 +34,8 @@
   $("productKind").textContent=product.name;
   $("purchaseTitle").textContent=productKey==="suite"?"You are purchasing: Five-product Plus bundle":"You are purchasing: "+product.name+" "+plan.label;
   $("purchaseDescription").textContent=product.description;
-  $("purchasePrice").textContent=plan.price;
+  const priceCents=productKey==="suite"?pricing.bundle.plus:pricing[productKey][planKey];
+  $("purchasePrice").textContent=window.formatLocalFilePrice(priceCents);
   (product.benefits[planKey]||[]).forEach(text=>{const li=document.createElement("li");li.textContent=text;$("benefitList").appendChild(li);});
   const cfg=window.LOCALFILE_PADDLE||{};
   const token=typeof cfg.clientToken==="string"?cfg.clientToken.trim():"";
