@@ -67,11 +67,14 @@ test("Plus routes are separate, entitlement-gated workspaces with a post-checkou
   const mode = read("plus-mode.js");
   const styles = read("plus-mode.css");
   assert.match(mode, /get\("mode"\) !== "plus"/);
-  assert.match(mode, /api\/account\/restore/);
+  assert.match(mode, /restoreEntitlements/);
+  assert.match(mode, /api\/account\/me/);
   assert.match(mode, /getCapabilities/);
   assert.match(mode, /plus-access-gate/);
   assert.match(mode, /plus-authorized/);
   assert.match(mode, /plus-locked/);
+  assert.match(mode, /Retry Plus restore/);
+  assert.match(mode, /setPaidAccess/);
   assert.match(mode, /plus-mode:ready/);
   assert.match(styles, /#pricing/);
   assert.match(styles, /#sampleBtn/);
@@ -92,6 +95,30 @@ test("Plus routes are separate, entitlement-gated workspaces with a post-checkou
     assert.match(page, /Try sample data/);
     assert.match(page, /id="pricing"/);
     assert.match(read(`${product}/plus.js`), /canUsePlus/);
+  });
+});
+
+test("Standard routes are separate paid workspaces with core entitlement gating", () => {
+  const mode = read("standard-mode.js");
+  const styles = read("standard-mode.css");
+  assert.match(mode, /get\("mode"\) !== "standard"/);
+  assert.match(mode, /canUseCore/);
+  assert.match(mode, /restoreEntitlements/);
+  assert.match(mode, /standard-access-gate/);
+  assert.match(mode, /standard-authorized/);
+  assert.match(mode, /standard-locked/);
+  assert.match(mode, /Retry Standard restore/);
+  assert.match(mode, /setPaidAccess/);
+  assert.match(styles, /#pricing/);
+  assert.match(styles, /#sampleBtn/);
+  assert.match(styles, /standard-locked/);
+  assert.match(styles, /standard-handoff/);
+  assert.match(read("account-access.js"), /standardHome/);
+  assert.match(read("account/account.js"), /mode=standard/);
+  assert.match(read("checkout-portal/checkout.js"), /standardHome/);
+  assert.match(read("checkout-portal/success.js"), /mode=standard/);
+  ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"].forEach((product) => {
+    assert.match(read(`${product}/common.js`), /\.\.\/standard-mode\.js/);
   });
 });
 
@@ -206,6 +233,37 @@ test("LedgerLift SEO pages have unique metadata, structured data, headings, and 
   assert.match(read("sitemap.xml"), /ledgerlift\/(bank-csv-to-iif|debit-credit-csv-to-iif|create-iif-from-spreadsheet)\.html/);
 });
 
+test("PixelPort SEO pages have unique metadata, format guidance, structured data, and sitemap coverage", () => {
+  const pages = ["pixelport/index.html", "pixelport/png-to-jpg-converter.html", "pixelport/jpg-to-png-converter.html", "pixelport/webp-to-jpg-converter.html", "pixelport/webp-to-png-converter.html", "pixelport/png-to-webp-converter.html", "pixelport/avif-to-jpg-converter.html", "pixelport/avif-to-png-converter.html", "pixelport/private-image-converter.html"];
+  const titles = new Set(); const descriptions = new Set();
+  pages.forEach((file) => {
+    const content = read(file);
+    const title = content.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
+    const description = content.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i)?.[1];
+    assert.ok(title && description, `${file} metadata`);
+    assert.equal((content.match(/<h1\b/gi) || []).length, 1, `${file} one H1`);
+    assert.doesNotMatch(content, /name="robots"[^>]+content="[^\"]*noindex/i, `${file} indexable`);
+    assert.match(content, /<link[^>]+rel="canonical"[^>]+https:\/\/localfiletoolkit\.com\/pixelport\//i, `${file} canonical`);
+    assert.match(content, /property="og:title"/i, `${file} Open Graph title`);
+    assert.match(content, /name="twitter:title"/i, `${file} Twitter title`);
+    assert.match(content, /class="[^"]*\bfaq\b/i, `${file} visible FAQ`);
+    titles.add(title); descriptions.add(description);
+    const jsonScripts = [...content.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
+    assert.ok(jsonScripts.length, `${file} JSON-LD`);
+    jsonScripts.forEach((match) => { const data = JSON.parse(match[1]); const graph = data["@graph"] || [data]; assert.ok(graph.some((item) => item["@type"] === "SoftwareApplication"), `${file} SoftwareApplication`); assert.ok(graph.some((item) => item["@type"] === "BreadcrumbList"), `${file} BreadcrumbList`); assert.ok(graph.some((item) => item["@type"] === "FAQPage"), `${file} FAQPage`); });
+  });
+  assert.equal(titles.size, pages.length);
+  assert.equal(descriptions.size, pages.length);
+  assert.match(read("pixelport/index.html"), /<title>Private Image Converter for PNG, JPG, WebP and AVIF \| PixelPort<\/title>/);
+  assert.match(read("pixelport/index.html"), /<h1>Convert Images Without Uploading Them<\/h1>/);
+  const routes = pages.slice(1).map((file) => file.replace("pixelport/", ""));
+  routes.forEach((route) => assert.ok(fs.existsSync(path.join(root, "pixelport", route)), route));
+  const sitemap = read("sitemap.xml");
+  pages.forEach((file) => { const url = file === "pixelport/index.html" ? "https://localfiletoolkit.com/pixelport/" : `https://localfiletoolkit.com/${file}`; assert.match(sitemap, new RegExp(url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${file} sitemap`); });
+  const index = read("pixelport/index.html");
+  ["png-to-jpg-converter.html", "jpg-to-png-converter.html", "webp-to-png-converter.html", "png-to-webp-converter.html", "avif-to-jpg-converter.html", "avif-to-png-converter.html", "private-image-converter.html", "../index.html", "../pricing.html", "../account/", "privacy.html", "security.html"].forEach((href) => assert.match(index, new RegExp(`href="${href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), `PixelPort link ${href}`));
+});
+
 test("root favicon is linked by suite pages", () => {
   ["index.html", "pricing.html", "terms.html", "privacy.html", "refunds.html", "support.html", "contact.html", "refund-request.html"].forEach((file) => assert.match(read(file), /href="favicon\.ico"/));
   assert.ok(fs.statSync(path.join(root, "favicon.ico")).size > 0);
@@ -298,7 +356,8 @@ test("LedgerLift trial survives refresh and only counts a real export", () => {
   assert.match(app, /if \(!sample && !window\.SuiteGate\.mayOpenRealDocument\(\)\)/);
   assert.match(app, /if \(!state\.source\) window\.SuiteGate\.markUsed\(\)/);
   assert.match(app, /if \(!state\.source && window\.SuiteGate\.used\(\)\)/);
-  assert.match(common, /function mayOpenRealDocument\(\) \{ return !used\(\); \}/);
+  assert.match(common, /function mayOpenRealDocument\(\) \{ return paidAccess \|\| !used\(\); \}/);
+  assert.match(common, /setPaidAccess/);
   assert.match(common, /Sample mode does not consume your free document/);
 });
 
@@ -309,7 +368,8 @@ test("cross-device account surface is wired to durable entitlements", () => {
   assert.match(read("account/verify.html"), /Resend code/);
   assert.match(read("account/reset.html"), /Re-enter password/);
   assert.match(read("account/index.html"), /Restore products on this device/);
-  assert.match(read("account/account.js"), /\/api\/account\/restore/);
+  assert.match(read("account/account.js"), /restoreEntitlements/);
+  assert.match(read("license.js"), /\/api\/account\/restore/);
   assert.match(read("worker.js"), /account_users/);
   assert.match(read("worker.js"), /portal-sessions/);
   assert.match(read("migrations/0002_accounts.sql"), /account_sessions/);
