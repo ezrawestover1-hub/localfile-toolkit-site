@@ -91,6 +91,9 @@ test("product entitlement summary keeps LedgerLift ownership independent", () =>
   assert.equal(ledgerStandard.products.pixelport, "free");
   const pixelPlus = summarizeEntitlements([{ product_key: "pixelport", plan_key: "plus", status: "active" }]);
   assert.equal(pixelPlus.highestLedgerLiftTier, "free");
+  const pixelStandard = summarizeEntitlements([{ product_key: "pixelport", plan_key: "standard", status: "active" }]);
+  assert.equal(pixelStandard.products.pixelport, "standard");
+  assert.equal(pixelStandard.products.ledgerlift, "free");
   const multiple = summarizeEntitlements([{ product_key: "ledgerlift", plan_key: "standard", status: "active" }, { product_key: "ledgerlift", plan_key: "plus", status: "active" }, { product_key: "calendarflow", plan_key: "standard", status: "active" }]);
   assert.equal(multiple.highestLedgerLiftTier, "plus");
   assert.equal(multiple.products.calendarflow, "standard");

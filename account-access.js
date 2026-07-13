@@ -68,7 +68,7 @@
     const title = document.createElement("strong");
     title.textContent = `${products[product]} ${plus ? "Plus" : "Standard"} active`;
     const detail = document.createElement("span");
-    detail.textContent = entitlement.source === "bundle" ? "LedgerLift Plus is included with your complete toolkit." : plus ? "All Plus controls are unlocked for this product." : "Core conversion is active. Upgrade when you need the Plus workflow.";
+    detail.textContent = entitlement.source === "bundle" ? `${products[product]} Plus is included with your complete toolkit.` : plus ? "All Plus controls are unlocked for this product." : "Core conversion is active. Upgrade when you need the Plus workflow.";
     content.append(title, detail);
     const actions = document.createElement("div");
     actions.className = "account-access-strip-actions";
@@ -104,6 +104,17 @@
     const copy = document.querySelector("#pricing .pricing-head .muted");
     if (heading) heading.textContent = plan === "plus" ? `${products[product]} Plus is ready.` : `${products[product]} Standard is active.`;
     if (copy) copy.textContent = plan === "plus" ? "Your Plus controls are unlocked below. Open the workspace and keep every workflow local to this browser." : "Your core converter is unlocked. Upgrade to Plus for the advanced workflow controls listed below.";
+  }
+
+  function suppressUnpurchasedPixelPortPromotion(map) {
+    if (document.body.dataset.product !== "pixelport" || map.hasPurchase !== true || productEntitlement(map, "pixelport")) return;
+    document.body.classList.add("account-product-free");
+    document.querySelector("#pricing")?.classList.add("hidden");
+    const pricingLink = document.querySelector("a[href='#pricing']");
+    if (pricingLink) {
+      pricingLink.href = "../pricing.html";
+      pricingLink.textContent = "Plans";
+    }
   }
 
   function applySuiteHome(map, fullPlus) {
@@ -204,6 +215,11 @@
     if (paid) {
       if (currentProduct) {
         document.querySelector("a.account-access-link")?.remove();
+        const entitlement = productEntitlement(map, currentProduct);
+        if (currentProduct === "pixelport") {
+          window.SuiteGate?.setTier?.(entitlement?.plan_key || "free", entitlement?.source);
+          suppressUnpurchasedPixelPortPromotion(map);
+        }
         if (!plusMode) {
           addAccessStrip(map, currentProduct);
           applyProductPricing(map, currentProduct);
@@ -228,8 +244,18 @@
     location.replace(`${productHome("ledgerlift")}?mode=${serverTier}`);
   }
 
+  function routeOwnedPixelPort(map, account) {
+    const path = location.pathname.replace(/\/+$/, "");
+    const isPixelPortHome = /\/pixelport(?:\/index\.html)?$/.test(path);
+    const mode = new URLSearchParams(location.search).get("mode");
+    if (!isPixelPortHome || mode === "standard" || mode === "plus") return;
+    const serverTier = ["free", "standard", "plus"].includes(account?.products?.pixelport) ? account.products.pixelport : productEntitlement(map, "pixelport")?.plan_key || "free";
+    if (serverTier === "free") return;
+    location.replace(`${productHome("pixelport")}?mode=${serverTier}`);
+  }
+
   fetch("/api/account/me", { credentials: "same-origin", cache: "no-store" })
     .then((response) => response.ok ? response.json() : null)
-    .then((account) => { if (account?.authenticated) { const map = entitlementMap(account.entitlements); routeOwnedLedgerLift(map, account); apply(map); } })
+    .then((account) => { if (account?.authenticated) { const map = entitlementMap(account.entitlements); routeOwnedLedgerLift(map, account); routeOwnedPixelPort(map, account); apply(map); } })
     .catch(() => {});
 })();

@@ -121,7 +121,7 @@
   async function getPlusState() {
     const license = await import("../license.js");
     let capabilities = await license.getCapabilities();
-    if (capabilities.canUsePlus(product)) return { state: "authorized" };
+    if (capabilities.canUsePlus(product)) return { state: "authorized", source: capabilities.bundle ? "bundle" : "" };
     const accountResponse = await fetch("/api/account/me", { credentials: "same-origin", cache: "no-store" }).catch(() => null);
     const account = await accountResponse?.json().catch(() => ({}));
     if (!accountResponse) return { state: "restore-error" };
@@ -129,14 +129,14 @@
     if (!accountResponse.ok) return { state: "restore-error" };
     const restored = await license.restoreEntitlements();
     capabilities = await license.getCapabilities();
-    if (capabilities.canUsePlus(product)) return { state: "authorized" };
+    if (capabilities.canUsePlus(product)) return { state: "authorized", source: account.bundle === true ? "bundle" : "" };
     if (!restored.ok) return { state: "restore-error" };
     const hasBundle = account.bundle === true || (account.entitlements || []).some((item) => item.product_key === "suite" && item.plan_key === "bundle");
     const hasPlus = hasBundle || (account.entitlements || []).some((item) => item.product_key === product && item.plan_key === "plus");
     return { state: hasPlus ? "restore-error" : "not-entitled" };
   }
 
-  function markAuthorized() {
+  function markAuthorized(source = "") {
     document.querySelector("#plus-access-gate")?.remove();
     document.body.classList.add("plus-authorized");
     document.body.classList.remove("plus-locked");
@@ -144,7 +144,7 @@
     document.title = `${meta.name} Plus — LocalFile Tools`;
     addHandoff();
     prepareCore();
-    window.dispatchEvent(new CustomEvent("plus-mode:ready", { detail: { product } }));
+    window.dispatchEvent(new CustomEvent("plus-mode:ready", { detail: { product, source } }));
   }
 
   function markLocked(state) {
@@ -161,7 +161,7 @@
     try {
       await waitForSuiteGate();
       const result = await getPlusState();
-      if (result.state === "authorized") markAuthorized();
+      if (result.state === "authorized") markAuthorized(result.source);
       else markLocked(result.state);
     } catch {
       markLocked("restore-error");

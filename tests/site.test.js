@@ -156,6 +156,33 @@ test("LedgerLift ownership is product-specific and routes owned users into a qui
   assert.match(read("ledgerlift/_headers"), /connect-src 'self'/);
 });
 
+test("PixelPort ownership is product-specific and routes owned users into distinct workspaces", () => {
+  const access = read("account-access.js");
+  const common = read("pixelport/common.js");
+  const app = read("pixelport/app.js");
+  const plus = read("pixelport/plus.js");
+  const checkout = read("checkout-portal/checkout.js");
+  assert.match(access, /routeOwnedPixelPort/);
+  assert.match(access, /account\?\.products\?\.pixelport/);
+  assert.match(access, /suppressUnpurchasedPixelPortPromotion/);
+  assert.match(common, /product-tier-status/);
+  assert.match(common, /1 image per conversion/);
+  assert.match(common, /20 MB maximum/);
+  assert.match(common, /setTier/);
+  assert.match(app, /file\.size > 20 \* 1024 \* 1024/);
+  assert.match(app, /mayOpenRealDocument/);
+  assert.match(plus, /canUsePlus\("pixelport"\)/);
+  assert.match(plus, /Batch image queue/);
+  assert.match(checkout, /This purchase unlocks PixelPort only/);
+  assert.match(checkout, /PixelPort Standard only; other products remain separate/);
+  assert.match(checkout, /Batch image queue and reusable presets \(PixelPort Plus\)/);
+  assert.match(read("plus-mode.js"), /source: capabilities\.bundle/);
+  assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /Free \/ unpaid/);
+  assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /PixelPort Standard/);
+  assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /PixelPort Plus/);
+  assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /not inferred from owning five individual products/);
+});
+
 test("final pricing source of truth matches every displayed plan", () => {
   const config = read("pricing-config.js");
   ["standard: 1999", "plus: 2499", "standard: 299", "plus: 599", "standard: 999", "plus: 1299", "standard: 699", "plus: 999", "separatePlusTotal: 6695", "savings: 2696", "savingsPercent: 40"].forEach((value) => assert.match(config, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))));

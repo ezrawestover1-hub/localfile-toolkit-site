@@ -67,11 +67,65 @@
 
   let activeRealDocument = false;
   let paidAccess = false;
+  let tier = mode === "plus" ? "plus" : mode === "standard" ? "standard" : "free";
+  let tierSource = "";
   let toastTimer;
   const $ = (id) => document.getElementById(id);
   const toast = $("toast");
   const dialog = $("upgradeDialog");
   const trial = $("trialStatus");
+
+  function ensurePixelPortTierStatus() {
+    if (product !== "pixelport" || !trial || document.querySelector(".product-tier-status")) return;
+    const style = document.createElement("style");
+    style.textContent = ".product-tier-status{margin:10px 0 0;padding:8px 11px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--primary);font-size:.76rem;font-weight:850;letter-spacing:.04em}.product-tier-status[data-tier=standard]{background:#e4f0ee;color:#1e5c5e;border-color:#9db8b8}.product-tier-status[data-tier=plus],.product-tier-status[data-tier=bundle]{background:#fff7df;color:#76520c;border-color:#dfc778}";
+    document.head.append(style);
+    const status = document.createElement("div");
+    status.className = "product-tier-status";
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    trial.after(status);
+  }
+
+  function tierLabel() {
+    if (tierSource === "bundle") return "INCLUDED WITH BUNDLE · PixelPort Plus access";
+    if (tier === "plus") return "PLUS · PixelPort Plus workspace";
+    if (tier === "standard") return "STANDARD · PixelPort Standard workspace";
+    return "FREE · 1 image per conversion · 20 MB max · 1 completed export per browser installation";
+  }
+
+  function setTier(nextTier = "free", source = "") {
+    if (product !== "pixelport") return;
+    tier = ["free", "standard", "plus"].includes(nextTier) ? nextTier : "free";
+    tierSource = source === "bundle" ? "bundle" : "";
+    ensurePixelPortTierStatus();
+    const status = document.querySelector(".product-tier-status");
+    if (status) { status.dataset.tier = tierSource || tier; status.textContent = tierLabel(); }
+    body.dataset.pixelportTier = tier;
+    body.dataset.pixelportTierSource = tierSource;
+  }
+
+  function applyPixelPortLimitsCopy() {
+    if (product !== "pixelport") return;
+    const dropHint = document.querySelector("#dropZone small");
+    const converterHeading = document.querySelector("#converter .section-title h2");
+    const converterCopy = document.querySelector("#converter .section-title p");
+    const freeCallout = document.querySelector(".free-demo-callout strong");
+    const freeCalloutCopy = document.querySelector(".free-demo-callout");
+    const pricingCopy = document.querySelector("#pricing .pricing-head .muted");
+    const freeProof = document.querySelector(".proof-grid > div:last-child");
+    const upgradeTitle = document.querySelector("#upgradeTitle");
+    const upgradeCopy = document.querySelector("#upgradeDialog .dialog-card p");
+    if (dropHint) dropHint.textContent = "PNG, JPG, WebP or AVIF · 20 MB maximum · one image per conversion · processed locally";
+    if (converterHeading) converterHeading.textContent = "Try one image conversion";
+    if (converterCopy) converterCopy.textContent = "Free: one image under 20 MB, one completed export per browser installation, and browser-dependent format support.";
+    if (freeCallout) freeCallout.textContent = "One complete image export is free.";
+    if (freeCalloutCopy) freeCalloutCopy.lastChild.textContent = " Use the converter above to load, preview, and export one real image before choosing a paid plan.";
+    if (pricingCopy) pricingCopy.textContent = "Your first complete image export is free. Paid plans begin only when you need another image.";
+    if (freeProof) { freeProof.querySelector("strong")?.replaceChildren(document.createTextNode("One complete image free")); freeProof.querySelector("small")?.replaceChildren(document.createTextNode("Test the actual conversion before paying.")); }
+    if (upgradeTitle) upgradeTitle.textContent = "Your free PixelPort image allowance has been used";
+    if (upgradeCopy) upgradeCopy.textContent = "Keep converting with PixelPort Standard, or review PixelPort Plus and the complete bundle when you deliberately choose an upgrade.";
+  }
 
   function used() { try { return localStorage.getItem(key) === "used"; } catch { return false; } }
   function markUsed() { try { localStorage.setItem(key, "used"); } catch {} activeRealDocument = true; update(); }
@@ -86,11 +140,17 @@
   }
   function update(sample=false) {
     if (!trial) return;
+    ensurePixelPortTierStatus();
     if (paidAccess) trial.textContent = mode === "plus" ? "Plus access is active. Real files are available without the free-document limit." : "Standard access is active. Core conversions are available without the free-document limit.";
+    else if (product === "pixelport" && sample) trial.textContent = "Sample mode does not consume your free image allowance.";
+    else if (product === "pixelport" && used() && activeRealDocument) trial.textContent = "Free image active: you may export this open image again. A new image requires a paid license.";
+    else if (product === "pixelport" && used()) trial.textContent = "Free image allowance used: choose Standard, Plus, or the five-product bundle to continue.";
+    else if (product === "pixelport") trial.textContent = "Free demo: one image under 20 MB and one completed export per browser installation.";
     else if (sample) trial.textContent = "Sample mode does not consume your free document.";
     else if (used() && activeRealDocument) trial.textContent = "Free document active: you may export this open document again. A new document requires a paid license.";
     else if (used()) trial.textContent = "Free document used: choose Standard, Plus, or the five-product bundle to continue.";
     else trial.textContent = "Free demo: convert and export one complete document.";
+    setTier(tier, tierSource);
   }
   function addSiteLinks() {
     const footer = document.querySelector(".footer");
@@ -164,6 +224,9 @@
     document.querySelectorAll(".faq details p").forEach(answer => { if (answer.textContent.includes("$39.99")) answer.textContent = answer.textContent.replaceAll("$39.99", window.formatLocalFilePrice(bundle.plus)); });
   }
   addSiteLinks();
+  applyPixelPortLimitsCopy();
+  ensurePixelPortTierStatus();
+  setTier(tier, tierSource);
   sanitizePlusMessaging();
   applyPricing();
   applyCanonicalProductIcons();
@@ -171,7 +234,18 @@
   $("closeUpgradeBtn")?.addEventListener("click", closeUpgrade);
   dialog?.addEventListener("click", e=>{ if (e.target===dialog) closeUpgrade(); });
   document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeUpgrade(); });
-  window.SuiteGate = { used, markUsed, mayOpenRealDocument, showUpgrade, closeUpgrade, message, update, setActive: v=>{activeRealDocument=!!v;update();}, setPaidAccess: v=>{paidAccess=!!v;update();}, paid:()=>paidAccess, product };
+  window.SuiteGate = { used, markUsed, mayOpenRealDocument, showUpgrade, closeUpgrade, message, update, setActive: v=>{activeRealDocument=!!v;update();}, setPaidAccess: v=>{paidAccess=!!v;update();}, setTier, paid:()=>paidAccess, product };
+  window.addEventListener("standard-mode:ready", (event) => { if (event.detail?.product === "pixelport") setTier("standard"); });
+  window.addEventListener("plus-mode:ready", (event) => { if (event.detail?.product === "pixelport") setTier("plus", event.detail.source); });
+  async function routeLocalPixelPortOwner() {
+    if (product !== "pixelport" || mode === "standard" || mode === "plus") return;
+    try {
+      const capabilities = await import("../license.js");
+      const plan = (await capabilities.getCapabilities()).planFor("pixelport");
+      if (["standard", "plus"].includes(plan)) location.replace(`./index.html?mode=${plan}`);
+    } catch {}
+  }
+  routeLocalPixelPortOwner();
   update();
   if (mode === "plus" || mode === "standard") { const script = document.createElement("script"); script.src = mode === "plus" ? "../plus-mode.js?v=8f5e2b1" : "../standard-mode.js?v=8f5e2b1"; document.head.append(script); }
   if (product === "pixelport" && mode !== "standard") import("./plus.js").catch(() => {});
