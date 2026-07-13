@@ -243,6 +243,7 @@ test("account setup stages passwords until email verification", () => {
   assert.match(read("account/reset.js"), /result\.diagnostic/);
   assert.match(read("worker.js"), /createAccountSessionJson/);
   assert.match(read("account/reset.js"), /result\.redirect/);
+  assert.match(read("account/login.js"), /result\.redirect/);
   assert.match(read("account/reset.js"), /replace\(\/\\D\/g/);
   assert.match(read("worker.js"), /SELECT id FROM customers WHERE normalized_email/);
 });

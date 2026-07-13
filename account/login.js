@@ -6,6 +6,7 @@ form.addEventListener("submit", async (event) => {
   message.textContent = "Signing in…";
   const response = await fetch("/api/account/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: data.get("email"), password: data.get("password") }) }).catch(() => null);
   const result = await response?.json().catch(() => ({}));
-  message.textContent = result?.message || "Unable to sign in right now.";
   if (response?.redirected) location.assign(response.url);
+  else if (result?.ok && result.redirect) location.assign(result.redirect);
+  else message.textContent = result?.message || "Unable to sign in right now.";
 });

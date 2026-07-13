@@ -98,11 +98,11 @@ async function createAccountSession(env, userId, request) {
   return setAccountCookie(accountRedirect(`${new URL(request.url).origin}/account/`), rawSession);
 }
 
-async function createAccountSessionJson(env, userId) {
+async function createAccountSessionJson(env, userId, message = "Password reset successfully.") {
   const rawSession = randomToken("session");
   const now = nowIso();
   await env.LICENSE_DB.prepare("INSERT INTO account_sessions (id,user_id,session_hash,expires_at,created_at,last_seen_at) VALUES (?,?,?,?,?,?)").bind(id("session"), userId, await sha256(rawSession), new Date(Date.now() + SESSION_MAX_AGE * 1000).toISOString(), now, now).run();
-  return setAccountCookie(json({ ok: true, message: "Password reset successfully.", redirect: "/account/" }), rawSession);
+  return setAccountCookie(json({ ok: true, message, redirect: "/account/" }), rawSession);
 }
 
 async function sendVerificationCode(env, email, code) {
@@ -245,7 +245,7 @@ async function handleAccountLogin(request, env) {
   let valid = false;
   if (record?.password_hash && record.password_salt && record.verified_at) valid = constantTimeEqual(await passwordHash(password, base64UrlToBytes(record.password_salt), Number(record.iterations)), base64UrlToBytes(record.password_hash));
   if (!valid) return json({ ok: false, message: "Incorrect email or password." }, 401);
-  return createAccountSession(env, record.id, request);
+  return createAccountSessionJson(env, record.id, "Signed in successfully.");
 }
 
 async function handleAccountVerifyCode(request, env) {
