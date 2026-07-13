@@ -1,7 +1,7 @@
 (() => {
   "use strict";
   const $ = (id) => document.getElementById(id);
-  const state = { headers: [], rows: [], tx: [], review: null, cleaner: null, mapper: null, source: false, name: "transactions", amountMode: "signed", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] };
+  const state = { headers: [], rows: [], tx: [], review: null, cleaner: null, mapper: null, accountMapper: null, source: false, name: "transactions", amountMode: "signed", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] };
   const input = $("fileInput");
   const drop = $("dropZone");
   const status = $("fileStatus");
@@ -39,7 +39,7 @@
     if (!canReplaceFile()) { input.value = ""; return; }
     try {
       const preview = await window.LedgerLiftImporter.importFile(file, { tier: tier() });
-      Object.assign(state, { source: sample, name: displayName(file), importPreview: preview, fileMeta: preview.fileMeta, format: preview.format, delimiter: preview.delimiter, worksheetName: preview.worksheetName || "", worksheetIndex: preview.worksheetIndex || 0, headerRow: preview.headerRow, suggestions: preview.suggestions, importWarnings: preview.warnings, importErrors: preview.blocking, imported: false, review: null, cleaner: null, mapper: null, headers: preview.headers, rows: preview.rows, tx: [], cleaned: false, cleanSummary: null });
+      Object.assign(state, { source: sample, name: displayName(file), importPreview: preview, fileMeta: preview.fileMeta, format: preview.format, delimiter: preview.delimiter, worksheetName: preview.worksheetName || "", worksheetIndex: preview.worksheetIndex || 0, headerRow: preview.headerRow, suggestions: preview.suggestions, importWarnings: preview.warnings, importErrors: preview.blocking, imported: false, review: null, cleaner: null, mapper: null, accountMapper: null, headers: preview.headers, rows: preview.rows, tx: [], cleaned: false, cleanSummary: null });
       ["date", "desc", "amount", "debit", "credit"].forEach(options);
       status.textContent = `${file.name} · ${preview.format} · ${Math.max(1, Math.round(file.size / 1024))} KB`;
       work.classList.add("hidden"); $("results").classList.add("hidden");
@@ -77,6 +77,7 @@
     state.review = window.LedgerLiftReviewModel?.create({ headers: preview.headers, rows: preview.rows, rowWarnings: preview.rowWarnings, tier: tier() }) || null;
     state.cleaner = state.review && window.LedgerLiftCleaner?.create({ review: state.review, tier: tier(), suggestedRoles: preview.suggestions?.roles || {} });
     state.mapper = state.review && window.LedgerLiftMapper?.create({ review: state.review, cleaner: state.cleaner, tier: tier(), suggestedRoles: preview.suggestions?.roles || {}, templates: window.LedgerLiftMappingTemplates?.create({ tier: tier() }) });
+    state.accountMapper = state.review && window.LedgerLiftAccountMapper?.create({ review: state.review, mapper: state.mapper, tier: tier(), templates: window.LedgerLiftAccountMappingTemplates?.create({ tier: tier() }) });
     Object.assign(state, { imported: true, headers: preview.headers, rows: state.review?.getWorkingRows() || preview.rows, tx: [], cleaned: false, cleanSummary: null });
     ["date", "desc", "amount", "debit", "credit"].forEach(options);
     applySuggestions(preview);
@@ -132,13 +133,18 @@
     if (!state.cleaned) { window.SuiteGate.message("Clean your rows before validating the mapping."); return; }
     if (state.mapper && !window.LedgerLiftWorkspace?.state?.mapColumnsVisited) { window.SuiteGate.message("Complete Map Columns before validating the mapping."); return; }
     if (state.mapper && !state.mapper.getValidation().canContinue) { window.SuiteGate.message("Resolve the required Map Columns issues before validating the mapping."); return; }
+    if (state.accountMapper && !window.LedgerLiftWorkspace?.state?.mapAccountsVisited) { window.SuiteGate.message("Complete Map Accounts before validating the mapping."); return; }
     const mode = $("amountMode")?.value || "signed";
     state.amountMode = mode;
-    state.tx = state.rows.map((row, index) => {
+    const rowAssignments = state.accountMapper?.rowAssignments?.() || {};
+    const reviewEntries = state.review?.activeEntries?.() || state.rows.map((row, index) => ({ id: `row-${index + 1}`, values: row }));
+    state.tx = reviewEntries.map((entry, index) => {
+      const row = entry.values;
       const debit = money(row[$("debit")?.value]), credit = money(row[$("credit")?.value]);
       let amount = money(row[$("amount").value]);
       if (mode === "debit-credit" && (Number.isFinite(debit) || Number.isFinite(credit))) amount = (Number.isFinite(credit) ? Math.abs(credit) : 0) - (Number.isFinite(debit) ? Math.abs(debit) : 0);
-      return { index, d: date(row[$("date").value]), a: amount, debit, credit, memo: clean(row[$("desc").value]), category: "Uncategorized", duplicate: false, ok: !!date(row[$("date").value]) && Number.isFinite(amount) && amount !== 0 };
+      const assignment = rowAssignments[entry.id] || {};
+      return { index, rowId: entry.id, d: date(row[$("date").value]), a: amount, debit, credit, memo: clean(row[$("desc").value]), category: assignment.category || "Uncategorized", name: assignment.name || "", className: assignment.className || "", customerJob: assignment.customerJob || "", sourceAccount: assignment.sourceAccount || "", duplicate: false, ok: !!date(row[$("date").value]) && Number.isFinite(amount) && amount !== 0 };
     });
     renderRows();
     const good = state.tx.filter((transaction) => transaction.ok).length;
@@ -169,7 +175,7 @@
 
   function resetImport() {
     input.value = "";
-    Object.assign(state, { headers: [], rows: [], tx: [], review: null, cleaner: null, mapper: null, source: false, name: "transactions", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] });
+    Object.assign(state, { headers: [], rows: [], tx: [], review: null, cleaner: null, mapper: null, accountMapper: null, source: false, name: "transactions", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] });
     work.classList.add("hidden"); $("results").classList.add("hidden"); status.textContent = "No file selected";
     window.SuiteGate.setActive(false);
     window.dispatchEvent(new CustomEvent("ledgerlift:cleared"));
@@ -188,6 +194,7 @@
     if (!state.review) return;
     state.cleaner?.syncReviewData();
     state.mapper?.refresh();
+    state.accountMapper?.sync();
     state.rows = state.review.getWorkingRows();
     if (["edit", "restore", "add", "delete", "restore-deleted", "undo", "redo"].includes(event.detail?.type)) {
       state.cleaned = false;
@@ -201,6 +208,7 @@
     state.rows = state.review.getWorkingRows();
     state.cleanSummary = state.cleaner.getSummary();
     state.mapper?.refresh();
+    state.accountMapper?.sync();
     if (event.detail?.type !== "review-change") state.cleaned = true;
     state.tx = [];
     $("results").classList.add("hidden");
@@ -219,11 +227,20 @@
     if (amountMode) amountMode.value = state.amountMode;
     state.mapping = mapping;
   }
+  function setAccountMapping(mapping) {
+    const sourceAccount = mapping?.sourceAccount?.name;
+    if (sourceAccount && $("bank")) $("bank").value = sourceAccount;
+    state.accountMapping = mapping;
+  }
   const mapperScript = document.createElement("script");
   mapperScript.src = "mapper.js?v=8f5e2b2";
   const templateScript = document.createElement("script");
   templateScript.src = "mapping-templates.js?v=8f5e2b2";
-  window.LedgerLiftCore = { state, analyze, cleanRows, renderRows, exportIif: iif, getTier: tier, setMapping, markCleanReady: () => { state.cleaned = true; }, markMapColumnsReady: (mapping) => { setMapping(mapping); }, syncReviewRows: () => { if (state.review) state.rows = state.review.getWorkingRows(); } };
+  const accountTemplateScript = document.createElement("script");
+  accountTemplateScript.src = "account-mapping-templates.js?v=8f5e2b3";
+  const accountMapperScript = document.createElement("script");
+  accountMapperScript.src = "account-mapper.js?v=8f5e2b3";
+  window.LedgerLiftCore = { state, analyze, cleanRows, renderRows, exportIif: iif, getTier: tier, setMapping, setAccountMapping, markCleanReady: () => { state.cleaned = true; }, markMapColumnsReady: (mapping) => { setMapping(mapping); }, markMapAccountsReady: (mapping) => { setAccountMapping(mapping); }, syncReviewRows: () => { if (state.review) state.rows = state.review.getWorkingRows(); } };
   const importerScript = document.createElement("script");
   importerScript.src = "importer.js?v=8f5e2b1";
   importerScript.onload = () => {
@@ -232,7 +249,7 @@
     reviewScript.onload = () => {
       const cleanerScript = document.createElement("script");
       cleanerScript.src = "cleaner.js?v=8f5e2b1";
-      cleanerScript.onload = () => { mapperScript.onload = () => { templateScript.onload = () => { const workspaceScript = document.createElement("script"); workspaceScript.src = "workspace.js?v=8f5e2b2"; document.head.append(workspaceScript); }; document.head.append(templateScript); }; document.head.append(mapperScript); };
+      cleanerScript.onload = () => { mapperScript.onload = () => { templateScript.onload = () => { accountTemplateScript.onload = () => { accountMapperScript.onload = () => { const workspaceScript = document.createElement("script"); workspaceScript.src = "workspace.js?v=8f5e2b3"; document.head.append(workspaceScript); }; document.head.append(accountMapperScript); }; document.head.append(accountTemplateScript); }; document.head.append(templateScript); }; document.head.append(mapperScript); };
       document.head.append(cleanerScript);
     };
     document.head.append(reviewScript);

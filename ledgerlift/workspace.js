@@ -18,6 +18,10 @@
   if (!converter || $("ledgerliftWorkspace")) return;
 
   const state = { current: 1, imported: false, cleaned: false, cleanVisited: false, mapColumnsVisited: false, mapAccountsVisited: false, analyzed: false, previewed: false, exported: false, cleanSummary: null };
+  const accountView = { query: "", filter: "all", sort: "frequency", templatePreview: null };
+  const accountSelected = new Set();
+  const ACCOUNT_ROLE_LABELS = { account: "Account", category: "Category", name: "Name", vendor: "Vendor", customer: "Customer", employee: "Employee", class: "Class", customerJob: "Customer / job", transactionType: "Transaction type", clearedStatus: "Cleared status", taxCode: "Tax code" };
+  const destinationTypeLabel = (type) => window.LedgerLiftAccountMapper?.DESTINATION_TYPES?.find((item) => item.id === type)?.label || type;
 
   const make = (tag, className, text) => {
     const element = document.createElement(tag);
@@ -306,7 +310,41 @@
     mapActions.append(continueToAccounts);
     mapPanel.append(mapHeader, mapMeta, mapNotice, mapToolbar, amountStructure, mappingIssues, mappingColumns, templatePanel, mapPreview, mapActions);
 
-    shell.append(heading, list, message, entry, importPreview, review, cleanPanel, mapPanel);
+    const accountPanel = make("section", "workspace-accounts hidden");
+    accountPanel.id = "workspaceMapAccounts";
+    accountPanel.setAttribute("aria-labelledby", "workspaceMapAccountsTitle");
+    const accountHeader = make("div", "workspace-review-header");
+    const accountCopy = make("div"); accountCopy.append(make("h3", "", "Map accounts and transaction details"), make("p", "", "Match imported account, category, and name values to the values LedgerLift should use in the converted file.")); accountCopy.querySelector("h3").id = "workspaceMapAccountsTitle";
+    const accountStatus = make("strong", "workspace-review-summary", "Mapping not ready"); accountStatus.id = "accountMappingStatus"; accountHeader.append(accountCopy, accountStatus);
+    const accountMeta = make("div", "account-meta"); ["accountFileMeta", "accountRowsMeta", "accountUniqueMeta", "accountMappedMeta", "accountUnmappedMeta", "accountAffectedMeta"].forEach((id) => { const item = make("div", "account-meta-item", ""); item.id = id; accountMeta.append(item); });
+    const accountNotice = make("div", "account-notice", "All source values are inspected locally. Suggestions are not confirmed until you accept them."); accountNotice.id = "accountMappingNotice"; accountNotice.setAttribute("role", "status"); accountNotice.setAttribute("aria-live", "polite");
+    const sourceAccount = make("section", "account-source-panel"); sourceAccount.setAttribute("aria-labelledby", "accountSourceTitle"); sourceAccount.append(make("h4", "", "Default source account"), make("p", "", "Which account do these transactions belong to? This is usually the bank, credit-card, or cash account represented by the imported file.")); sourceAccount.querySelector("h4").id = "accountSourceTitle";
+    const sourceControls = make("div", "account-source-controls"); const sourceLabel = make("label", "", "Account represented by this file"); const sourceSelect = make("select"); sourceSelect.id = "accountSourceSelect"; sourceSelect.setAttribute("aria-label", "Default source account"); sourceLabel.append(sourceSelect); const sourceType = make("span", "account-source-type", "No account selected"); sourceType.id = "accountSourceType"; sourceControls.append(sourceLabel, sourceType); sourceAccount.append(sourceControls);
+    const sourceMessage = make("p", "account-source-message", "Create an Account destination below, then select it here."); sourceMessage.id = "accountSourceMessage"; sourceAccount.append(sourceMessage);
+    const accountToolbar = make("div", "account-toolbar");
+    const accountSearchLabel = make("label", "", "Search source values"); const accountSearch = make("input"); accountSearch.id = "accountMappingSearch"; accountSearch.type = "search"; accountSearch.placeholder = "Search source values"; accountSearch.autocomplete = "off"; accountSearchLabel.append(accountSearch);
+    const accountFilterLabel = make("label", "", "Filter values"); const accountFilter = make("select"); accountFilter.id = "accountMappingFilter"; [["all", "All values"], ["unmapped", "Unmapped"], ["mapped", "Mapped"], ["suggested", "Suggested"], ["ignored", "Ignored"], ["review", "Needs review"], ["frequency", "High-frequency values"], ["blank", "Blank-affected rows"]].forEach(([value, label]) => { const option = make("option", "", label); option.value = value; accountFilter.append(option); }); accountFilterLabel.append(accountFilter);
+    const accountSortLabel = make("label", "", "Sort values"); const accountSort = make("select"); accountSort.id = "accountMappingSort"; [["frequency", "Most transactions"], ["source", "Source value A–Z"], ["status", "Mapping status"], ["destination", "Destination A–Z"]].forEach(([value, label]) => { const option = make("option", "", label); option.value = value; accountSort.append(option); }); accountSortLabel.append(accountSort); accountToolbar.append(accountSearchLabel, accountFilterLabel, accountSortLabel);
+    const accountActions = make("div", "account-selection-toolbar"); const selectValues = make("label", "account-select-visible"); const selectAllValues = make("input"); selectAllValues.type = "checkbox"; selectAllValues.id = "accountSelectVisible"; selectValues.append(selectAllValues, make("span", "", "Select visible values")); const selectedValues = make("span", "account-selected-count", "0 values selected"); selectedValues.id = "accountSelectedCount";
+    const bulkLabel = make("label", "", "Assign selected to"); const bulkDestination = make("select"); bulkDestination.id = "accountBulkDestination"; bulkDestination.setAttribute("aria-label", "Bulk destination"); bulkLabel.append(bulkDestination); const bulkAssign = make("button", "button secondary", "Assign selected"); bulkAssign.type = "button"; bulkAssign.id = "accountBulkAssign"; const bulkClear = make("button", "button quiet", "Clear selected"); bulkClear.type = "button"; bulkClear.id = "accountBulkClear"; const bulkIgnore = make("button", "button quiet", "Ignore selected"); bulkIgnore.type = "button"; bulkIgnore.id = "accountBulkIgnore"; const accountSuggestions = make("button", "button secondary", "Apply exact suggestions"); accountSuggestions.type = "button"; accountSuggestions.id = "accountApplySuggestions"; const accountUndo = make("button", "button secondary", "Undo"); accountUndo.type = "button"; accountUndo.id = "accountUndo"; const accountRedo = make("button", "button secondary", "Redo"); accountRedo.type = "button"; accountRedo.id = "accountRedo"; accountActions.append(selectValues, selectedValues, bulkLabel, bulkAssign, bulkClear, bulkIgnore, accountSuggestions, accountUndo, accountRedo);
+    const accountIssues = make("div", "account-issues"); accountIssues.id = "accountMappingIssues"; accountIssues.setAttribute("role", "alert");
+    const valueList = make("div", "account-value-list"); valueList.id = "accountValueList";
+    const destinationPanel = make("details", "destination-library"); destinationPanel.open = true; const destinationSummary = make("summary", "", "Destination library and creation"); destinationPanel.append(destinationSummary);
+    const destinationForm = make("div", "destination-form"); const destinationTypeLabel = make("label", "", "Destination type"); const destinationType = make("select"); destinationType.id = "accountDestinationType"; (window.LedgerLiftAccountMapper?.DESTINATION_TYPES || []).forEach((item) => { const option = make("option", "", item.label); option.value = item.id; destinationType.append(option); }); destinationTypeLabel.append(destinationType);
+    const destinationNameLabel = make("label", "", "Name"); const destinationName = make("input"); destinationName.id = "accountDestinationName"; destinationName.placeholder = "e.g. Checking or Office Supplies"; destinationNameLabel.append(destinationName);
+    const destinationAccountTypeLabel = make("label", "", "Account type"); const destinationAccountType = make("select"); destinationAccountType.id = "accountDestinationAccountType"; (window.LedgerLiftAccountMapper?.ACCOUNT_TYPES || []).forEach((item) => { const option = make("option", "", item.label); option.value = item.id; destinationAccountType.append(option); }); destinationAccountTypeLabel.append(destinationAccountType);
+    const destinationParentLabel = make("label", "", "Parent account (optional)"); const destinationParent = make("select"); destinationParent.id = "accountDestinationParent"; destinationParentLabel.append(destinationParent);
+    const destinationDescriptionLabel = make("label", "", "Description (optional)"); const destinationDescription = make("input"); destinationDescription.id = "accountDestinationDescription"; destinationDescriptionLabel.append(destinationDescription);
+    const createDestination = make("button", "button", "Create destination"); createDestination.type = "button"; createDestination.id = "accountCreateDestination"; const destinationFormMessage = make("p", "destination-form-message", ""); destinationFormMessage.id = "accountDestinationFormMessage"; destinationForm.append(destinationTypeLabel, destinationNameLabel, destinationAccountTypeLabel, destinationParentLabel, destinationDescriptionLabel, createDestination, destinationFormMessage); destinationPanel.append(destinationForm);
+    const destinationList = make("div", "destination-list"); destinationList.id = "accountDestinationList"; destinationPanel.append(destinationList);
+    const accountTemplates = make("section", "account-mapping-templates"); accountTemplates.id = "accountMappingTemplates"; accountTemplates.setAttribute("aria-labelledby", "accountTemplatesTitle"); accountTemplates.append(make("h4", "", "Saved value-mapping templates"), make("p", "", "Templates store only the source value you explicitly mapped, its role, and destination structure—not transaction rows or amounts.")); accountTemplates.querySelector("h4").id = "accountTemplatesTitle";
+    const accountTemplateUnavailable = make("p", "account-template-unavailable", "Persistent value-mapping templates are available in Standard and Plus workspaces."); accountTemplateUnavailable.id = "accountTemplateUnavailable"; accountTemplates.append(accountTemplateUnavailable);
+    const accountTemplateControls = make("div", "account-template-controls"); accountTemplateControls.id = "accountTemplateControls"; const accountTemplateName = make("input"); accountTemplateName.id = "accountTemplateName"; accountTemplateName.placeholder = "Template name"; accountTemplateName.setAttribute("aria-label", "New value-mapping template name"); const accountSaveTemplate = make("button", "button secondary", "Save template"); accountSaveTemplate.type = "button"; accountSaveTemplate.id = "accountSaveTemplate"; const accountTemplateSelect = make("select"); accountTemplateSelect.id = "accountTemplateSelect"; accountTemplateSelect.setAttribute("aria-label", "Saved value-mapping template"); const accountApplyTemplate = make("button", "button quiet", "Preview selected template"); accountApplyTemplate.type = "button"; accountApplyTemplate.id = "accountPreviewTemplate"; const accountApplyConfirmed = make("button", "button quiet", "Apply selected matches"); accountApplyConfirmed.type = "button"; accountApplyConfirmed.id = "accountApplyTemplate"; const accountRenameTemplate = make("button", "button quiet", "Rename template"); accountRenameTemplate.type = "button"; accountRenameTemplate.id = "accountRenameTemplate"; const accountDeleteTemplate = make("button", "button quiet", "Delete template"); accountDeleteTemplate.type = "button"; accountDeleteTemplate.id = "accountDeleteTemplate"; accountTemplateControls.append(accountTemplateName, accountSaveTemplate, accountTemplateSelect, accountApplyTemplate, accountApplyConfirmed, accountRenameTemplate, accountDeleteTemplate); accountTemplates.append(accountTemplateControls);
+    const accountPreview = make("section", "account-mapping-preview"); accountPreview.id = "accountMappingPreview"; accountPreview.setAttribute("aria-labelledby", "accountPreviewTitle"); accountPreview.append(make("h4", "", "Account mapping preview"), make("p", "", "This preview shows assigned accounts and names. LedgerLift has not completed accounting validation yet.")); accountPreview.querySelector("h4").id = "accountPreviewTitle"; const accountPreviewMeta = make("div", "account-preview-meta", ""); accountPreviewMeta.id = "accountPreviewMeta"; const accountPreviewWrap = make("div", "table-wrap account-preview-table"); const accountPreviewTable = make("table"); accountPreviewTable.append(make("caption", "sr-only", "Preview of account mappings"), make("thead"), make("tbody")); accountPreviewTable.querySelector("thead").id = "accountPreviewHead"; accountPreviewTable.querySelector("tbody").id = "accountPreviewRows"; accountPreviewWrap.append(accountPreviewTable); accountPreview.append(accountPreviewMeta, accountPreviewWrap);
+    const accountActionsBottom = make("div", "workspace-account-actions"); const backToColumns = make("button", "button secondary", "Back to Map Columns"); backToColumns.type = "button"; backToColumns.id = "backToMapColumns"; backToColumns.addEventListener("click", () => setStep(4)); const continueToValidate = make("button", "button", "Continue to Validate"); continueToValidate.type = "button"; continueToValidate.id = "continueToValidate"; continueToValidate.addEventListener("click", () => { const accountModel = accountMapperModel(); if (!accountModel?.getValidation().canContinue) return; window.LedgerLiftCore?.markMapAccountsReady?.(accountModel.getState()); state.mapAccountsVisited = true; setStep(6); }); accountActionsBottom.append(backToColumns, continueToValidate);
+    accountPanel.append(accountHeader, accountMeta, accountNotice, sourceAccount, accountToolbar, accountActions, accountIssues, valueList, destinationPanel, accountTemplates, accountPreview, accountActionsBottom);
+
+    shell.append(heading, list, message, entry, importPreview, review, cleanPanel, mapPanel, accountPanel);
     converter.prepend(shell);
 
     const sectionTitle = converter.querySelector(".section-title");
@@ -414,6 +452,52 @@
     });
     $("mappingApplyTemplate").addEventListener("click", () => { const mapper = mapperModel(), store = mapper?.getTemplateStore?.(), selected = store?.list?.().find((template) => template.id === $("mappingTemplateSelect").value); if (mapper && selected) mapper.applyTemplate(selected); });
     $("mappingDeleteTemplate").addEventListener("click", () => { const store = mapperModel()?.getTemplateStore?.(); if (store?.remove($("mappingTemplateSelect").value)) renderMapping(); });
+    $("accountSourceSelect").addEventListener("change", (event) => { accountMapperModel()?.setDefaultSourceAccount(event.target.value); });
+    $("accountMappingSearch").addEventListener("input", (event) => { accountView.query = event.target.value; renderAccountMapping(); });
+    $("accountMappingFilter").addEventListener("change", (event) => { accountView.filter = event.target.value; renderAccountMapping(); });
+    $("accountMappingSort").addEventListener("change", (event) => { accountView.sort = event.target.value; renderAccountMapping(); });
+    $("accountSelectVisible").addEventListener("change", (event) => { const model = accountMapperModel(); const ids = filteredAccountRecords().map((record) => record.id); ids.forEach((id) => event.target.checked ? accountSelected.add(id) : accountSelected.delete(id)); renderAccountMapping(); });
+    $("accountValueList").addEventListener("change", (event) => {
+      const select = event.target.closest("[data-account-record-destination]");
+      if (select) accountMapperModel()?.setMapping(select.dataset.recordId, select.value);
+      const checkbox = event.target.closest("[data-account-record-select]");
+      if (checkbox) { checkbox.checked ? accountSelected.add(checkbox.dataset.recordId) : accountSelected.delete(checkbox.dataset.recordId); renderAccountMapping(); }
+    });
+    $("accountValueList").addEventListener("click", (event) => {
+      const action = event.target.closest("[data-account-record-action]"); if (!action) return;
+      const model = accountMapperModel(); const id = action.dataset.recordId;
+      if (action.dataset.accountRecordAction === "ignore") model?.ignore(id);
+      if (action.dataset.accountRecordAction === "restore") model?.restoreIgnored(id);
+      if (action.dataset.accountRecordAction === "clear") model?.resetRecord(id);
+      if (action.dataset.accountRecordAction === "reset-column") model?.resetColumn(action.dataset.columnId);
+    });
+    $("accountBulkAssign").addEventListener("click", () => { const model = accountMapperModel(); model?.bulkAssign([...accountSelected], $("accountBulkDestination").value); });
+    $("accountBulkClear").addEventListener("click", () => { accountMapperModel()?.bulkClear([...accountSelected]); });
+    $("accountBulkIgnore").addEventListener("click", () => { accountMapperModel()?.bulkIgnore([...accountSelected]); });
+    $("accountApplySuggestions").addEventListener("click", () => accountMapperModel()?.applyExactSuggestions());
+    $("accountUndo").addEventListener("click", () => accountMapperModel()?.undo());
+    $("accountRedo").addEventListener("click", () => accountMapperModel()?.redo());
+    $("accountCreateDestination").addEventListener("click", () => {
+      const model = accountMapperModel(); const result = model?.createDestination({ type: $("accountDestinationType").value, name: $("accountDestinationName").value, accountType: $("accountDestinationAccountType").value, parentId: $("accountDestinationParent").value, description: $("accountDestinationDescription").value });
+      $("accountDestinationFormMessage").textContent = result?.ok ? `Created ${result.destination.name}. Select it where needed.` : result?.reason || "Could not create that destination.";
+      if (result?.ok) { $("accountDestinationName").value = ""; $("accountDestinationDescription").value = ""; renderAccountMapping(); }
+    });
+    $("accountDestinationType").addEventListener("change", () => renderAccountMapping());
+    $("accountSaveTemplate").addEventListener("click", () => {
+      const store = accountMapperModel()?.getTemplateStore?.(), model = accountMapperModel(); if (!store || !model) return;
+      const result = store.save($("accountTemplateName").value, model.mappingTemplateBlueprint()); $("accountMappingNotice").textContent = result.ok ? `Saved “${result.template.name}” on this device. Only explicit mapping keys were included.` : result.reason; if (result.ok) { $("accountTemplateName").value = ""; renderAccountMapping(); }
+    });
+    $("accountPreviewTemplate").addEventListener("click", () => {
+      const store = accountMapperModel()?.getTemplateStore?.(), template = store?.list?.().find((item) => item.id === $("accountTemplateSelect").value); if (!template) return;
+      const preview = accountMapperModel()?.previewTemplate(template); accountView.templatePreview = preview; renderAccountMapping();
+    });
+    $("accountApplyTemplate").addEventListener("click", () => {
+      const store = accountMapperModel()?.getTemplateStore?.(), template = store?.list?.().find((item) => item.id === $("accountTemplateSelect").value); if (template) accountMapperModel()?.applyTemplate(template, accountView.templatePreview?.matches?.map((match) => match.recordId) || []);
+    });
+    $("accountRenameTemplate").addEventListener("click", () => {
+      const store = accountMapperModel()?.getTemplateStore?.(), id = $("accountTemplateSelect").value; if (store && id) { const result = store.rename(id, window.prompt("New template name", store.list().find((item) => item.id === id)?.name || "")); $("accountMappingNotice").textContent = result.reason || "Template renamed."; renderAccountMapping(); }
+    });
+    $("accountDeleteTemplate").addEventListener("click", () => { const store = accountMapperModel()?.getTemplateStore?.(); if (store?.remove($("accountTemplateSelect").value)) renderAccountMapping(); });
     document.addEventListener("keydown", (event) => {
       const reviewPanel = $("workspaceReview");
       const activeElement = document.activeElement;
@@ -483,6 +567,80 @@
   function cleanerModel() { return window.LedgerLiftCore?.state?.cleaner || null; }
 
   function mapperModel() { return window.LedgerLiftCore?.state?.mapper || null; }
+
+  function accountMapperModel() { return window.LedgerLiftCore?.state?.accountMapper || null; }
+
+  function accountRecordStatus(record) {
+    if (record.ignored) return "Ignored";
+    if (record.warning || record.suggestion?.confidence === "Possible") return "Needs review";
+    if (record.destinationId) return record.origin === "suggestion" || record.origin === "template" ? "Suggested" : "Mapped";
+    return "Unmapped";
+  }
+
+  function filteredAccountRecords() {
+    const model = accountMapperModel();
+    if (!model) return [];
+    const records = model.getState().records.filter((record) => {
+      const query = accountView.query.trim().toLocaleLowerCase();
+      const status = accountRecordStatus(record);
+      if (query && !`${record.sourceValue} ${record.sourceRole} ${record.columnHeader}`.toLocaleLowerCase().includes(query)) return false;
+      if (accountView.filter === "unmapped" && status !== "Unmapped") return false;
+      if (accountView.filter === "mapped" && status !== "Mapped") return false;
+      if (accountView.filter === "suggested" && status !== "Suggested") return false;
+      if (accountView.filter === "ignored" && status !== "Ignored") return false;
+      if (accountView.filter === "review" && status !== "Needs review") return false;
+      if (accountView.filter === "frequency" && record.count < 3) return false;
+      return true;
+    });
+    return records.sort((left, right) => {
+      if (accountView.sort === "source") return left.sourceValue.localeCompare(right.sourceValue, undefined, { numeric: true, sensitivity: "base" });
+      if (accountView.sort === "status") return accountRecordStatus(left).localeCompare(accountRecordStatus(right));
+      if (accountView.sort === "destination") return (model.getDestination(left.destinationId)?.name || "").localeCompare(model.getDestination(right.destinationId)?.name || "", undefined, { sensitivity: "base" });
+      return right.count - left.count || left.sourceValue.localeCompare(right.sourceValue, undefined, { sensitivity: "base" });
+    });
+  }
+
+  function accountDestinationOptions(role, selected = "") {
+    const model = accountMapperModel();
+    const options = [{ id: "", label: "Not mapped" }];
+    (model?.getState().destinations || []).filter((destination) => {
+      const accepted = window.LedgerLiftAccountMapper?.DESTINATION_TYPES ? { account: ["account"], category: ["account"], name: ["vendor", "customer", "employee", "other-name"], vendor: ["vendor"], customer: ["customer"], employee: ["employee"], class: ["class"], customerJob: ["customer-job"], transactionType: ["transaction-type"], clearedStatus: ["cleared-status"], taxCode: ["tax-code"] }[role] || [] : [];
+      return accepted.includes(destination.type);
+    }).forEach((destination) => options.push({ id: destination.id, label: destination.type === "account" && destination.parentId ? `${accountDestinationName(destination.parentId)}:${destination.name}` : destination.name }));
+    return options.map((item) => { const option = make("option", "", item.label); option.value = item.id; option.selected = item.id === selected; return option; });
+  }
+
+  function accountDestinationName(id) { return accountMapperModel()?.getState().destinations.find((destination) => destination.id === id)?.name || ""; }
+
+  function renderAccountMapping() {
+    const model = accountMapperModel();
+    if (!model) return;
+    const modelState = model.getState(), validation = modelState.validation, core = window.LedgerLiftCore?.state;
+    const fileName = core?.fileMeta?.name || `${core?.name || "transactions"}.csv`;
+    const setMeta = (id, label, value) => $(id)?.replaceChildren(make("span", "account-meta-label", label), make("strong", "", String(value)));
+    setMeta("accountFileMeta", "File", fileName); setMeta("accountRowsMeta", "Active rows", validation.activeRows); setMeta("accountUniqueMeta", "Unique source values", validation.uniqueValues); setMeta("accountMappedMeta", "Mapped values", validation.mappedValues); setMeta("accountUnmappedMeta", "Unmapped / ignored", `${validation.unmappedValues} / ${validation.ignoredValues}`); setMeta("accountAffectedMeta", "Rows needing review", validation.rowsAffected);
+    $("accountMappingStatus").textContent = validation.canContinue ? "Ready to continue" : `${validation.blocking.length} required issue${validation.blocking.length === 1 ? "" : "s"}`;
+    $("accountMappingNotice").textContent = validation.canContinue ? "Required values are mapped. Optional values can remain unresolved, or you can return later without losing these choices." : "Resolve the required account setup below before continuing to Validate.";
+    const sourceSelect = $("accountSourceSelect"); sourceSelect.replaceChildren(); const accounts = modelState.destinations.filter((destination) => destination.type === "account"); sourceSelect.append(make("option", "", "Choose a source account")); sourceSelect.firstChild.value = ""; accounts.forEach((destination) => { const option = make("option", "", destination.parentId ? `${accountDestinationName(destination.parentId)}:${destination.name}` : destination.name); option.value = destination.id; option.selected = destination.id === modelState.sourceAccount.destinationId; sourceSelect.append(option); });
+    $("accountSourceType").textContent = modelState.sourceAccount.destinationId ? `${modelState.sourceAccount.name} · ${window.LedgerLiftAccountMapper?.ACCOUNT_TYPES.find((item) => item.id === modelState.sourceAccount.accountType)?.label || modelState.sourceAccount.accountType}` : validation.hasSourceAccountColumn ? "Source Account column is mapped" : "Required before Validate";
+    $("accountSourceMessage").textContent = validation.hasSourceAccountColumn ? "The source Account column will provide the account per row. A default is only used for blank values." : accounts.length ? "Choose the account represented by this file." : "Create an Account destination below, then select it here.";
+    const issues = $("accountMappingIssues"); issues.replaceChildren(); validation.blocking.forEach((issue) => { const item = make("div", "account-issue account-issue-blocking"); item.append(make("strong", "", "Required"), make("span", "", issue.message)); issues.append(item); }); validation.warnings.forEach((warning) => { const item = make("div", "account-issue account-issue-warning"); item.append(make("strong", "", "Review recommended"), make("span", "", warning.message)); issues.append(item); }); if (!validation.blocking.length && !validation.warnings.length) issues.append(make("p", "account-success", "No account-mapping issues are waiting for review."));
+    const records = filteredAccountRecords(), valueList = $("accountValueList"); valueList.replaceChildren(); if (!modelState.sourceColumns.length) valueList.append(make("p", "account-empty", "No account, category, party, class, customer/job, or other eligible source columns were mapped. You can still assign the default source account above.")); else if (accountView.filter === "blank") { const blankColumns = modelState.blankByColumn.filter((column) => column.count > 0); valueList.append(make("p", "account-empty", blankColumns.length ? `Blank source values are not listed as destinations. ${blankColumns.map((column) => `${column.header}: ${column.count} row${column.count === 1 ? "" : "s"}`).join(" · ")}.` : "No blank source values were found.")); } else if (!records.length) valueList.append(make("p", "account-empty", "No source values match this search or filter."));
+    records.slice(0, 150).forEach((record) => {
+      const card = make("article", "account-value-card"); card.dataset.recordId = record.id; const head = make("div", "account-value-head"); const check = make("input"); check.type = "checkbox"; check.dataset.accountRecordSelect = "true"; check.dataset.recordId = record.id; check.checked = accountSelected.has(record.id); check.setAttribute("aria-label", `Select ${record.sourceValue} from ${record.columnHeader}`); const title = make("div", "account-value-title"); title.append(make("strong", "", record.sourceValue), make("span", "", `${ACCOUNT_ROLE_LABELS[record.sourceRole] || record.sourceRole} · ${record.count} transaction${record.count === 1 ? "" : "s"}`)); const status = make("span", `account-value-status account-status-${accountRecordStatus(record).toLocaleLowerCase().replace(/\s+/g, "-")}`, accountRecordStatus(record)); head.append(check, title, status); card.append(head);
+      const controls = make("div", "account-value-controls"); const destinationLabel = make("label", "", "Destination"); const destinationSelect = make("select"); destinationSelect.dataset.accountRecordDestination = "true"; destinationSelect.dataset.recordId = record.id; destinationSelect.setAttribute("aria-label", `Destination for ${record.sourceValue}`); destinationSelect.append(...accountDestinationOptions(record.sourceRole, record.destinationId)); destinationLabel.append(destinationSelect); controls.append(destinationLabel);
+      if (record.suggestion) controls.append(make("span", "account-suggestion", `${record.suggestion.confidence}: ${record.suggestion.reason}`)); else controls.append(make("span", "account-suggestion", "No suggestion"));
+      const action = make("button", "button quiet", record.ignored ? "Restore" : record.destinationId ? "Clear" : "Ignore"); action.type = "button"; action.dataset.accountRecordAction = record.ignored ? "restore" : record.destinationId ? "clear" : "ignore"; action.dataset.recordId = record.id; action.disabled = !record.ignored && !record.destinationId && window.LedgerLiftAccountMapper?.REQUIRED_ROLES.has(record.sourceRole); action.setAttribute("aria-label", `${record.ignored ? "Restore" : record.destinationId ? "Clear" : "Ignore"} mapping for ${record.sourceValue}`); controls.append(action); card.append(controls);
+      if (record.warning) card.append(make("p", "account-value-warning", record.warning)); const sample = record.rowIds.slice(0, 3).map((id) => `Row ${id.replace("row-", "")}`).join(" · "); card.append(make("p", "account-value-sample", `Affected rows: ${sample}${record.rowIds.length > 3 ? " · more" : ""}`)); valueList.append(card);
+    });
+    const visibleIds = records.slice(0, 150).map((record) => record.id); $("accountSelectedCount").textContent = `${accountSelected.size} value${accountSelected.size === 1 ? "" : "s"} selected`; $("accountSelectVisible").checked = visibleIds.length > 0 && visibleIds.every((id) => accountSelected.has(id)); $("accountBulkAssign").disabled = !accountSelected.size || !$("accountBulkDestination").value; $("accountBulkClear").disabled = !accountSelected.size; $("accountBulkIgnore").disabled = !accountSelected.size; $("accountApplySuggestions").disabled = !modelState.records.some((record) => record.suggestion?.confidence === "Exact match" && !record.destinationId && !record.ignored); $("accountUndo").disabled = !modelState.canUndo; $("accountRedo").disabled = !modelState.canRedo; $("continueToValidate").disabled = !validation.canContinue;
+    const bulk = $("accountBulkDestination"); bulk.replaceChildren(make("option", "", "Choose destination")); bulk.firstChild.value = ""; modelState.destinations.forEach((destination) => { const option = make("option", "", destination.name); option.value = destination.id; bulk.append(option); });
+    const destinationAccountType = $("accountDestinationAccountType"), destinationParent = $("accountDestinationParent"); const accountTypeVisible = $("accountDestinationType").value === "account"; destinationAccountType.closest("label").hidden = !accountTypeVisible; destinationParent.closest("label").hidden = !accountTypeVisible; destinationParent.replaceChildren(make("option", "", "No parent")); destinationParent.firstChild.value = ""; modelState.destinations.filter((destination) => destination.type === "account").forEach((destination) => { const option = make("option", "", destination.parentId ? `${accountDestinationName(destination.parentId)}:${destination.name}` : destination.name); option.value = destination.id; destinationParent.append(option); });
+    const destinationList = $("accountDestinationList"); destinationList.replaceChildren(); if (!modelState.destinations.length) destinationList.append(make("p", "destination-empty", "No destinations created in this session yet.")); modelState.destinations.forEach((destination) => { const item = make("div", "destination-item"); item.append(make("strong", "", destination.parentId ? `${accountDestinationName(destination.parentId)}:${destination.name}` : destination.name), make("span", "", `${destinationTypeLabel(destination.type)}${destination.accountType ? ` · ${destination.accountType}` : ""}`)); destinationList.append(item); });
+    const store = model.getTemplateStore?.(), eligible = Boolean(store && store.limit > 0); $("accountTemplateControls").hidden = !eligible; $("accountTemplateUnavailable").hidden = eligible; if (eligible) { const select = $("accountTemplateSelect"); select.replaceChildren(); store.list().forEach((template) => { const option = make("option", "", template.name); option.value = template.id; select.append(option); }); const has = select.options.length > 0; $("accountPreviewTemplate").disabled = !has; $("accountApplyTemplate").disabled = !has || !accountView.templatePreview?.matches?.length; $("accountRenameTemplate").disabled = !has; $("accountDeleteTemplate").disabled = !has; }
+    const preview = model.getPreview(6); $("accountPreviewMeta").textContent = `${preview.length} sample rows shown · unresolved fields are not final validation results.`; const previewHead = $("accountPreviewHead"); previewHead.replaceChildren(); ["Date", "Description", "Amount", "Source account", "Destination account/category", "Name", "Class", "Customer/job", "Status"].forEach((label) => { const th = make("th", "", label); th.scope = "col"; previewHead.append(th); }); const previewBody = $("accountPreviewRows"); previewBody.replaceChildren(); preview.forEach((row) => { const tr = make("tr"); [row.date, row.description, row.amount || `${row.debit || ""} / ${row.credit || ""}`, row.sourceAccount, row.destination, row.name, row.className, row.customerJob, row.status].forEach((value) => tr.append(make("td", "", textForDisplay(value) || "—"))); previewBody.append(tr); });
+    if (accountView.templatePreview) { const summary = accountView.templatePreview; $("accountMappingNotice").textContent = `${summary.matches?.length || 0} template matches previewed; ${summary.unmatched?.length || 0} current values have no saved match. Applying will remain local and reversible.`; }
+  }
 
   function mappingRoleOptions(selected) {
     const roles = window.LedgerLiftMapper?.ROLE_DEFINITIONS || [];
@@ -900,7 +1058,8 @@
     if (step === 3) return state.imported && (reviewModel()?.getState().totalRows || 0) > 0;
     if (step === 4) return state.imported && state.cleanVisited && state.cleaned && (reviewModel()?.getState().totalRows || 0) > 0;
     if (step === 5) return state.cleaned && state.mapColumnsVisited && Boolean(mapperModel()?.getValidation().canContinue);
-    if (step === 6 || step === 7) return state.analyzed;
+    if (step === 6) return state.mapAccountsVisited && Boolean(accountMapperModel()?.getValidation().canContinue);
+    if (step === 7) return state.analyzed;
     if (step === 8) return state.previewed && allRowsValid();
     return false;
   }
@@ -910,7 +1069,7 @@
     if (step === 2) return state.cleanVisited;
     if (step === 3) return state.cleanVisited && state.cleaned;
     if (step === 4) return state.mapColumnsVisited && Boolean(mapperModel()?.getValidation().canContinue);
-    if (step === 5) return state.analyzed;
+    if (step === 5) return state.mapAccountsVisited && Boolean(accountMapperModel()?.getValidation().canContinue);
     if (step === 6) return state.previewed;
     if (step === 7 || step === 8) return state.exported;
     return false;
@@ -929,7 +1088,7 @@
     if (state.current === 2) return state.imported ? ((reviewModel()?.getState().totalRows || 0) > 0 ? "Your file is loaded. Review and edit the imported rows, then continue to cleaning." : "No transaction rows remain. Add or restore at least one row before continuing.") : "Import a file to unlock the review step.";
     if (state.current === 3) return "Normalize dates, descriptions, and amounts locally. Rows that remain invalid will be called out.";
     if (state.current === 4) return "Choose the date, description, and signed amount columns from your file.";
-    if (state.current === 5) return "Enter the bank, expense, and income accounts for the exported transactions.";
+    if (state.current === 5) return "Assign the source account and review account, category, party, class, and customer/job values before validation.";
     if (state.current === 6) {
       const transactions = window.LedgerLiftCore?.state?.tx || [];
       const ready = transactions.filter((transaction) => transaction.ok).length;
@@ -949,6 +1108,7 @@
     document.body.classList.toggle("ledgerlift-pre-map-active", state.current < 4 && state.imported);
     document.body.classList.toggle("ledgerlift-map-active", state.current >= 4 && state.imported);
     document.body.classList.toggle("ledgerlift-map-columns-active", state.current === 4 && state.imported);
+    document.body.classList.toggle("ledgerlift-map-accounts-active", state.current === 5 && state.imported);
     steps.forEach((step) => {
       const item = shell.querySelector(`[data-step="${step.id}"]`);
       const button = shell.querySelector(`[data-step-button="${step.id}"]`);
@@ -974,8 +1134,11 @@
     cleanPanel.classList.toggle("hidden", !state.imported || state.current !== 3);
     const mapPanel = $("workspaceMapColumns");
     mapPanel.classList.toggle("hidden", !state.imported || state.current !== 4);
+    const accountPanel = $("workspaceMapAccounts");
+    accountPanel.classList.toggle("hidden", !state.imported || state.current !== 5);
     renderCleanSummary();
     if (state.imported && state.current === 4) renderMapping();
+    if (state.imported && state.current === 5) renderAccountMapping();
     $("continueToPreview").hidden = !state.analyzed;
     $("continueToExport").disabled = !state.previewed || !allRowsValid();
     $("download").hidden = !state.previewed || !allRowsValid();
@@ -986,7 +1149,7 @@
     if (step === 2) return $("workspaceReview");
     if (step === 3) return $("workspaceClean");
     if (step === 4) return $("workspaceMapColumns");
-    if (step === 5) return $("bank");
+    if (step === 5) return $("workspaceMapAccounts");
     if (step === 6 || step === 7) return $("validation");
     if (step === 8) return $("download");
     return $("ledgerliftWorkspace");
@@ -995,7 +1158,6 @@
   function setStep(step) {
     if (!available(step) && step !== state.current) return;
     if (step === 3) { state.cleanVisited = true; window.LedgerLiftCore?.markCleanReady?.(); state.cleaned = true; }
-    if (step === 5) state.mapAccountsVisited = true;
     state.current = step;
     render();
     const target = targetFor(step);
@@ -1044,13 +1206,14 @@
   });
   window.addEventListener("ledgerlift:import-preview-ready", (event) => { state.imported = false; state.current = 1; renderImportPreview(event.detail?.preview); render(); $("importPreviewTitle")?.focus(); });
   window.addEventListener("ledgerlift:import-error", (event) => { $("workflowMessage").textContent = event.detail?.message || "LedgerLift could not read that file. Choose another file and try again."; $("workflowMessage").dataset.error = "true"; $("workflowMessage")?.focus(); });
-  window.addEventListener("ledgerlift:data-loaded", () => { state.imported = true; state.cleaned = false; state.cleanVisited = false; state.cleanSummary = null; state.mapColumnsVisited = false; state.mapAccountsVisited = false; state.analyzed = false; state.previewed = false; state.exported = false; state.current = 2; renderReviewTable(); render(); $("workspaceReviewTitle")?.focus(); });
+  window.addEventListener("ledgerlift:data-loaded", () => { accountSelected.clear(); state.imported = true; state.cleaned = false; state.cleanVisited = false; state.cleanSummary = null; state.mapColumnsVisited = false; state.mapAccountsVisited = false; state.analyzed = false; state.previewed = false; state.exported = false; state.current = 2; renderReviewTable(); render(); $("workspaceReviewTitle")?.focus(); });
   window.addEventListener("ledgerlift:clean-state-changed", (event) => { state.cleanSummary = cleanerModel()?.getSummary?.() || state.cleanSummary; if (event.detail?.type !== "review-change") state.cleaned = true; if (state.current === 3) { if (event.detail?.type === "preview") renderCleanPreview(); else render(); } });
-  window.addEventListener("ledgerlift:mapping-changed", () => { if (state.current === 4) renderMapping(); });
-  window.addEventListener("ledgerlift:cleaned", (event) => { state.imported = true; state.cleaned = true; state.cleanSummary = event.detail?.summary || null; state.analyzed = false; state.mapColumnsVisited = false; state.mapAccountsVisited = false; state.previewed = false; state.exported = false; state.current = 3; render(); });
+  window.addEventListener("ledgerlift:mapping-changed", () => { accountMapperModel()?.sync(); if (state.current === 4) renderMapping(); else { state.mapAccountsVisited = false; state.analyzed = false; if (state.current === 5) renderAccountMapping(); render(); } });
+  window.addEventListener("ledgerlift:account-mapping-changed", () => { if (state.current === 5) renderAccountMapping(); });
+  window.addEventListener("ledgerlift:cleaned", (event) => { state.imported = true; state.cleaned = true; state.cleanSummary = event.detail?.summary || null; state.analyzed = false; state.mapColumnsVisited = false; state.mapAccountsVisited = false; state.previewed = false; state.exported = false; accountSelected.clear(); render(); });
   window.addEventListener("ledgerlift:review-edited", () => { state.cleaned = false; state.cleanSummary = cleanerModel()?.getSummary?.() || null; state.analyzed = false; state.mapColumnsVisited = false; state.mapAccountsVisited = false; state.previewed = false; state.exported = false; state.current = 2; render(); });
   window.addEventListener("ledgerlift:analyzed", () => { state.imported = true; state.mapColumnsVisited = true; state.mapAccountsVisited = true; state.analyzed = true; state.previewed = false; state.exported = false; state.current = 6; render(); });
-  window.addEventListener("ledgerlift:cleared", () => { syncFromCore(); state.current = 1; render(); });
+  window.addEventListener("ledgerlift:cleared", () => { accountSelected.clear(); syncFromCore(); state.current = 1; render(); });
   window.addEventListener("ledgerlift:exported", () => { state.exported = true; state.current = 8; render(); });
   window.LedgerLiftWorkspace = { state, setStep, canExport: () => state.previewed && allRowsValid() };
 })();
