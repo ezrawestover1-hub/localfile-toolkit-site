@@ -63,6 +63,38 @@ test("paid account handoff is tier-aware and purchase-gated", () => {
   assert.match(read("worker.js"), /JOIN entitlements/);
 });
 
+test("Plus routes are separate, entitlement-gated workspaces with a post-checkout handoff", () => {
+  const mode = read("plus-mode.js");
+  const styles = read("plus-mode.css");
+  assert.match(mode, /get\("mode"\) !== "plus"/);
+  assert.match(mode, /api\/account\/restore/);
+  assert.match(mode, /getCapabilities/);
+  assert.match(mode, /plus-access-gate/);
+  assert.match(mode, /plus-authorized/);
+  assert.match(mode, /plus-locked/);
+  assert.match(mode, /plus-mode:ready/);
+  assert.match(styles, /#pricing/);
+  assert.match(styles, /#sampleBtn/);
+  assert.match(styles, /plus-locked/);
+  assert.match(styles, /plus-handoff/);
+  assert.match(read("account-access.js"), /const plusHome/);
+  assert.match(read("account-access.js"), /mode=plus/);
+  assert.match(read("account/account.js"), /mode=plus/);
+  assert.match(read("checkout-portal/checkout.js"), /plusHome/);
+  assert.match(read("checkout-portal/checkout.js"), /successUrl/);
+  assert.match(read("checkout-portal/success.js"), /mode=plus/);
+  assert.match(read("account/verify.js"), /lft_pending_next/);
+  assert.match(read("account/login.js"), /safeNext/);
+  ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"].forEach((product) => {
+    const common = read(`${product}/common.js`);
+    const page = read(`${product}/index.html`);
+    assert.match(common, /\.\.\/plus-mode\.js/);
+    assert.match(page, /Try sample data/);
+    assert.match(page, /id="pricing"/);
+    assert.match(read(`${product}/plus.js`), /canUsePlus/);
+  });
+});
+
 test("final pricing source of truth matches every displayed plan", () => {
   const config = read("pricing-config.js");
   ["standard: 1999", "plus: 2499", "standard: 299", "plus: 599", "standard: 999", "plus: 1299", "standard: 699", "plus: 999", "separatePlusTotal: 6695", "savings: 2696", "savingsPercent: 40"].forEach((value) => assert.match(config, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))));

@@ -1,6 +1,8 @@
 const form = document.querySelector("#register-form");
 const message = document.querySelector("#register-message");
 const purchaseLink = document.querySelector("#register-purchase-link");
+const requestedNext = new URLSearchParams(location.search).get("next") || "";
+const safeNext = /^\/(ledgerlift|pixelport|contactcraft|calendarflow|captionshift)\/index\.html\?mode=plus$/.test(requestedNext) ? requestedNext : "/account/";
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const data = new FormData(form);
@@ -16,5 +18,5 @@ form.addEventListener("submit", async (event) => {
     return;
   }
   message.textContent = result?.message || "Unable to create the account right now.";
-  if (response?.ok) { sessionStorage.setItem("lft_pending_email", email); location.assign("/account/verify.html"); }
+  if (response?.ok) { sessionStorage.setItem("lft_pending_email", email); sessionStorage.setItem("lft_pending_next", safeNext); location.assign("/account/verify.html"); }
 });

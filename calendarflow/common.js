@@ -3,6 +3,7 @@
   const body = document.body;
   const key = body.dataset.demoKey;
   const product = body.dataset.product;
+  if (new URLSearchParams(location.search).get("mode") === "plus") { const script = document.createElement("script"); script.src = "../plus-mode.js"; document.head.append(script); }
   const checkout = window.PRODUCT_CHECKOUTS || {};
   const PRODUCT_ICON_REFS = Object.freeze(Object.fromEntries(Object.entries(window.PRODUCT_ICONS || {}).map(([key, item]) => [key, { name: item.name, src: item.icon }])));
 

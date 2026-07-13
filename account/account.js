@@ -94,7 +94,7 @@ function renderProductCard(key, entitlement) {
   const actions = document.createElement("div");
   actions.className = "product-actions";
   if (plus) {
-    actions.append(makeLink(`Open ${meta.name} Plus`, meta.home), makeLink("Access other products", "/account/", "button secondary"));
+    actions.append(makeLink(`Open ${meta.name} Plus`, `${meta.home}?mode=plus`), makeLink("Access other products", "/account/", "button secondary"));
   } else if (standard) {
     actions.append(makeLink(`Open ${meta.name} Standard`, meta.home), makeLink("Upgrade to Plus", `/checkout-portal/index.html?product=${key}&plan=plus`, "button secondary"));
   } else {

@@ -10,8 +10,15 @@ form.addEventListener("submit", async (event) => {
   if (!email) return;
   message.textContent = "Verifying…";
   const response = await fetch("/api/account/verify-code", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, code: new FormData(form).get("code") }) }).catch(() => null);
-  if (response?.redirected) { sessionStorage.removeItem("lft_pending_email"); location.assign(response.url); return; }
-  message.textContent = (await response?.json().catch(() => ({})))?.message || "Unable to verify the code.";
+  const result = await response?.json().catch(() => ({}));
+  if (response?.redirected || (result?.ok && result.redirect)) {
+    const next = sessionStorage.getItem("lft_pending_next") || result.redirect || response.url;
+    sessionStorage.removeItem("lft_pending_email");
+    sessionStorage.removeItem("lft_pending_next");
+    location.assign(next);
+    return;
+  }
+  message.textContent = result?.message || "Unable to verify the code.";
 });
 resend.addEventListener("click", async () => {
   if (!email) return;

@@ -2,6 +2,7 @@
   "use strict";
   const products = Object.freeze({ ledgerlift: "LedgerLift", pixelport: "PixelPort", contactcraft: "ContactCraft", calendarflow: "CalendarFlow", captionshift: "CaptionShift" });
   const productHome = (product) => `/${product}/index.html`;
+  const plusHome = (product) => `${productHome(product)}?mode=plus`;
   const checkoutHome = (product) => `/checkout-portal/index.html?product=${product}&plan=plus`;
   const planRank = { standard: 1, plus: 2 };
 
@@ -48,7 +49,7 @@
 
   function addAccessStrip(map, product) {
     const entitlement = map.get(product);
-    if (!entitlement || document.querySelector(".account-access-strip")) return;
+    if (!entitlement || document.body.classList.contains("plus-mode") || document.querySelector(".account-access-strip")) return;
     const plus = entitlement.plan_key === "plus";
     const strip = document.createElement("section");
     strip.className = `account-access-strip ${plus ? "is-plus" : "is-standard"}`;
@@ -87,7 +88,7 @@
     }
     if (plus) {
       plus.closest("#plus-plan")?.classList.add(plan === "plus" ? "account-active-plan" : "account-upgrade-plan");
-      if (plan === "plus") makeAccessButton(plus, `Open ${products[product]} Plus`, productHome(product));
+      if (plan === "plus") makeAccessButton(plus, `Open ${products[product]} Plus`, plusHome(product));
       else makeAccessButton(plus, `Upgrade to ${products[product]} Plus`, checkoutHome(product));
     }
     const heading = document.querySelector("#pricing .pricing-head h2");
@@ -111,7 +112,12 @@
       if (heroLink) { heroLink.textContent = "Open My Account"; heroLink.href = "/account/"; }
       if (portalHeading) portalHeading.textContent = "Open your Plus tools";
       if (portalCopy) portalCopy.textContent = "Every product below is ready with its Plus features. Choose a tool and start working.";
-      document.querySelectorAll(".suite-card b").forEach((label) => { label.textContent = label.textContent.replace(/^Open /, "Open Plus "); });
+      document.querySelectorAll(".suite-card").forEach((card) => {
+        const match = (card.getAttribute("href") || "").match(/\/(ledgerlift|pixelport|contactcraft|calendarflow|captionshift)\//);
+        if (match) card.href = plusHome(match[1]);
+        const label = card.querySelector("b");
+        if (label) label.textContent = label.textContent.replace(/^Open /, "Open Plus ");
+      });
       const bundle = document.querySelector(".bundle");
       if (bundle) {
         const bundleKicker = bundle.querySelector(".bundle-kicker");
@@ -147,6 +153,7 @@
       const entitlement = map.get(product);
       const label = card.querySelector("b");
       if (label) label.textContent = entitlement ? `Open ${entitlement.plan_key === "plus" ? "Plus " : ""}${products[product]} →` : `Explore ${products[product]} →`;
+      if (entitlement) card.href = entitlement.plan_key === "plus" ? plusHome(product) : productHome(product);
       card.dataset.accessState = entitlement?.plan_key || "unowned";
     });
     const bundle = document.querySelector(".bundle");
@@ -169,6 +176,7 @@
     const paid = map.size > 0;
     const fullPlus = isBundleOwner(map);
     const currentProduct = document.body.dataset.product;
+    const plusMode = new URLSearchParams(location.search).get("mode") === "plus";
     document.querySelectorAll("a[href*='product=suite'], .bundle-menu-button, [data-checkout='bundle'], .product-bundle-card").forEach((element) => {
       if (!paid || element.dataset.accountAccessApplied === "true") return;
       const isSuiteHeader = !currentProduct && element.classList.contains("suite-bundle-link");
@@ -181,13 +189,15 @@
       const match = (element.getAttribute("href") || "").match(/product=(ledgerlift|pixelport|contactcraft|calendarflow|captionshift)&plan=(standard|plus)/);
       if (match) [, product, plan] = match;
       if (!map.has(product) || !planRank[plan] || planRank[map.get(product).plan_key] < planRank[plan]) return;
-      makeAccessButton(element, accessLabel(product, plan), productHome(product));
+      makeAccessButton(element, accessLabel(product, plan), plan === "plus" ? plusHome(product) : productHome(product));
     });
     if (paid) {
       if (currentProduct) {
         document.querySelector("a.account-access-link")?.remove();
-        addAccessStrip(map, currentProduct);
-        applyProductPricing(map, currentProduct);
+        if (!plusMode) {
+          addAccessStrip(map, currentProduct);
+          applyProductPricing(map, currentProduct);
+        }
       } else {
         if (document.querySelector(".suite-bundle-link")) document.querySelector("a.account-access-link")?.remove();
         else addAccountLink();

@@ -1,11 +1,11 @@
 (() => {
   "use strict";
   const PRODUCTS = Object.freeze({
-    ledgerlift:{name:"LedgerLift",icon:window.PRODUCT_ICONS.ledgerlift.icon,description:"Private CSV-to-IIF conversion for recurring QuickBooks Desktop workflows.",home:"../ledgerlift/index.html",benefits:{standard:["Unlimited core conversions","Preview and basic validation","No ads inside the converter"],plus:["Everything in Standard","Saved mapping and account profiles","Advanced debit / credit mapping, categorization, duplicate review, and reports"]}},
-    pixelport:{name:"PixelPort",icon:window.PRODUCT_ICONS.pixelport.icon,description:"Private image conversion for PNG, JPG, WebP and supported AVIF files.",home:"../pixelport/index.html",benefits:{standard:["Unlimited core image conversions","Quality and output controls","No ads inside the converter"],plus:["Everything in Standard","Batch image queue and reusable presets","Background, filename, and web optimization controls"]}},
-    contactcraft:{name:"ContactCraft",icon:window.PRODUCT_ICONS.contactcraft.icon,description:"Private contact conversion between VCF/vCard and CSV.",home:"../contactcraft/index.html",benefits:{standard:["Unlimited core contact conversions","Preview before export","No ads inside the converter"],plus:["Everything in Standard","Duplicate detection and merge review","Cleanup, output mapping, and validation reports"]}},
-    calendarflow:{name:"CalendarFlow",icon:window.PRODUCT_ICONS.calendarflow.icon,description:"Private calendar conversion between ICS/iCalendar and CSV.",home:"../calendarflow/index.html",benefits:{standard:["Unlimited core calendar conversions","Preview before export","No ads inside the converter"],plus:["Everything in Standard","Calendar merging, filtering, and duplicate removal","Saved presets, recurrence normalization, and validation reports"]}},
-    captionshift:{name:"CaptionShift",icon:window.PRODUCT_ICONS.captionshift.icon,description:"Private subtitle conversion among SRT, VTT, SBV and ASS.",home:"../captionshift/index.html",benefits:{standard:["Unlimited core subtitle conversions","Timing preview and export","No ads inside the converter"],plus:["Everything in Standard","Batch conversion and saved timing presets","Find-and-replace cleanup and timing validation reports"]}},
+    ledgerlift:{name:"LedgerLift",icon:window.PRODUCT_ICONS.ledgerlift.icon,description:"Private CSV-to-IIF conversion for recurring QuickBooks Desktop workflows.",home:"../ledgerlift/index.html",plusHome:"../ledgerlift/index.html?mode=plus",benefits:{standard:["Unlimited core conversions","Preview and basic validation","No ads inside the converter"],plus:["Everything in Standard","Saved mapping and account profiles","Advanced debit / credit mapping, categorization, duplicate review, and reports"]}},
+    pixelport:{name:"PixelPort",icon:window.PRODUCT_ICONS.pixelport.icon,description:"Private image conversion for PNG, JPG, WebP and supported AVIF files.",home:"../pixelport/index.html",plusHome:"../pixelport/index.html?mode=plus",benefits:{standard:["Unlimited core image conversions","Quality and output controls","No ads inside the converter"],plus:["Everything in Standard","Batch image queue and reusable presets","Background, filename, and web optimization controls"]}},
+    contactcraft:{name:"ContactCraft",icon:window.PRODUCT_ICONS.contactcraft.icon,description:"Private contact conversion between VCF/vCard and CSV.",home:"../contactcraft/index.html",plusHome:"../contactcraft/index.html?mode=plus",benefits:{standard:["Unlimited core contact conversions","Preview before export","No ads inside the converter"],plus:["Everything in Standard","Duplicate detection and merge review","Cleanup, output mapping, and validation reports"]}},
+    calendarflow:{name:"CalendarFlow",icon:window.PRODUCT_ICONS.calendarflow.icon,description:"Private calendar conversion between ICS/iCalendar and CSV.",home:"../calendarflow/index.html",plusHome:"../calendarflow/index.html?mode=plus",benefits:{standard:["Unlimited core calendar conversions","Preview before export","No ads inside the converter"],plus:["Everything in Standard","Calendar merging, filtering, and duplicate removal","Saved presets, recurrence normalization, and validation reports"]}},
+    captionshift:{name:"CaptionShift",icon:window.PRODUCT_ICONS.captionshift.icon,description:"Private subtitle conversion among SRT, VTT, SBV and ASS.",home:"../captionshift/index.html",plusHome:"../captionshift/index.html?mode=plus",benefits:{standard:["Unlimited core subtitle conversions","Timing preview and export","No ads inside the converter"],plus:["Everything in Standard","Batch conversion and saved timing presets","Find-and-replace cleanup and timing validation reports"]}},
     suite:{name:"Complete Plus Bundle",icons:Object.values(window.PRODUCT_ICONS).map(item=>item.icon),description:"One-time Plus entitlement for all five private converter products.",home:"../index.html",benefits:{bundle:["LedgerLift Plus with saved profiles, advanced mapping, categorization, duplicate review, and reports","PixelPort Plus","ContactCraft Plus","CalendarFlow Plus","CaptionShift Plus","Save $26.96 versus five separate Plus licenses"]}}
   });
   const pricing=window.LOCALFILE_PRICING;
@@ -20,7 +20,7 @@
   const $=id=>document.getElementById(id);
   const button=$("checkoutButton"), msg=$("setupMessage");
   if(!valid){location.replace("../pricing.html");return;}
-  $("returnLink").href=product.home;
+  $("returnLink").href=planKey === "plus" ? product.plusHome : product.home;
   const emblemSources = product.icons || (product.icon ? [product.icon] : []);
   emblemSources.forEach(src=>{
     const image=document.createElement("img");
@@ -53,7 +53,7 @@
       button.disabled = false;
       button.textContent = productKey === "suite" ? "Access other products" : `Access ${product.name}${owned.get(productKey) === "plus" ? " Plus" : ""}`;
       msg.textContent = "This purchase is already linked to your account.";
-      button.addEventListener("click", () => location.assign(productKey === "suite" ? "/account/" : product.home), { once: true });
+      button.addEventListener("click", () => location.assign(productKey === "suite" ? "/account/" : owned.get(productKey) === "plus" ? product.plusHome : product.home), { once: true });
       return true;
     } catch { return false; }
   }
