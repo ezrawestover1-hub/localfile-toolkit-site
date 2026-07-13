@@ -19,7 +19,7 @@ const clientKey = (request) => request.headers.get("CF-Connecting-IP") || reques
 const ACCOUNT_COOKIE = "__Host-lft_account_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 const SESSION_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
-const PASSWORD_ITERATIONS = 10000;
+const PASSWORD_ITERATIONS = 2000;
 const PASSWORD_MIN_LENGTH = 8;
 
 function randomToken(prefix) {
@@ -78,9 +78,10 @@ function randomVerificationCode() {
 }
 
 async function passwordHash(password, salt, iterations = PASSWORD_ITERATIONS) {
-  const key = await crypto.subtle.importKey("raw", utf8(password).buffer, { name: "PBKDF2" }, false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: salt.buffer, iterations, hash: "SHA-256" }, key, 256);
-  return new Uint8Array(bits);
+  const key = await crypto.subtle.importKey("raw", salt.buffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  let state = utf8(password);
+  for (let index = 0; index < iterations; index += 1) state = new Uint8Array(await crypto.subtle.sign("HMAC", key, state));
+  return state;
 }
 
 function constantTimeEqual(left, right) {
