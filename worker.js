@@ -673,7 +673,7 @@ export async function handleRequest(request, env) {
   if (request.method === "POST" && url.pathname === "/api/account/register") return handleAccountRegister(request, env).catch((error) => { const reason = new Set(["account_user_write", "account_user_read", "account_password_read", "password_hash", "account_password_write", "verification_code_write"]).has(error?.message) ? error.message : "account_register_failed"; console.error("account_register_failed", reason); return json({ ok: false, message: "Account setup is temporarily unavailable. Please try again." }, 503); });
   if (request.method === "POST" && url.pathname === "/api/account/resend-code") return handleResendCode(request, env);
   if (request.method === "POST" && url.pathname === "/api/account/password-reset/request") return handlePasswordResetRequest(request, env);
-  if (request.method === "POST" && url.pathname === "/api/account/password-reset/complete") return handlePasswordResetComplete(request, env);
+  if (request.method === "POST" && url.pathname === "/api/account/password-reset/complete") return handlePasswordResetComplete(request, env).catch((error) => { console.error("account_password_reset_route_failed", error?.message || "unknown"); return json({ ok: false, message: "We could not complete the reset. Request a new code and try again." }, 503); });
   if (request.method === "POST" && url.pathname === "/api/account/login") return handleAccountLogin(request, env);
   if (request.method === "POST" && url.pathname === "/api/account/verify-code") return handleAccountVerifyCode(request, env);
   if (request.method === "GET" && url.pathname === "/api/account/me") return handleAccountMe(request, env);
