@@ -3,7 +3,7 @@ import { restoreEntitlements } from "/license.js";
 const message = document.querySelector("#account-message");
 const productsRoot = document.querySelector("#products");
 const productMeta = {
-  ledgerlift: { name: "LedgerLift", feature: "Private finance workflows, batch tools, and Plus automation.", home: "/ledgerlift/index.html" },
+  ledgerlift: { name: "LedgerLift", feature: "Private CSV-to-IIF conversion with Plus profiles, categorization, duplicate review, and reports.", home: "/ledgerlift/index.html" },
   pixelport: { name: "PixelPort", feature: "Private image conversion, batch processing, and Plus export controls.", home: "/pixelport/index.html" },
   contactcraft: { name: "ContactCraft", feature: "Clean contact conversion with Plus normalization and export tools.", home: "/contactcraft/index.html" },
   calendarflow: { name: "CalendarFlow", feature: "Calendar conversion with Plus batch workflows and flexible export controls.", home: "/calendarflow/index.html" },
@@ -14,10 +14,14 @@ let account;
 
 function currentEntitlements() {
   const latest = new Map();
-  (Array.isArray(account?.entitlements) ? account.entitlements : []).forEach((item) => {
+  const active = Array.isArray(account?.entitlements) ? account.entitlements.filter((item) => item?.status === undefined || item.status === "active") : [];
+  latest.bundleActive = account?.bundle === true || active.some((item) => item.product_key === "suite" && item.plan_key === "bundle");
+  latest.hasPurchase = latest.bundleActive;
+  active.forEach((item) => {
     if (!productMeta[item.product_key] || !planRank[item.plan_key]) return;
     const previous = latest.get(item.product_key);
     if (!previous || planRank[item.plan_key] > planRank[previous.plan_key]) latest.set(item.product_key, item);
+    latest.hasPurchase = true;
   });
   return latest;
 }
@@ -45,9 +49,9 @@ function renderSummary(entitlements) {
     summary.className = "account-summary";
     document.querySelector(".account-grid")?.before(summary);
   }
-  const count = entitlements.size;
-  const plusCount = [...entitlements.values()].filter((item) => item.plan_key === "plus").length;
-  const status = count === Object.keys(productMeta).length && plusCount === count ? "Plus access active across your toolkit" : plusCount ? "Your Plus upgrades are ready" : "Standard access active";
+  const count = entitlements.bundleActive ? Object.keys(productMeta).length : entitlements.size;
+  const plusCount = entitlements.bundleActive ? count : [...entitlements.values()].filter((item) => item.plan_key === "plus").length;
+  const status = entitlements.bundleActive ? "Complete Plus bundle active" : count === Object.keys(productMeta).length && plusCount === count ? "Plus access active across your toolkit" : plusCount ? "Your Plus upgrades are ready" : "Standard access active";
   summary.replaceChildren();
   const main = document.createElement("div");
   main.className = "account-summary-main";
@@ -72,6 +76,7 @@ function renderDetails() {
 function renderProductCard(key, entitlement) {
   const meta = productMeta[key];
   const plan = entitlement?.plan_key || "unowned";
+  const included = entitlement?.source === "bundle";
   const plus = plan === "plus";
   const standard = plan === "standard";
   const card = document.createElement("article");
@@ -86,9 +91,9 @@ function renderProductCard(key, entitlement) {
   icon.height = 48;
   const copy = document.createElement("div");
   copy.className = "account-product-copy";
-  copy.append(makeText("h3", "", meta.name), makeText("span", "account-product-meta", plus ? "Plus unlocked" : standard ? "Standard active" : "Not purchased"));
+  copy.append(makeText("h3", "", meta.name), makeText("span", "account-product-meta", included ? "Included with Bundle" : plus ? "Plus unlocked" : standard ? "Standard active" : "Not purchased"));
   header.append(icon, copy);
-  const status = makeText("span", `account-product-status ${plan}`, plus ? "PLUS" : standard ? "STANDARD" : "EXPLORE");
+  const status = makeText("span", `account-product-status ${included ? "bundle" : plan}`, included ? "INCLUDED WITH BUNDLE" : plus ? "PLUS" : standard ? "STANDARD" : "EXPLORE");
   header.append(status);
   const description = makeText("p", "", plus || standard ? meta.feature : `Explore ${meta.name} and see which workflow fits your files.`);
   const actions = document.createElement("div");
@@ -106,7 +111,7 @@ function renderProductCard(key, entitlement) {
 
 function renderProducts(entitlements) {
   productsRoot.replaceChildren();
-  Object.keys(productMeta).forEach((key) => productsRoot.append(renderProductCard(key, entitlements.get(key))));
+  Object.keys(productMeta).forEach((key) => productsRoot.append(renderProductCard(key, entitlements.bundleActive ? { plan_key: "plus", source: "bundle" } : entitlements.get(key))));
 }
 
 function setupTabs() {

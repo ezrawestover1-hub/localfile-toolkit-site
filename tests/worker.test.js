@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHmac, webcrypto } from "node:crypto";
-import { handleRequest } from "../worker.js";
+import { handleRequest, summarizeEntitlements } from "../worker.js";
 
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
@@ -80,7 +80,30 @@ test("Paddle customer lookup failure is retriable", async () => { const env = db
 test("invalid customer email prevents fulfillment", async () => { const env = dbEnv(); env.PADDLE_API_KEY = "server-only-test-key"; env.PADDLE_API_BASE_URL = "https://sandbox-api.paddle.com"; const originalFetch = globalThis.fetch; globalThis.fetch = async () => new Response(JSON.stringify({ data: { email: "not-an-email" } }), { status: 200 }); try { const response = await handleRequest(await signedRequest(eventFor(prices.standard, "evt_invalid_email", { customer: {} })), env); assert.equal(response.status, 422); assert.equal((await response.json()).error, "invalid_customer_email"); assert.equal(env.LICENSE_DB.entitlements.length, 0); } finally { globalThis.fetch = originalFetch; } });
 test("empty item list is rejected without recording fulfillment", async () => { const env = dbEnv(); const response = await handleRequest(await signedRequest(eventFor(prices.standard, "evt_empty", { items: [] })), env); assert.equal(response.status, 422); assert.equal((await response.json()).error, "unsupported_price"); assert.equal(env.LICENSE_DB.events.size, 0); });
 test("unknown price IDs are rejected", async () => { const env = dbEnv(); const result = await fulfill(env, "pri_unknown"); assert.equal(result.error, "unsupported_price"); assert.equal(env.LICENSE_DB.entitlements.length, 0); });
-test("bundle creates five Plus entitlements", async () => { const env = dbEnv(); const result = await fulfill(env, prices.bundle); assert.equal(result.fulfilled, 5); assert.equal(env.LICENSE_DB.entitlements.filter((row) => row.plan_key === "plus").length, 5); });
+test("bundle creates an explicit bundle entitlement plus five product Plus entitlements", async () => { const env = dbEnv(); const result = await fulfill(env, prices.bundle); assert.equal(result.fulfilled, 6); assert.equal(env.LICENSE_DB.entitlements.filter((row) => row.plan_key === "plus").length, 5); assert.deepEqual(env.LICENSE_DB.entitlements.find((row) => row.product_key === "suite"), { id: env.LICENSE_DB.entitlements.find((row) => row.product_key === "suite").id, customer_id: env.LICENSE_DB.entitlements[0].customer_id, transaction_id: "txn_evt_1", product_key: "suite", plan_key: "bundle", status: "active" }); });
+
+test("product entitlement summary keeps LedgerLift ownership independent", () => {
+  const free = summarizeEntitlements([]);
+  assert.equal(free.highestLedgerLiftTier, "free");
+  assert.equal(free.products.pixelport, "free");
+  const ledgerStandard = summarizeEntitlements([{ product_key: "ledgerlift", plan_key: "standard", status: "active" }]);
+  assert.equal(ledgerStandard.highestLedgerLiftTier, "standard");
+  assert.equal(ledgerStandard.products.pixelport, "free");
+  const pixelPlus = summarizeEntitlements([{ product_key: "pixelport", plan_key: "plus", status: "active" }]);
+  assert.equal(pixelPlus.highestLedgerLiftTier, "free");
+  const multiple = summarizeEntitlements([{ product_key: "ledgerlift", plan_key: "standard", status: "active" }, { product_key: "ledgerlift", plan_key: "plus", status: "active" }, { product_key: "calendarflow", plan_key: "standard", status: "active" }]);
+  assert.equal(multiple.highestLedgerLiftTier, "plus");
+  assert.equal(multiple.products.calendarflow, "standard");
+  const revoked = summarizeEntitlements([{ product_key: "ledgerlift", plan_key: "plus", status: "revoked" }]);
+  assert.equal(revoked.highestLedgerLiftTier, "free");
+  const bundle = summarizeEntitlements([{ product_key: "suite", plan_key: "bundle", status: "active" }]);
+  assert.equal(bundle.bundle, true);
+  assert.equal(bundle.highestLedgerLiftTier, "plus");
+  assert.equal(bundle.products.pixelport, "plus");
+  const allIndividualPlus = summarizeEntitlements(["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"].map((product_key) => ({ product_key, plan_key: "plus", status: "active" })));
+  assert.equal(allIndividualPlus.bundle, false);
+  assert.equal(allIndividualPlus.highestLedgerLiftTier, "plus");
+});
 test("concurrent delivery allows one owner and makes the other retry", async () => { const env = dbEnv(); const responses = await Promise.all([handleRequest(await signedRequest(eventFor(prices.plus, "evt_concurrent")), env), handleRequest(await signedRequest(eventFor(prices.plus, "evt_concurrent")), env)]); const statuses = responses.map((response) => response.status).sort(); assert.deepEqual(statuses, [200, 409]); assert.equal(env.LICENSE_DB.entitlements.length, 1); const retry = await fulfill(env, prices.plus, "evt_concurrent"); assert.equal(retry.duplicate, true); assert.equal(env.LICENSE_DB.codes.length, 1); });
 test("replayed fulfillment does not create another activation code", async () => { const env = dbEnv(); await fulfill(env); await fulfill(env); assert.equal(env.LICENSE_DB.entitlements.length, 1); assert.equal(env.LICENSE_DB.codes.length, 1); });
 test("activation code is single-use and returns a signed entitlement", async () => { const env = dbEnv(); const result = await fulfill(env); const claim = await handleRequest(new Request("https://example.test/api/license/claim", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ activation_code: result.development_activation_codes[0], installation_id: "installation-123456789" }) }), env); assert.equal(claim.status, 200); const second = await handleRequest(new Request("https://example.test/api/license/claim", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ activation_code: result.development_activation_codes[0], installation_id: "installation-987654321" }) }), env); assert.equal(second.status, 400); });

@@ -130,7 +130,8 @@
     capabilities = await license.getCapabilities();
     if (capabilities.canUseCore(product)) return "authorized";
     if (!restored.ok) return "restore-error";
-    return (account.entitlements || []).some((item) => item.product_key === product && ["standard", "plus"].includes(item.plan_key)) ? "restore-error" : "not-entitled";
+    const hasBundle = account.bundle === true || (account.entitlements || []).some((item) => item.product_key === "suite" && item.plan_key === "bundle");
+    return hasBundle || (account.entitlements || []).some((item) => item.product_key === product && ["standard", "plus"].includes(item.plan_key)) ? "restore-error" : "not-entitled";
   }
 
   function markAuthorized() {

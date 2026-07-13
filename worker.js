@@ -22,6 +22,17 @@ const SESSION_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 const PASSWORD_ITERATIONS = 2000;
 const PASSWORD_MIN_LENGTH = 8;
 
+export function summarizeEntitlements(items) {
+  const active = Array.isArray(items) ? items.filter((item) => item?.status === undefined || item.status === "active") : [];
+  const bundle = active.some((item) => item.product_key === "suite" && item.plan_key === "bundle");
+  const products = Object.fromEntries(PRODUCTS.map((product) => {
+    const owned = active.filter((item) => item.product_key === product && ["standard", "plus"].includes(item.plan_key));
+    const highest = owned.some((item) => item.plan_key === "plus") ? "plus" : owned.length ? "standard" : "free";
+    return [product, bundle ? "plus" : highest];
+  }));
+  return { active, bundle, products, highestLedgerLiftTier: products.ledgerlift, hasPurchase: bundle || active.some((item) => PRODUCTS.includes(item.product_key) && ["standard", "plus"].includes(item.plan_key)) };
+}
+
 function randomToken(prefix) {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
@@ -286,7 +297,8 @@ async function handleAccountMe(request, env) {
   if (!user) return json({ authenticated: false }, 401);
   const customer = await env.LICENSE_DB.prepare("SELECT id,normalized_email,created_at FROM customers WHERE normalized_email = ?").bind(user.normalized_email).first();
   const entitlements = customer ? await env.LICENSE_DB.prepare("SELECT product_key,plan_key,status,transaction_id,created_at FROM entitlements WHERE customer_id = ? AND status = 'active' ORDER BY created_at DESC").bind(customer.id).all() : { results: [] };
-  return json({ authenticated: true, email: user.normalized_email, customer: customer ? { created_at: customer.created_at } : null, entitlements: entitlements.results || [] });
+  const summary = summarizeEntitlements(entitlements.results || []);
+  return json({ authenticated: true, email: user.normalized_email, customer: customer ? { created_at: customer.created_at } : null, entitlements: summary.active, bundle: summary.bundle, products: summary.products, highestLedgerLiftTier: summary.highestLedgerLiftTier });
 }
 
 async function handleAccountRestore(request, env) {
@@ -488,10 +500,11 @@ function entitlementsForPrices(priceIds, env) {
   for (const priceId of priceIds) {
     const mapped = map.get(priceId);
     if (!mapped) throw new Error("unknown_price");
-    if (mapped[1] === "bundle") return PRODUCTS.map((product) => [product, "plus"]);
+    if (mapped[1] === "bundle") return [["suite", "bundle"], ...PRODUCTS.map((product) => [product, "plus"])]
+      .filter((grant, index, grants) => grants.findIndex((candidate) => candidate[0] === grant[0] && candidate[1] === grant[1]) === index);
     products.push(mapped);
   }
-  return products;
+  return products.filter((grant, index, grants) => grants.findIndex((candidate) => candidate[0] === grant[0] && candidate[1] === grant[1]) === index);
 }
 
 function activationCode() {
@@ -709,7 +722,8 @@ async function handleVerify(request, env) {
   const row = await env.LICENSE_DB.prepare("SELECT a.revoked_at, e.status, e.product_key, e.plan_key FROM activations a JOIN entitlements e ON e.id = a.entitlement_id WHERE a.token_id = ?").bind(payload.token_id).first();
   if (!row || row.revoked_at || row.status !== "active" || row.product_key !== payload.product || row.plan_key !== payload.plan) return json({ valid: false }, 401);
   await env.LICENSE_DB.prepare("UPDATE activations SET last_seen_at = ? WHERE token_id = ?").bind(nowIso(), payload.token_id).run();
-  return json({ valid: true, product: row.product_key, plan: row.plan_key, capabilities: { core: true, plus: row.plan_key === "plus", bundle: row.product_key === "suite" } });
+  const isBundle = row.product_key === "suite" && row.plan_key === "bundle";
+  return json({ valid: true, product: row.product_key, plan: row.plan_key, capabilities: { core: true, plus: row.plan_key === "plus" || isBundle, bundle: isBundle } });
 }
 
 export async function handleRequest(request, env) {

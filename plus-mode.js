@@ -131,7 +131,8 @@
     capabilities = await license.getCapabilities();
     if (capabilities.canUsePlus(product)) return { state: "authorized" };
     if (!restored.ok) return { state: "restore-error" };
-    const hasPlus = (account.entitlements || []).some((item) => item.product_key === product && item.plan_key === "plus");
+    const hasBundle = account.bundle === true || (account.entitlements || []).some((item) => item.product_key === "suite" && item.plan_key === "bundle");
+    const hasPlus = hasBundle || (account.entitlements || []).some((item) => item.product_key === product && item.plan_key === "plus");
     return { state: hasPlus ? "restore-error" : "not-entitled" };
   }
 

@@ -18,15 +18,23 @@
 
   function entitlementMap(items) {
     const map = new Map();
-    (Array.isArray(items) ? items : []).forEach((item) => {
+    const active = Array.isArray(items) ? items.filter((item) => item?.status === undefined || item.status === "active") : [];
+    map.bundleActive = active.some((item) => item.product_key === "suite" && item.plan_key === "bundle");
+    map.hasPurchase = map.bundleActive;
+    active.forEach((item) => {
       if (!products[item.product_key] || !planRank[item.plan_key]) return;
       const previous = map.get(item.product_key);
       if (!previous || planRank[item.plan_key] > planRank[previous.plan_key]) map.set(item.product_key, item);
+      map.hasPurchase = true;
     });
     return map;
   }
 
-  function isBundleOwner(map) { return Object.keys(products).every((product) => map.get(product)?.plan_key === "plus"); }
+  function isBundleOwner(map) { return map.bundleActive === true; }
+  function productEntitlement(map, product) {
+    if (map.bundleActive) return { product_key: product, plan_key: "plus", source: "bundle" };
+    return map.get(product) || null;
+  }
   function accessLabel(product, plan) { return `Access ${products[product]}${plan === "plus" ? " Plus" : ""}`; }
   function makeAccessButton(element, label, target) {
     element.textContent = label;
@@ -49,7 +57,7 @@
   }
 
   function addAccessStrip(map, product) {
-    const entitlement = map.get(product);
+    const entitlement = productEntitlement(map, product);
     if (!entitlement || document.body.classList.contains("plus-mode") || document.querySelector(".account-access-strip")) return;
     const plus = entitlement.plan_key === "plus";
     const strip = document.createElement("section");
@@ -60,7 +68,7 @@
     const title = document.createElement("strong");
     title.textContent = `${products[product]} ${plus ? "Plus" : "Standard"} active`;
     const detail = document.createElement("span");
-    detail.textContent = plus ? "All Plus controls are unlocked for this product." : "Core conversion is active. Upgrade when you need the Plus workflow.";
+    detail.textContent = entitlement.source === "bundle" ? "LedgerLift Plus is included with your complete toolkit." : plus ? "All Plus controls are unlocked for this product." : "Core conversion is active. Upgrade when you need the Plus workflow.";
     content.append(title, detail);
     const actions = document.createElement("div");
     actions.className = "account-access-strip-actions";
@@ -78,7 +86,7 @@
   }
 
   function applyProductPricing(map, product) {
-    const entitlement = map.get(product);
+    const entitlement = productEntitlement(map, product);
     if (!entitlement) return;
     const standard = document.querySelector("#standard-plan [data-checkout], #standard-plan a[href*='checkout-portal']");
     const plus = document.querySelector("#plus-plan [data-checkout], #plus-plan a[href*='checkout-portal']");
@@ -151,7 +159,7 @@
       const match = (card.getAttribute("href") || "").match(/\/(ledgerlift|pixelport|contactcraft|calendarflow|captionshift)\//);
       if (!match) return;
       const product = match[1];
-      const entitlement = map.get(product);
+      const entitlement = productEntitlement(map, product);
       const label = card.querySelector("b");
       if (label) label.textContent = entitlement ? `Open ${entitlement.plan_key === "plus" ? "Plus " : ""}${products[product]} →` : `Explore ${products[product]} →`;
       if (entitlement) card.href = entitlement.plan_key === "plus" ? plusHome(product) : standardHome(product);
@@ -174,7 +182,7 @@
   }
 
   function apply(map) {
-    const paid = map.size > 0;
+    const paid = map.hasPurchase === true;
     const fullPlus = isBundleOwner(map);
     const currentProduct = document.body.dataset.product;
     const plusMode = new URLSearchParams(location.search).get("mode") === "plus";
@@ -189,7 +197,8 @@
       let plan = element.dataset.checkout || "";
       const match = (element.getAttribute("href") || "").match(/product=(ledgerlift|pixelport|contactcraft|calendarflow|captionshift)&plan=(standard|plus)/);
       if (match) [, product, plan] = match;
-      if (!map.has(product) || !planRank[plan] || planRank[map.get(product).plan_key] < planRank[plan]) return;
+      const entitlement = productEntitlement(map, product);
+      if (!entitlement || !planRank[plan] || planRank[entitlement.plan_key] < planRank[plan]) return;
       makeAccessButton(element, accessLabel(product, plan), plan === "plus" ? plusHome(product) : standardHome(product));
     });
     if (paid) {
@@ -209,8 +218,18 @@
 
   loadStylesheet();
   addAccountLink();
+  function routeOwnedLedgerLift(map, account) {
+    const path = location.pathname.replace(/\/+$/, "");
+    const isLedgerLiftHome = /\/ledgerlift(?:\/index\.html)?$/.test(path);
+    const mode = new URLSearchParams(location.search).get("mode");
+    if (!isLedgerLiftHome || mode === "standard" || mode === "plus") return;
+    const serverTier = ["free", "standard", "plus"].includes(account?.highestLedgerLiftTier) ? account.highestLedgerLiftTier : productEntitlement(map, "ledgerlift")?.plan_key || "free";
+    if (serverTier === "free") return;
+    location.replace(`${productHome("ledgerlift")}?mode=${serverTier}`);
+  }
+
   fetch("/api/account/me", { credentials: "same-origin", cache: "no-store" })
     .then((response) => response.ok ? response.json() : null)
-    .then((account) => { if (account?.authenticated) apply(entitlementMap(account.entitlements)); })
+    .then((account) => { if (account?.authenticated) { const map = entitlementMap(account.entitlements); routeOwnedLedgerLift(map, account); apply(map); } })
     .catch(() => {});
 })();

@@ -60,10 +60,18 @@ export async function verifyEntitlement(token) {
 export async function getCapabilities() {
   const results = await Promise.all(readTokens().map(async (token) => ({ token, result: await verifyEntitlement(token).catch(() => null) })));
   const active = results.filter(({ result }) => result);
+  const bundle = active.some(({ result }) => result.product === "suite" && result.plan === "bundle" && result.capabilities.bundle === true);
+  const planFor = (product) => {
+    if (bundle) return "plus";
+    return active.some(({ result }) => result.product === product && result.plan === "plus") ? "plus" : active.some(({ result }) => result.product === product && ["standard", "plus"].includes(result.plan)) ? "standard" : "free";
+  };
   return {
     active,
-    canUseCore(product) { return active.some(({ result }) => result.product === product || result.product === "suite"); },
-    canUsePlus(product) { return active.some(({ result }) => result.product === product || result.product === "suite") && active.some(({ result }) => result.product === product && result.capabilities.plus || result.product === "suite"); },
-    ownsBundle() { return active.some(({ result }) => result.product === "suite" && result.capabilities.bundle); }
+    bundle,
+    planFor,
+    ownsProduct(product) { return planFor(product) !== "free"; },
+    canUseCore(product) { return planFor(product) !== "free"; },
+    canUsePlus(product) { return planFor(product) === "plus"; },
+    ownsBundle() { return bundle; }
   };
 }

@@ -128,6 +128,31 @@ test("Standard routes are separate paid workspaces with core entitlement gating"
   });
 });
 
+test("LedgerLift ownership is product-specific and routes owned users into a quiet workspace", () => {
+  const access = read("account-access.js");
+  const license = read("license.js");
+  const worker = read("worker.js");
+  assert.match(access, /bundleActive/);
+  assert.match(access, /highestLedgerLiftTier/);
+  assert.match(access, /routeOwnedLedgerLift/);
+  assert.match(access, /mode=\$\{serverTier\}/);
+  assert.doesNotMatch(access, /Object\.keys\(products\)\.every/);
+  assert.match(license, /planFor/);
+  assert.match(license, /bundle/);
+  assert.match(worker, /summarizeEntitlements/);
+  assert.match(worker, /highestLedgerLiftTier/);
+  assert.match(worker, /\["suite", "bundle"\]/);
+  assert.match(read("plus-mode.js"), /hasBundle/);
+  assert.match(read("standard-mode.js"), /hasBundle/);
+  assert.match(read("LEDGERLIFT_PRODUCT_MATRIX.md"), /Free \/ unpaid/);
+  assert.match(read("LEDGERLIFT_PRODUCT_MATRIX.md"), /LedgerLift Standard/);
+  assert.match(read("LEDGERLIFT_PRODUCT_MATRIX.md"), /LedgerLift Plus/);
+  assert.match(read("LEDGERLIFT_PRODUCT_MATRIX.md"), /not inferred from owning five individual products/);
+  assert.match(read("checkout-portal/checkout.js"), /This purchase unlocks LedgerLift only/);
+  assert.match(read("checkout-portal/success.js"), /handoffAuthenticatedBuyer/);
+  assert.match(read("checkout-portal/purchase-success.html"), /connect-src 'self'/);
+});
+
 test("final pricing source of truth matches every displayed plan", () => {
   const config = read("pricing-config.js");
   ["standard: 1999", "plus: 2499", "standard: 299", "plus: 599", "standard: 999", "plus: 1299", "standard: 699", "plus: 999", "separatePlusTotal: 6695", "savings: 2696", "savingsPercent: 40"].forEach((value) => assert.match(config, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))));
