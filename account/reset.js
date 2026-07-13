@@ -26,5 +26,5 @@ form.addEventListener("submit", async (event) => {
   if (data.get("password") !== data.get("confirm_password")) { message.textContent = "Passwords do not match."; return; }
   message.textContent = "Resetting password…";
   const response = await fetch("/api/account/password-reset/complete", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: data.get("email"), code: data.get("code"), password: data.get("password") }) }).catch(() => null);
-  if (response?.redirected) location.assign(response.url); else { const result = await response?.json().catch(() => ({})); message.textContent = result?.message ? `${result.message}${result.diagnostic ? ` Reason: ${result.diagnostic}.` : ""}` : `Unable to reset the password (server status ${response?.status || "unavailable"}).`; }
+  if (response?.redirected) location.assign(response.url); else { const result = await response?.json().catch(() => ({})); if (result?.ok && result.redirect) location.assign(result.redirect); else message.textContent = result?.message ? `${result.message}${result.diagnostic ? ` Reason: ${result.diagnostic}.` : ""}` : `Unable to reset the password (server status ${response?.status || "unavailable"}).`; }
 });

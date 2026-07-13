@@ -98,6 +98,13 @@ async function createAccountSession(env, userId, request) {
   return setAccountCookie(accountRedirect(`${new URL(request.url).origin}/account/`), rawSession);
 }
 
+async function createAccountSessionJson(env, userId) {
+  const rawSession = randomToken("session");
+  const now = nowIso();
+  await env.LICENSE_DB.prepare("INSERT INTO account_sessions (id,user_id,session_hash,expires_at,created_at,last_seen_at) VALUES (?,?,?,?,?,?)").bind(id("session"), userId, await sha256(rawSession), new Date(Date.now() + SESSION_MAX_AGE * 1000).toISOString(), now, now).run();
+  return setAccountCookie(json({ ok: true, message: "Password reset successfully.", redirect: "/account/" }), rawSession);
+}
+
 async function sendVerificationCode(env, email, code) {
   return sendEmail(env, { to: email, subject: "Your LocalFile Toolkit verification code", text: `Your LocalFile Toolkit verification code is ${code}. It expires in 15 minutes. If you did not request this, you can ignore this email.` });
 }
@@ -192,7 +199,7 @@ async function handlePasswordResetComplete(request, env) {
   if (!validEmail(email) || !/^\d{6}$/.test(code) || password.length < PASSWORD_MIN_LENGTH || password.length > 256) return json({ ok: false, message: `Enter the code and a password of at least ${PASSWORD_MIN_LENGTH} characters.` }, 400);
   const user = await env.LICENSE_DB.prepare("SELECT u.id,p.verified_at FROM account_users u LEFT JOIN account_passwords p ON p.user_id = u.id WHERE u.normalized_email = ?").bind(email).first();
   const row = user?.id ? await env.LICENSE_DB.prepare("SELECT id,user_id,expires_at,used_at FROM account_verification_codes WHERE user_id = ? AND purpose IN ('reset','signup') AND code_hash = ? ORDER BY created_at DESC LIMIT 1").bind(user.id, await sha256(code)).first() : null;
-  if (row?.used_at && user?.verified_at) return createAccountSession(env, row.user_id, request);
+  if (row?.used_at && user?.verified_at) return createAccountSessionJson(env, row.user_id);
   if (!row || row.used_at || new Date(row.expires_at).getTime() <= Date.now()) return json({ ok: false, message: "That code is invalid or expired." }, 400);
   try {
     const now = nowIso();
@@ -256,8 +263,8 @@ async function handleAccountVerifyCode(request, env) {
     const pending = await env.LICENSE_DB.prepare("SELECT user_id FROM account_pending_passwords WHERE user_id = ?").bind(row.user_id).first();
     if (pending) await activateStagedPassword(env, row.user_id, now);
     const consumed = await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?").bind(now, row.id, now).run();
-    if (!consumed?.meta?.changes) return createAccountSession(env, row.user_id, request);
-    return createAccountSession(env, row.user_id, request);
+    if (!consumed?.meta?.changes) return createAccountSessionJson(env, row.user_id);
+    return createAccountSessionJson(env, row.user_id);
   } catch (error) {
     console.error("account_verify_failed", error?.message === "pending_password_missing" ? "pending_password_missing" : "verification_completion_failed");
     return json({ ok: false, message: "We could not complete verification. Request a new code and try again." }, 503);
