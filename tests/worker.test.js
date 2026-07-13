@@ -107,6 +107,21 @@ test("product entitlement summary keeps LedgerLift ownership independent", () =>
   assert.equal(allIndividualPlus.bundle, false);
   assert.equal(allIndividualPlus.highestLedgerLiftTier, "plus");
 });
+
+test("product entitlement summary keeps ContactCraft ownership independent", () => {
+  const contactStandard = summarizeEntitlements([{ product_key: "contactcraft", plan_key: "standard", status: "active" }]);
+  assert.equal(contactStandard.products.contactcraft, "standard");
+  assert.equal(contactStandard.products.ledgerlift, "free");
+  assert.equal(contactStandard.products.pixelport, "free");
+  const contactPlus = summarizeEntitlements([{ product_key: "contactcraft", plan_key: "standard", status: "active" }, { product_key: "contactcraft", plan_key: "plus", status: "active" }]);
+  assert.equal(contactPlus.products.contactcraft, "plus");
+  const otherProduct = summarizeEntitlements([{ product_key: "ledgerlift", plan_key: "plus", status: "active" }]);
+  assert.equal(otherProduct.products.contactcraft, "free");
+  const revoked = summarizeEntitlements([{ product_key: "contactcraft", plan_key: "plus", status: "revoked" }]);
+  assert.equal(revoked.products.contactcraft, "free");
+  const bundle = summarizeEntitlements([{ product_key: "suite", plan_key: "bundle", status: "active" }]);
+  assert.equal(bundle.products.contactcraft, "plus");
+});
 test("concurrent delivery allows one owner and makes the other retry", async () => { const env = dbEnv(); const responses = await Promise.all([handleRequest(await signedRequest(eventFor(prices.plus, "evt_concurrent")), env), handleRequest(await signedRequest(eventFor(prices.plus, "evt_concurrent")), env)]); const statuses = responses.map((response) => response.status).sort(); assert.deepEqual(statuses, [200, 409]); assert.equal(env.LICENSE_DB.entitlements.length, 1); const retry = await fulfill(env, prices.plus, "evt_concurrent"); assert.equal(retry.duplicate, true); assert.equal(env.LICENSE_DB.codes.length, 1); });
 test("replayed fulfillment does not create another activation code", async () => { const env = dbEnv(); await fulfill(env); await fulfill(env); assert.equal(env.LICENSE_DB.entitlements.length, 1); assert.equal(env.LICENSE_DB.codes.length, 1); });
 test("activation code is single-use and returns a signed entitlement", async () => { const env = dbEnv(); const result = await fulfill(env); const claim = await handleRequest(new Request("https://example.test/api/license/claim", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ activation_code: result.development_activation_codes[0], installation_id: "installation-123456789" }) }), env); assert.equal(claim.status, 200); const second = await handleRequest(new Request("https://example.test/api/license/claim", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ activation_code: result.development_activation_codes[0], installation_id: "installation-987654321" }) }), env); assert.equal(second.status, 400); });

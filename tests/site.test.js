@@ -487,6 +487,21 @@ test("ContactCraft Plus promises are implemented and license-gated", () => {
   assert.match(read("checkout-portal/checkout.js"), /Duplicate detection and merge review/);
 });
 
+test("ContactCraft has product-specific tier routing, free messaging, and promotion suppression", () => {
+  const access = read("account-access.js");
+  const common = read("contactcraft/common.js");
+  assert.match(access, /routeOwnedContactCraft\(map, account\)/);
+  assert.match(access, /account\.products\.contactcraft/);
+  assert.match(access, /suppressUnpurchasedContactCraftPromotion/);
+  assert.match(access, /setTier\?\.\(entitlement\?\.plan_key \|\| "free", entitlement\?\.source\)/);
+  assert.match(common, /setTier/);
+  assert.match(common, /INCLUDED WITH BUNDLE · ContactCraft Plus workspace/);
+  assert.match(common, /FREE · 1 complete contact file per browser installation · 10 MB maximum/);
+  assert.match(read("contactcraft/plus.js"), /canUsePlus\("contactcraft"\)/, "ContactCraft Plus remains license-gated");
+  assert.match(read("CONTACTCRAFT_PRODUCT_MATRIX.md"), /highest active ContactCraft entitlement wins/);
+  assert.match(read("contactcraft/_headers"), /connect-src 'self'/);
+});
+
 test("CalendarFlow Plus promises are implemented and license-gated", () => {
   const plus = read("calendarflow/plus.js");
   assert.match(plus, /Merge calendars/);

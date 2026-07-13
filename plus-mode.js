@@ -121,7 +121,11 @@
   async function getPlusState() {
     const license = await import("../license.js");
     let capabilities = await license.getCapabilities();
-    if (capabilities.canUsePlus(product)) return { state: "authorized", source: capabilities.bundle ? "bundle" : "" };
+    if (capabilities.canUsePlus(product)) {
+      const accountResponse = await fetch("/api/account/me", { credentials: "same-origin", cache: "no-store" }).catch(() => null);
+      const account = await accountResponse?.json().catch(() => ({}));
+      return { state: "authorized", source: capabilities.bundle || account?.bundle === true ? "bundle" : "" };
+    }
     const accountResponse = await fetch("/api/account/me", { credentials: "same-origin", cache: "no-store" }).catch(() => null);
     const account = await accountResponse?.json().catch(() => ({}));
     if (!accountResponse) return { state: "restore-error" };

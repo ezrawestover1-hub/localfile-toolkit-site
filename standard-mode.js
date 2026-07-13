@@ -4,7 +4,7 @@
   const products = {
     ledgerlift: { name: "LedgerLift", description: "Unlimited core CSV-to-IIF conversion with mapping, preview, validation, and export." },
     pixelport: { name: "PixelPort", description: "Unlimited core image conversion with preview, resizing, quality, and supported background controls." },
-    contactcraft: { name: "ContactCraft", description: "Unlimited core contact conversion with preview, cleanup, and export." },
+    contactcraft: { name: "ContactCraft", description: "Unlimited core contact conversion with preview and export." },
     calendarflow: { name: "CalendarFlow", description: "Unlimited core calendar conversion with preview, validation, and export." },
     captionshift: { name: "CaptionShift", description: "Unlimited core subtitle conversion with timing preview and export." }
   };

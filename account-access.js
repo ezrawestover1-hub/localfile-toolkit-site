@@ -117,6 +117,17 @@
     }
   }
 
+  function suppressUnpurchasedContactCraftPromotion(map) {
+    if (document.body.dataset.product !== "contactcraft" || map.hasPurchase !== true || productEntitlement(map, "contactcraft")) return;
+    document.body.classList.add("account-product-free");
+    document.querySelector("#pricing")?.classList.add("hidden");
+    const pricingLink = document.querySelector("a[href='#pricing']");
+    if (pricingLink) {
+      pricingLink.href = "../pricing.html";
+      pricingLink.textContent = "Plans";
+    }
+  }
+
   function applySuiteHome(map, fullPlus) {
     if (fullPlus) {
       document.body.classList.add("account-active");
@@ -220,6 +231,10 @@
           window.SuiteGate?.setTier?.(entitlement?.plan_key || "free", entitlement?.source);
           suppressUnpurchasedPixelPortPromotion(map);
         }
+        if (currentProduct === "contactcraft") {
+          window.SuiteGate?.setTier?.(entitlement?.plan_key || "free", entitlement?.source);
+          suppressUnpurchasedContactCraftPromotion(map);
+        }
         if (!plusMode) {
           addAccessStrip(map, currentProduct);
           applyProductPricing(map, currentProduct);
@@ -254,8 +269,18 @@
     location.replace(`${productHome("pixelport")}?mode=${serverTier}`);
   }
 
+  function routeOwnedContactCraft(map, account) {
+    const path = location.pathname.replace(/\/+$/, "");
+    const isContactCraftHome = /\/contactcraft(?:\/index\.html)?$/.test(path);
+    const mode = new URLSearchParams(location.search).get("mode");
+    if (!isContactCraftHome || mode === "standard" || mode === "plus") return;
+    const serverTier = ["free", "standard", "plus"].includes(account?.products?.contactcraft) ? account.products.contactcraft : productEntitlement(map, "contactcraft")?.plan_key || "free";
+    if (serverTier === "free") return;
+    location.replace(`${productHome("contactcraft")}?mode=${serverTier}`);
+  }
+
   fetch("/api/account/me", { credentials: "same-origin", cache: "no-store" })
     .then((response) => response.ok ? response.json() : null)
-    .then((account) => { if (account?.authenticated) { const map = entitlementMap(account.entitlements); routeOwnedLedgerLift(map, account); routeOwnedPixelPort(map, account); apply(map); } })
+    .then((account) => { if (account?.authenticated) { const map = entitlementMap(account.entitlements); routeOwnedLedgerLift(map, account); routeOwnedPixelPort(map, account); routeOwnedContactCraft(map, account); apply(map); } })
     .catch(() => {});
 })();
