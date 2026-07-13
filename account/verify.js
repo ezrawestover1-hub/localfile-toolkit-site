@@ -3,6 +3,8 @@ const message = document.querySelector("#verify-message");
 const resend = document.querySelector("#resend-button");
 const email = sessionStorage.getItem("lft_pending_email") || "";
 if (!email) message.textContent = "Start from the account creation page so we know which email to verify.";
+const codeInput = document.querySelector("#code");
+codeInput.addEventListener("input", () => { codeInput.value = codeInput.value.replace(/\D/g, "").slice(0, 6); });
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!email) return;
