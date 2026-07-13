@@ -102,6 +102,12 @@ async function sendVerificationCode(env, email, code) {
   return sendEmail(env, { to: email, subject: "Your LocalFile Toolkit verification code", text: `Your LocalFile Toolkit verification code is ${code}. It expires in 15 minutes. If you did not request this, you can ignore this email.` });
 }
 
+async function issueVerificationCode(env, userId, email, purpose) {
+  const code = randomVerificationCode();
+  await env.LICENSE_DB.prepare("INSERT INTO account_verification_codes (id,user_id,code_hash,purpose,expires_at,used_at,created_at) VALUES (?,?,?,?,?,?,?)").bind(id("verify"), userId, await sha256(code), purpose, new Date(Date.now() + 15 * 60 * 1000).toISOString(), null, nowIso()).run();
+  return sendVerificationCode(env, email, code);
+}
+
 async function handleAccountRegister(request, env) {
   if (!(await allowSubmission(request, env))) return json({ ok: false, message: "Too many requests. Please try again later." }, 429);
   const body = await readJsonObject(request);
@@ -119,14 +125,57 @@ async function handleAccountRegister(request, env) {
   if (existing?.verified_at) return json({ ok: false, message: "That account already exists. Sign in instead." }, 409);
   const salt = new Uint8Array(16);
   crypto.getRandomValues(salt);
-  const code = randomVerificationCode();
   let hashedPassword;
   try { hashedPassword = bytesToBase64Url(await passwordHash(password, salt)); } catch { throw new Error("password_hash"); }
   try { await env.LICENSE_DB.prepare("INSERT INTO account_passwords (user_id,password_hash,password_salt,iterations,verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, iterations = excluded.iterations, updated_at = excluded.updated_at").bind(user.id, hashedPassword, bytesToBase64Url(salt), PASSWORD_ITERATIONS, null, createdAt, createdAt).run(); } catch { throw new Error("account_password_write"); }
-  try { await env.LICENSE_DB.prepare("INSERT INTO account_verification_codes (id,user_id,code_hash,purpose,expires_at,used_at,created_at) VALUES (?,?,?,?,?,?,?)").bind(id("verify"), user.id, await sha256(code), "signup", new Date(Date.now() + 15 * 60 * 1000).toISOString(), null, createdAt).run(); } catch { throw new Error("verification_code_write"); }
-  const delivery = await sendVerificationCode(env, email, code);
+  let delivery;
+  try { delivery = await issueVerificationCode(env, user.id, email, "signup"); } catch { throw new Error("verification_code_write"); }
   if (!delivery.ok) return json({ ok: false, message: delivery.setup ? "Email delivery is not configured yet." : "We could not send the verification email right now." }, delivery.setup ? 503 : 502);
   return json({ ok: true, message: "Check your email for the six-digit verification code." }, 202);
+}
+
+async function handleResendCode(request, env) {
+  if (!(await allowSubmission(request, env))) return json({ ok: false, message: "Too many requests. Please try again later." }, 429);
+  const body = await readJsonObject(request);
+  const email = normalizeEmail(body?.email);
+  if (!validEmail(email)) return json({ ok: false, message: "Enter a valid email address." }, 400);
+  const user = await env.LICENSE_DB.prepare("SELECT u.id,p.verified_at FROM account_users u JOIN account_passwords p ON p.user_id = u.id WHERE u.normalized_email = ?").bind(email).first();
+  if (!user?.id || user.verified_at) return json({ ok: true, message: "If the account can receive mail, a new code has been sent." }, 202);
+  const delivery = await issueVerificationCode(env, user.id, email, "signup");
+  if (!delivery.ok) return json({ ok: false, message: delivery.setup ? "Email delivery is not configured yet." : "We could not send a new code right now." }, delivery.setup ? 503 : 502);
+  return json({ ok: true, message: "A new verification code has been sent." }, 202);
+}
+
+async function handlePasswordResetRequest(request, env) {
+  if (!(await allowSubmission(request, env))) return json({ ok: false, message: "Too many requests. Please try again later." }, 429);
+  const body = await readJsonObject(request);
+  const email = normalizeEmail(body?.email);
+  if (!validEmail(email)) return json({ ok: false, message: "Enter a valid email address." }, 400);
+  const user = await env.LICENSE_DB.prepare("SELECT id FROM account_users WHERE normalized_email = ?").bind(email).first();
+  if (user?.id) {
+    const delivery = await issueVerificationCode(env, user.id, email, "reset");
+    if (!delivery.ok) return json({ ok: false, message: delivery.setup ? "Email delivery is not configured yet." : "We could not send a reset code right now." }, delivery.setup ? 503 : 502);
+  }
+  return json({ ok: true, message: "If an account matches, a password reset code has been sent." }, 202);
+}
+
+async function handlePasswordResetComplete(request, env) {
+  if (!(await allowSubmission(request, env))) return json({ ok: false, message: "Too many requests. Please try again later." }, 429);
+  const body = await readJsonObject(request);
+  const email = normalizeEmail(body?.email);
+  const code = String(body?.code || "").trim();
+  const password = String(body?.password || "");
+  if (!validEmail(email) || !/^\d{6}$/.test(code) || password.length < PASSWORD_MIN_LENGTH || password.length > 256) return json({ ok: false, message: `Enter the code and a password of at least ${PASSWORD_MIN_LENGTH} characters.` }, 400);
+  const user = await env.LICENSE_DB.prepare("SELECT id FROM account_users WHERE normalized_email = ?").bind(email).first();
+  const row = user?.id ? await env.LICENSE_DB.prepare("SELECT id,user_id,expires_at,used_at FROM account_verification_codes WHERE user_id = ? AND purpose = 'reset' AND code_hash = ? ORDER BY created_at DESC LIMIT 1").bind(user.id, await sha256(code)).first() : null;
+  if (!row || row.used_at || new Date(row.expires_at).getTime() <= Date.now()) return json({ ok: false, message: "That code is invalid or expired." }, 400);
+  const salt = new Uint8Array(16); crypto.getRandomValues(salt);
+  const hash = bytesToBase64Url(await passwordHash(password, salt));
+  const now = nowIso();
+  const consumed = await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?").bind(now, row.id, now).run();
+  if (!consumed?.meta?.changes) return json({ ok: false, message: "That code is no longer valid." }, 400);
+  await env.LICENSE_DB.prepare("UPDATE account_passwords SET password_hash = ?, password_salt = ?, iterations = ?, verified_at = ?, updated_at = ? WHERE user_id = ?").bind(hash, bytesToBase64Url(salt), PASSWORD_ITERATIONS, now, now, row.user_id).run();
+  return createAccountSession(env, row.user_id, request);
 }
 
 async function handleAccountLogin(request, env) {
@@ -586,6 +635,9 @@ export async function handleRequest(request, env) {
   const url = new URL(request.url);
   if (request.method === "GET" && url.pathname === "/api/health") return json({ status: "ok" });
   if (request.method === "POST" && url.pathname === "/api/account/register") return handleAccountRegister(request, env).catch((error) => { const reason = new Set(["account_user_write", "account_user_read", "account_password_read", "password_hash", "account_password_write", "verification_code_write"]).has(error?.message) ? error.message : "account_register_failed"; console.error("account_register_failed", reason); return json({ ok: false, message: "Account setup is temporarily unavailable. Please try again." }, 503); });
+  if (request.method === "POST" && url.pathname === "/api/account/resend-code") return handleResendCode(request, env);
+  if (request.method === "POST" && url.pathname === "/api/account/password-reset/request") return handlePasswordResetRequest(request, env);
+  if (request.method === "POST" && url.pathname === "/api/account/password-reset/complete") return handlePasswordResetComplete(request, env);
   if (request.method === "POST" && url.pathname === "/api/account/login") return handleAccountLogin(request, env);
   if (request.method === "POST" && url.pathname === "/api/account/verify-code") return handleAccountVerifyCode(request, env);
   if (request.method === "GET" && url.pathname === "/api/account/me") return handleAccountMe(request, env);

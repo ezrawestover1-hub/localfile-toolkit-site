@@ -210,6 +210,8 @@ test("cross-device account surface is wired to durable entitlements", () => {
   assert.match(read("account/login.html"), /type="password"/);
   assert.match(read("account/register.html"), /confirm-password/);
   assert.match(read("account/verify.html"), /Verification code/);
+  assert.match(read("account/verify.html"), /Resend code/);
+  assert.match(read("account/reset.html"), /Re-enter password/);
   assert.match(read("account/index.html"), /Restore products on this device/);
   assert.match(read("account/account.js"), /\/api\/account\/restore/);
   assert.match(read("worker.js"), /account_users/);
