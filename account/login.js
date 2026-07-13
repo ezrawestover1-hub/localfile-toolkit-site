@@ -1,36 +1,48 @@
-const loginForm = document.querySelector("#login-form");
-const registerForm = document.querySelector("#register-form");
-const codeForm = document.querySelector("#code-form");
+const form = document.querySelector("#auth-form");
+const credentialsStep = document.querySelector("#credentials-step");
+const codeStep = document.querySelector("#code-step");
+const email = document.querySelector("#email");
+const password = document.querySelector("#password");
+const code = document.querySelector("#code");
+const submitButton = document.querySelector("#submit-button");
+const registerButton = document.querySelector("#register-button");
 const message = document.querySelector("#login-message");
-const showRegister = document.querySelector("#show-register");
-let pendingEmail = "";
-const read = async (response) => response?.json().catch(() => ({}));
+let mode = "login";
 
-showRegister.addEventListener("click", () => { registerForm.hidden = false; showRegister.hidden = true; message.textContent = "Create a password, then verify your email with the code we send."; });
-loginForm.addEventListener("submit", async (event) => {
+const read = async (response) => response?.json().catch(() => ({}));
+const setCodeStep = () => {
+  mode = "verify";
+  credentialsStep.hidden = true;
+  email.disabled = true;
+  password.disabled = true;
+  codeStep.hidden = false;
+  code.required = true;
+  submitButton.textContent = "Verify email";
+  registerButton.hidden = true;
+  code.focus();
+};
+
+registerButton.addEventListener("click", async () => {
+  mode = "register";
+  if (!form.reportValidity()) return;
+  message.textContent = "Sending verification code…";
+  const response = await fetch("/api/account/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: email.value, password: password.value }) }).catch(() => null);
+  const result = await read(response);
+  message.textContent = result?.message || "Unable to create the account right now.";
+  if (response?.ok) setCodeStep();
+});
+
+form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const data = new FormData(loginForm);
+  if (mode === "verify") {
+    message.textContent = "Verifying…";
+    const response = await fetch("/api/account/verify-code", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: email.value, code: code.value }) }).catch(() => null);
+    if (response?.redirected) location.assign(response.url); else message.textContent = (await read(response))?.message || "Unable to verify the code.";
+    return;
+  }
   message.textContent = "Signing in…";
-  const response = await fetch("/api/account/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: data.get("email"), password: data.get("password") }) }).catch(() => null);
+  const response = await fetch("/api/account/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: email.value, password: password.value }) }).catch(() => null);
   const result = await read(response);
   message.textContent = result?.message || "Unable to sign in right now.";
   if (response?.redirected) location.assign(response.url);
-});
-registerForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const loginData = new FormData(loginForm);
-  const registerData = new FormData(registerForm);
-  pendingEmail = String(loginData.get("email") || "");
-  message.textContent = "Sending verification code…";
-  const response = await fetch("/api/account/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: pendingEmail, password: registerData.get("password") }) }).catch(() => null);
-  const result = await read(response);
-  message.textContent = result?.message || "Unable to create the account right now.";
-  if (response?.ok) { registerForm.hidden = true; codeForm.hidden = false; }
-});
-codeForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const data = new FormData(codeForm);
-  message.textContent = "Verifying…";
-  const response = await fetch("/api/account/verify-code", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: pendingEmail || new FormData(loginForm).get("email"), code: data.get("code") }) }).catch(() => null);
-  if (response?.redirected) location.assign(response.url); else message.textContent = (await read(response))?.message || "Unable to verify the code.";
 });
