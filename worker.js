@@ -223,7 +223,8 @@ async function handleAccountVerifyCode(request, env) {
   if (!row || row.used_at || new Date(row.expires_at).getTime() <= Date.now()) return json({ ok: false, message: "That code is invalid or expired." }, 400);
   try {
     const now = nowIso();
-    await activateStagedPassword(env, row.user_id, now);
+    const pending = await env.LICENSE_DB.prepare("SELECT user_id FROM account_pending_passwords WHERE user_id = ?").bind(row.user_id).first();
+    if (pending) await activateStagedPassword(env, row.user_id, now);
     const consumed = await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?").bind(now, row.id, now).run();
     if (!consumed?.meta?.changes) return createAccountSession(env, row.user_id, request);
     return createAccountSession(env, row.user_id, request);
