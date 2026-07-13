@@ -57,6 +57,14 @@ test("LedgerLift guided workspace defines the eight honest workflow steps", () =
   assert.match(app, /markMapColumnsReady/);
   assert.match(app, /LedgerLiftAccountMapper/);
   assert.match(app, /markMapAccountsReady/);
+  assert.match(app, /LedgerLiftValidator/);
+  assert.match(app, /validationReport/);
+  assert.match(app, /ledgerlift:validated/);
+  assert.match(workspace, /workspaceValidate/);
+  assert.match(workspace, /validationFilter/);
+  assert.match(workspace, /validationContinueToPreview/);
+  assert.match(read("ledgerlift/validator.js"), /createValidator/);
+  assert.match(read("ledgerlift/validator.js"), /possible-duplicate/);
   assert.match(app, /Clean your rows before validating/);
   assert.match(workspace, /Supported here: CSV, TSV, and XLSX/);
   assert.match(workspace, /importPreview/);
