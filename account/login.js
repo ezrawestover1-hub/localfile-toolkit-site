@@ -1,13 +1,36 @@
-const form = document.querySelector("#login-form");
+const loginForm = document.querySelector("#login-form");
+const registerForm = document.querySelector("#register-form");
+const codeForm = document.querySelector("#code-form");
 const message = document.querySelector("#login-message");
-const params = new URLSearchParams(location.search);
-if (params.get("error")) message.textContent = params.get("error") === "expired" ? "That sign-in link expired. Request a new one." : "That sign-in link is invalid. Request a new one.";
-form.addEventListener("submit", async (event) => {
+const showRegister = document.querySelector("#show-register");
+let pendingEmail = "";
+const read = async (response) => response?.json().catch(() => ({}));
+
+showRegister.addEventListener("click", () => { registerForm.hidden = false; showRegister.hidden = true; message.textContent = "Create a password, then verify your email with the code we send."; });
+loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  message.textContent = "Sending…";
-  const response = await fetch("/api/account/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: new FormData(form).get("email") }) }).catch(() => null);
-  const result = await response?.json().catch(() => ({}));
-  message.textContent = result?.message || "If that address can receive mail, a sign-in link is on its way.";
-  if (result?.development_login_url) { const link = document.createElement("a"); link.href = result.development_login_url; link.textContent = " Open development sign-in link"; message.append(link); }
-  if (response?.ok) form.reset();
+  const data = new FormData(loginForm);
+  message.textContent = "Signing in…";
+  const response = await fetch("/api/account/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: data.get("email"), password: data.get("password") }) }).catch(() => null);
+  const result = await read(response);
+  message.textContent = result?.message || "Unable to sign in right now.";
+  if (response?.redirected) location.assign(response.url);
+});
+registerForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const loginData = new FormData(loginForm);
+  const registerData = new FormData(registerForm);
+  pendingEmail = String(loginData.get("email") || "");
+  message.textContent = "Sending verification code…";
+  const response = await fetch("/api/account/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: pendingEmail, password: registerData.get("password") }) }).catch(() => null);
+  const result = await read(response);
+  message.textContent = result?.message || "Unable to create the account right now.";
+  if (response?.ok) { registerForm.hidden = true; codeForm.hidden = false; }
+});
+codeForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const data = new FormData(codeForm);
+  message.textContent = "Verifying…";
+  const response = await fetch("/api/account/verify-code", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: pendingEmail || new FormData(loginForm).get("email"), code: data.get("code") }) }).catch(() => null);
+  if (response?.redirected) location.assign(response.url); else message.textContent = (await read(response))?.message || "Unable to verify the code.";
 });
