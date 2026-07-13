@@ -40,28 +40,48 @@
   const cfg=window.LOCALFILE_PADDLE||{};
   const token=typeof cfg.clientToken==="string"?cfg.clientToken.trim():"";
   const priceId=cfg.prices?.[productKey]?.[planKey]||"";
-  const ready=cfg.checkoutEnabled===true&&cfg.environment==="sandbox"&&/^test_/.test(token)&&/^pri_/.test(priceId)&&window.Paddle;
-  if(!ready){
-    msg.textContent="Checkout is in setup mode. Add your Paddle client-side token and price IDs in paddle-config.js.";
-    button.disabled=true;
-    return;
+  async function ownedAccess() {
+    try {
+      const response = await fetch("/api/account/me", { credentials: "same-origin", cache: "no-store" });
+      if (!response.ok) return false;
+      const account = await response.json();
+      const owned = new Map();
+      (account.entitlements || []).forEach((item) => { if (item.product_key && (!owned.has(item.product_key) || item.plan_key === "plus")) owned.set(item.product_key, item.plan_key); });
+      const bundleOwned = ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"].every((productName) => owned.get(productName) === "plus");
+      const productOwned = productKey === "suite" ? bundleOwned : owned.get(productKey) === "plus" || (planKey === "standard" && owned.has(productKey));
+      if (!productOwned) return false;
+      button.disabled = false;
+      button.textContent = productKey === "suite" ? "Access other products" : `Access ${product.name}${owned.get(productKey) === "plus" ? " Plus" : ""}`;
+      msg.textContent = "This purchase is already linked to your account.";
+      button.addEventListener("click", () => location.assign(productKey === "suite" ? "/account/" : product.home), { once: true });
+      return true;
+    } catch { return false; }
   }
-  try{
-    if(cfg.environment==="sandbox") window.Paddle.Environment.set("sandbox");
-    window.Paddle.Initialize({token});
-    button.disabled=false;
-    msg.textContent="Payment details are handled by Paddle Checkout.";
-    button.addEventListener("click",()=>{
-      const success=new URL("purchase-success.html",location.href);
-      success.searchParams.set("product",productKey);
-      success.searchParams.set("plan",planKey);
-      window.Paddle.Checkout.open({
-        items:[{priceId,quantity:1}],
-        settings:{displayMode:"overlay",variant:"one-page",theme:"light",locale:"en",successUrl:success.href}
+  function initializeCheckout() {
+    const ready=cfg.checkoutEnabled===true&&cfg.environment==="sandbox"&&/^test_/.test(token)&&/^pri_/.test(priceId)&&window.Paddle;
+    if(!ready){
+      msg.textContent="Checkout is in setup mode. Add your Paddle client-side token and price IDs in paddle-config.js.";
+      button.disabled=true;
+      return;
+    }
+    try{
+      if(cfg.environment==="sandbox") window.Paddle.Environment.set("sandbox");
+      window.Paddle.Initialize({token});
+      button.disabled=false;
+      msg.textContent="Payment details are handled by Paddle Checkout.";
+      button.addEventListener("click",()=>{
+        const success=new URL("purchase-success.html",location.href);
+        success.searchParams.set("product",productKey);
+        success.searchParams.set("plan",planKey);
+        window.Paddle.Checkout.open({
+          items:[{priceId,quantity:1}],
+          settings:{displayMode:"overlay",variant:"one-page",theme:"light",locale:"en",successUrl:success.href}
+        });
       });
-    });
-  }catch(error){
-    msg.textContent="Secure checkout could not initialize. Confirm the Paddle environment, token, approved domain, and price IDs.";
-    button.disabled=true;
+    }catch(error){
+      msg.textContent="Secure checkout could not initialize. Confirm the Paddle environment, token, approved domain, and price IDs.";
+      button.disabled=true;
+    }
   }
+  ownedAccess().then((alreadyOwned) => { if (!alreadyOwned) initializeCheckout(); });
 })();

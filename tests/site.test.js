@@ -22,6 +22,17 @@ test("pricing page sends every choice to the one shared portal", () => {
   choices.forEach(([product, plan]) => assert.match(pricing, new RegExp(`checkout-portal/index\\.html\\?product=${product}&amp;plan=${plan}`)));
   assert.match(pricing, /\$26\.96/);
   assert.match(pricing, /Five-product Plus bundle/);
+  assert.match(pricing, /account-access\.js/);
+});
+
+test("paid users receive access actions without exposing a second bundle purchase", () => {
+  const access = read("account-access.js");
+  assert.match(access, /api\/account\/me/);
+  assert.match(access, /Access other products/);
+  assert.match(access, /account\.entitlements/);
+  assert.match(access, /planRank/);
+  assert.match(read("checkout-portal/checkout.js"), /This purchase is already linked to your account/);
+  ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"].forEach((product) => assert.match(read(`${product}/index.html`), /account-access\.js/));
 });
 
 test("final pricing source of truth matches every displayed plan", () => {
