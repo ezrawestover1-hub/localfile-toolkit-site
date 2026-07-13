@@ -1,4 +1,4 @@
-import { addStoredEntitlement, getInstallationId } from "/license.js";
+import { restoreEntitlements } from "/license.js";
 
 const message = document.querySelector("#account-message");
 const productsRoot = document.querySelector("#products");
@@ -96,7 +96,7 @@ function renderProductCard(key, entitlement) {
   if (plus) {
     actions.append(makeLink(`Open ${meta.name} Plus`, `${meta.home}?mode=plus`), makeLink("Access other products", "/account/", "button secondary"));
   } else if (standard) {
-    actions.append(makeLink(`Open ${meta.name} Standard`, meta.home), makeLink("Upgrade to Plus", `/checkout-portal/index.html?product=${key}&plan=plus`, "button secondary"));
+    actions.append(makeLink(`Open ${meta.name} Standard`, `${meta.home}?mode=standard`), makeLink("Upgrade to Plus", `/checkout-portal/index.html?product=${key}&plan=plus`, "button secondary"));
   } else {
     actions.append(makeLink(`Explore ${meta.name}`, meta.home), makeLink("View pricing", `/pricing.html#${key}`, "button secondary"));
   }
@@ -161,11 +161,9 @@ async function restore() {
   const button = document.querySelector("#restore-button");
   if (button) { button.disabled = true; button.textContent = "Restoring access…"; }
   try {
-    const response = await fetch("/api/account/restore", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ installation_id: getInstallationId() }) });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw Error(result.message || "Could not restore access.");
-    (result.entitlements || []).forEach(addStoredEntitlement);
-    document.querySelector("#restore-message").textContent = result.entitlements?.length ? "Products restored on this device." : "No active products were found for this account.";
+    const result = await restoreEntitlements();
+    if (!result.ok) throw Error(result.result?.message || "Could not restore access.");
+    document.querySelector("#restore-message").textContent = result.tokens?.length ? "Products restored on this device." : "No active products were found for this account.";
   } finally {
     if (button) { button.disabled = false; button.textContent = "Restore products on this device"; }
   }

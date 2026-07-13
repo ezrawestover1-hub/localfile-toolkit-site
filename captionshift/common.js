@@ -3,7 +3,7 @@
   const body = document.body;
   const key = body.dataset.demoKey;
   const product = body.dataset.product;
-  if (new URLSearchParams(location.search).get("mode") === "plus") { const script = document.createElement("script"); script.src = "../plus-mode.js?v=ab2f40c"; document.head.append(script); }
+  const mode = new URLSearchParams(location.search).get("mode");
   const checkout = window.PRODUCT_CHECKOUTS || {};
   const PRODUCT_ICON_REFS = Object.freeze(Object.fromEntries(Object.entries(window.PRODUCT_ICONS || {}).map(([key, item]) => [key, { name: item.name, src: item.icon }])));
 
@@ -66,6 +66,7 @@
   }
 
   let activeRealDocument = false;
+  let paidAccess = false;
   let toastTimer;
   const $ = (id) => document.getElementById(id);
   const toast = $("toast");
@@ -74,7 +75,7 @@
 
   function used() { try { return localStorage.getItem(key) === "used"; } catch { return false; } }
   function markUsed() { try { localStorage.setItem(key, "used"); } catch {} activeRealDocument = true; update(); }
-  function mayOpenRealDocument() { return !used() || activeRealDocument; }
+  function mayOpenRealDocument() { return paidAccess || !used() || activeRealDocument; }
   function showUpgrade() { dialog?.classList.remove("hidden"); body.classList.add("dialog-open"); $("closeUpgradeBtn")?.focus(); }
   function closeUpgrade() { dialog?.classList.add("hidden"); body.classList.remove("dialog-open"); }
   function message(text) { if (!toast) return; toast.textContent = text; toast.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>toast.classList.remove("show"),3200); }
@@ -85,7 +86,8 @@
   }
   function update(sample=false) {
     if (!trial) return;
-    if (sample) trial.textContent = "Sample mode does not consume your free document.";
+    if (paidAccess) trial.textContent = mode === "plus" ? "Plus access is active. Real files are available without the free-document limit." : "Standard access is active. Core conversions are available without the free-document limit.";
+    else if (sample) trial.textContent = "Sample mode does not consume your free document.";
     else if (used() && activeRealDocument) trial.textContent = "Free document active: you may export this open document again. A new document requires a paid license.";
     else if (used()) trial.textContent = "Free document used: choose Standard, Plus, or the five-product bundle to continue.";
     else trial.textContent = "Free demo: convert and export one complete document.";
@@ -173,7 +175,8 @@
   $("closeUpgradeBtn")?.addEventListener("click", closeUpgrade);
   dialog?.addEventListener("click", e=>{ if (e.target===dialog) closeUpgrade(); });
   document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeUpgrade(); });
-  window.SuiteGate = { used, markUsed, mayOpenRealDocument, showUpgrade, closeUpgrade, message, update, setActive: v=>{activeRealDocument=!!v;update();}, product };
-  if (product === "captionshift") import("./plus.js").catch(() => {});
+  window.SuiteGate = { used, markUsed, mayOpenRealDocument, showUpgrade, closeUpgrade, message, update, setActive: v=>{activeRealDocument=!!v;update();}, setPaidAccess: v=>{paidAccess=!!v;update();}, paid:()=>paidAccess, product };
+  if (mode === "plus" || mode === "standard") { const script = document.createElement("script"); script.src = mode === "plus" ? "../plus-mode.js?v=8f5e2b1" : "../standard-mode.js?v=8f5e2b1"; document.head.append(script); }
+  if (product === "captionshift" && mode !== "standard") import("./plus.js").catch(() => {});
   update();
 })();

@@ -98,6 +98,8 @@ test("Plus routes are separate, entitlement-gated workspaces with a post-checkou
     assert.match(page, /Try sample data/);
     assert.match(page, /id="pricing"/);
     assert.match(read(`${product}/plus.js`), /canUsePlus/);
+    assert.match(read(`${product}/plus.js`), /plus-mode:ready/);
+    assert.match(read(`${product}/plus.js`), /modeAuthorized/);
   });
 });
 

@@ -2,6 +2,7 @@
   "use strict";
   const products = Object.freeze({ ledgerlift: "LedgerLift", pixelport: "PixelPort", contactcraft: "ContactCraft", calendarflow: "CalendarFlow", captionshift: "CaptionShift" });
   const productHome = (product) => `/${product}/index.html`;
+  const standardHome = (product) => `${productHome(product)}?mode=standard`;
   const plusHome = (product) => `${productHome(product)}?mode=plus`;
   const checkoutHome = (product) => `/checkout-portal/index.html?product=${product}&plan=plus`;
   const planRank = { standard: 1, plus: 2 };
@@ -84,7 +85,7 @@
     const plan = entitlement.plan_key;
     if (standard) {
       standard.closest("#standard-plan")?.classList.add("account-owned-plan");
-      makeAccessButton(standard, plan === "plus" ? "Included in Plus" : `Open ${products[product]} Standard`, productHome(product));
+      makeAccessButton(standard, plan === "plus" ? "Included in Plus" : `Open ${products[product]} Standard`, standardHome(product));
     }
     if (plus) {
       plus.closest("#plus-plan")?.classList.add(plan === "plus" ? "account-active-plan" : "account-upgrade-plan");
@@ -153,7 +154,7 @@
       const entitlement = map.get(product);
       const label = card.querySelector("b");
       if (label) label.textContent = entitlement ? `Open ${entitlement.plan_key === "plus" ? "Plus " : ""}${products[product]} →` : `Explore ${products[product]} →`;
-      if (entitlement) card.href = entitlement.plan_key === "plus" ? plusHome(product) : productHome(product);
+      if (entitlement) card.href = entitlement.plan_key === "plus" ? plusHome(product) : standardHome(product);
       card.dataset.accessState = entitlement?.plan_key || "unowned";
     });
     const bundle = document.querySelector(".bundle");
@@ -189,7 +190,7 @@
       const match = (element.getAttribute("href") || "").match(/product=(ledgerlift|pixelport|contactcraft|calendarflow|captionshift)&plan=(standard|plus)/);
       if (match) [, product, plan] = match;
       if (!map.has(product) || !planRank[plan] || planRank[map.get(product).plan_key] < planRank[plan]) return;
-      makeAccessButton(element, accessLabel(product, plan), plan === "plus" ? plusHome(product) : productHome(product));
+      makeAccessButton(element, accessLabel(product, plan), plan === "plus" ? plusHome(product) : standardHome(product));
     });
     if (paid) {
       if (currentProduct) {

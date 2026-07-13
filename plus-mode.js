@@ -13,12 +13,12 @@
 
   const meta = products[product];
   const plusPath = `/${product}/index.html?mode=plus`;
-  const standardPath = `/${product}/index.html`;
+  const standardPath = `/${product}/index.html?mode=standard`;
   document.body.classList.add("plus-mode");
   document.body.dataset.plusRoute = "true";
   const stylesheet = document.createElement("link");
   stylesheet.rel = "stylesheet";
-  stylesheet.href = "../plus-mode.css";
+  stylesheet.href = "../plus-mode.css?v=8f5e2b1";
   stylesheet.dataset.plusModeStyles = "true";
   document.head.append(stylesheet);
 
@@ -52,27 +52,40 @@
     document.querySelector("main")?.prepend(handoff);
   }
 
-  function addGate() {
-    if (document.querySelector("#plus-access-gate")) return;
-    const gate = document.createElement("section");
-    gate.id = "plus-access-gate";
-    gate.className = "plus-access-gate container";
+  function addGate(state = "loading") {
+    let gate = document.querySelector("#plus-access-gate");
+    if (!gate) {
+      gate = document.createElement("section");
+      gate.id = "plus-access-gate";
+      gate.className = "plus-access-gate container";
+      document.querySelector("main")?.prepend(gate);
+    }
+    gate.dataset.state = state;
     const icon = document.createElement("img");
     icon.src = `../assets/product-icons/${product}/icon-128.png`;
     icon.alt = "";
     icon.width = 72;
     icon.height = 72;
     const heading = document.createElement("h1");
-    heading.textContent = `${meta.name} Plus is ready when you are.`;
+    heading.textContent = state === "loading" ? `Checking your ${meta.name} Plus access…` : state === "not-entitled" ? `${meta.name} Plus is not connected to this account.` : `${meta.name} Plus is ready when you are.`;
     const copy = document.createElement("p");
-    copy.textContent = "This direct Plus workspace requires a verified Plus entitlement. Sign in to restore access on this device, or complete the one-time Plus purchase.";
+    copy.textContent = state === "loading" ? "Checking your account and restoring this device’s license." : state === "unauthenticated" ? "Sign in with the account used for your purchase to restore Plus access on this device." : state === "not-entitled" ? "This account is signed in, but it does not have this product’s Plus entitlement. Open your account to review connected products or purchase Plus." : "Your account is signed in, but this device has not received a Plus activation yet. Try restoring again or open My Account.";
     const actions = document.createElement("div");
     actions.className = "plus-gate-actions";
-    const login = new URL("/account/login.html", location.origin);
-    login.searchParams.set("next", plusPath);
-    actions.append(link("Sign in and restore Plus", login.pathname + login.search, "button"), link(`Get ${meta.name} Plus`, `/checkout-portal/index.html?product=${product}&plan=plus`, "button secondary"), link("Return to Standard", standardPath, "plus-text-link"));
-    gate.append(icon, heading, copy, actions);
-    document.querySelector("main")?.prepend(gate);
+    if (state === "unauthenticated") {
+      const login = new URL("/account/login.html", location.origin);
+      login.searchParams.set("next", plusPath);
+      actions.append(link("Sign in and restore Plus", login.pathname + login.search, "button"));
+    } else if (state !== "loading") {
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "button";
+      retry.textContent = "Retry Plus restore";
+      retry.addEventListener("click", resolveAccess, { once: true });
+      actions.append(retry, link("Open My Account", "/account/", "button secondary"));
+    }
+    if (state !== "loading") actions.append(link(`Get ${meta.name} Plus`, `/checkout-portal/index.html?product=${product}&plan=plus`, "button secondary"), link("Standard workspace", standardPath, "plus-text-link"));
+    gate.replaceChildren(icon, heading, copy, actions);
   }
 
   function prepareCore() {
@@ -88,41 +101,71 @@
     if (copy) copy.textContent = "Upload a real file to use the premium controls below. Your file stays in this browser.";
     if (trial) { trial.textContent = "Plus access is active. Real files are available without the free-document limit."; trial.classList.add("plus-active-status"); }
     if (sample) sample.hidden = true;
+    window.SuiteGate?.setPaidAccess(true);
     document.querySelector("#work")?.classList.remove("hidden");
   }
 
-  async function getPlusCapabilities() {
+  function waitForSuiteGate() {
+    if (window.SuiteGate) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const started = Date.now();
+      const check = () => {
+        if (window.SuiteGate) return resolve();
+        if (Date.now() - started >= 5000) return reject(new Error("workspace_not_ready"));
+        setTimeout(check, 25);
+      };
+      check();
+    });
+  }
+
+  async function getPlusState() {
     const license = await import("../license.js");
     let capabilities = await license.getCapabilities();
-    if (capabilities.canUsePlus(product)) return capabilities;
-    const response = await fetch("/api/account/restore", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ installation_id: license.getInstallationId() }), credentials: "same-origin" }).catch(() => null);
-    if (response?.ok) {
-      const result = await response.json().catch(() => ({}));
-      (result.entitlements || []).forEach(license.addStoredEntitlement);
-      capabilities = await license.getCapabilities();
-    }
-    return capabilities;
+    if (capabilities.canUsePlus(product)) return { state: "authorized" };
+    const accountResponse = await fetch("/api/account/me", { credentials: "same-origin", cache: "no-store" }).catch(() => null);
+    const account = await accountResponse?.json().catch(() => ({}));
+    if (!accountResponse) return { state: "restore-error" };
+    if (accountResponse.status === 401 || !account?.authenticated) return { state: "unauthenticated" };
+    if (!accountResponse.ok) return { state: "restore-error" };
+    const restored = await license.restoreEntitlements();
+    capabilities = await license.getCapabilities();
+    if (capabilities.canUsePlus(product)) return { state: "authorized" };
+    if (!restored.ok) return { state: "restore-error" };
+    const hasPlus = (account.entitlements || []).some((item) => item.product_key === product && item.plan_key === "plus");
+    return { state: hasPlus ? "restore-error" : "not-entitled" };
   }
 
   function markAuthorized() {
+    document.querySelector("#plus-access-gate")?.remove();
     document.body.classList.add("plus-authorized");
     document.body.classList.remove("plus-locked");
+    document.body.dataset.plusAccessState = "authorized";
     document.title = `${meta.name} Plus — LocalFile Tools`;
     addHandoff();
     prepareCore();
     window.dispatchEvent(new CustomEvent("plus-mode:ready", { detail: { product } }));
   }
 
-  function markLocked() {
+  function markLocked(state) {
     document.body.classList.add("plus-locked");
     document.body.classList.remove("plus-authorized");
+    document.body.dataset.plusAccessState = state;
+    window.SuiteGate?.setPaidAccess(false);
     document.title = `${meta.name} Plus — LocalFile Tools`;
-    addGate();
+    addGate(state);
   }
 
-  addGate();
-  getPlusCapabilities().then((capabilities) => {
-    if (capabilities.canUsePlus(product)) markAuthorized();
-    else markLocked();
-  }).catch(() => markLocked());
+  async function resolveAccess() {
+    addGate("loading");
+    try {
+      await waitForSuiteGate();
+      const result = await getPlusState();
+      if (result.state === "authorized") markAuthorized();
+      else markLocked(result.state);
+    } catch {
+      markLocked("restore-error");
+    }
+  }
+
+  resolveAccess();
 })();

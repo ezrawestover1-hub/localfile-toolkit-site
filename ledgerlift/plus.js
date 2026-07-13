@@ -72,7 +72,10 @@
     window.addEventListener("ledgerlift:analyzed", () => { duplicateRows(); renderPlusRows(); report(); });
   }
   function work() { return $("work"); }
-  window.addEventListener("ledgerlift:ready", async () => { createPanel(); try { const module = await import("../license.js"); const capabilities = await module.getCapabilities(); setEnabled(capabilities.canUsePlus("ledgerlift")); } catch { setEnabled(false); } });
+  const modeAuthorized = () => document.body.dataset.plusAccessState === "authorized" || window.SuiteGate?.paid?.() === true;
+  window.addEventListener("ledgerlift:ready", async () => { createPanel(); try { const module = await import("../license.js"); const capabilities = await module.getCapabilities(); setEnabled(capabilities.canUsePlus("ledgerlift") || modeAuthorized()); } catch { setEnabled(modeAuthorized()); } });
+  window.addEventListener("plus-mode:ready", (event) => { if (event.detail?.product === "ledgerlift") { createPanel(); setEnabled(true); } });
   window.addEventListener("ledgerlift:data-loaded", () => { if ($("ledgerliftPlus")) { refreshProfiles(); } });
   if (window.LedgerLiftCore) setTimeout(() => window.dispatchEvent(new Event("ledgerlift:ready")), 0);
+  if (modeAuthorized()) setTimeout(() => { createPanel(); setEnabled(true); }, 0);
 })();

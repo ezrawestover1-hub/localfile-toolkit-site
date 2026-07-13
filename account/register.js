@@ -2,7 +2,7 @@ const form = document.querySelector("#register-form");
 const message = document.querySelector("#register-message");
 const purchaseLink = document.querySelector("#register-purchase-link");
 const requestedNext = new URLSearchParams(location.search).get("next") || "";
-const safeNext = /^\/(ledgerlift|pixelport|contactcraft|calendarflow|captionshift)\/index\.html\?mode=plus$/.test(requestedNext) ? requestedNext : "/account/";
+const safeNext = /^\/(ledgerlift|pixelport|contactcraft|calendarflow|captionshift)\/index\.html\?mode=(standard|plus)$/.test(requestedNext) ? requestedNext : "/account/";
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const data = new FormData(form);

@@ -31,6 +31,21 @@ export function getInstallationId() {
   return value;
 }
 
+export async function restoreEntitlements() {
+  const response = await fetch("/api/account/restore", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ installation_id: getInstallationId() }),
+    credentials: "same-origin",
+    cache: "no-store"
+  }).catch(() => null);
+  const result = await response?.json().catch(() => ({}));
+  if (!response?.ok) return { ok: false, status: response?.status || 0, result };
+  const tokens = Array.isArray(result?.entitlements) ? result.entitlements.filter((token) => typeof token === "string") : [];
+  tokens.forEach(addStoredEntitlement);
+  return { ok: true, status: response.status, result, tokens };
+}
+
 export async function verifyEntitlement(token) {
   const response = await fetch("/api/license/verify", {
     method: "POST",
