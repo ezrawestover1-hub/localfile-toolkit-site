@@ -209,8 +209,9 @@ async function handleAccountVerifyCode(request, env) {
   const email = normalizeEmail(body?.email);
   const code = String(body?.code || "").trim();
   if (!validEmail(email) || !/^\d{6}$/.test(code)) return json({ ok: false, message: "Enter the six-digit code from your email." }, 400);
-  const user = await env.LICENSE_DB.prepare("SELECT id FROM account_users WHERE normalized_email = ?").bind(email).first();
+  const user = await env.LICENSE_DB.prepare("SELECT u.id,p.verified_at FROM account_users u LEFT JOIN account_passwords p ON p.user_id = u.id WHERE u.normalized_email = ?").bind(email).first();
   const row = user?.id ? await env.LICENSE_DB.prepare("SELECT id,user_id,expires_at,used_at FROM account_verification_codes WHERE user_id = ? AND purpose = 'signup' AND code_hash = ? ORDER BY created_at DESC LIMIT 1").bind(user.id, await sha256(code)).first() : null;
+  if (row?.used_at && user?.verified_at) return createAccountSession(env, row.user_id, request);
   if (!row || row.used_at || new Date(row.expires_at).getTime() <= Date.now()) return json({ ok: false, message: "That code is invalid or expired." }, 400);
   const now = nowIso();
   const consumed = await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?").bind(now, row.id, now).run();
