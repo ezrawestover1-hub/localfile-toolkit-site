@@ -117,10 +117,8 @@ async function handleAccountRegister(request, env) {
   const salt = new Uint8Array(16);
   crypto.getRandomValues(salt);
   const code = randomVerificationCode();
-  await env.LICENSE_DB.batch([
-    env.LICENSE_DB.prepare("INSERT INTO account_passwords (user_id,password_hash,password_salt,iterations,verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, iterations = excluded.iterations, updated_at = excluded.updated_at").bind(user.id, bytesToBase64Url(await passwordHash(password, salt)), bytesToBase64Url(salt), PASSWORD_ITERATIONS, null, createdAt, createdAt),
-    env.LICENSE_DB.prepare("INSERT INTO account_verification_codes (id,user_id,code_hash,purpose,expires_at,used_at,created_at) VALUES (?,?,?,?,?,?,?)").bind(id("verify"), user.id, await sha256(code), "signup", new Date(Date.now() + 15 * 60 * 1000).toISOString(), null, createdAt)
-  ]);
+  await env.LICENSE_DB.prepare("INSERT INTO account_passwords (user_id,password_hash,password_salt,iterations,verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, iterations = excluded.iterations, updated_at = excluded.updated_at").bind(user.id, bytesToBase64Url(await passwordHash(password, salt)), bytesToBase64Url(salt), PASSWORD_ITERATIONS, null, createdAt, createdAt).run();
+  await env.LICENSE_DB.prepare("INSERT INTO account_verification_codes (id,user_id,code_hash,purpose,expires_at,used_at,created_at) VALUES (?,?,?,?,?,?,?)").bind(id("verify"), user.id, await sha256(code), "signup", new Date(Date.now() + 15 * 60 * 1000).toISOString(), null, createdAt).run();
   const delivery = await sendVerificationCode(env, email, code);
   if (!delivery.ok) return json({ ok: false, message: delivery.setup ? "Email delivery is not configured yet." : "We could not send the verification email right now." }, delivery.setup ? 503 : 502);
   return json({ ok: true, message: "Check your email for the six-digit verification code." }, 202);
@@ -582,7 +580,7 @@ async function handleVerify(request, env) {
 export async function handleRequest(request, env) {
   const url = new URL(request.url);
   if (request.method === "GET" && url.pathname === "/api/health") return json({ status: "ok" });
-  if (request.method === "POST" && url.pathname === "/api/account/register") return handleAccountRegister(request, env);
+  if (request.method === "POST" && url.pathname === "/api/account/register") return handleAccountRegister(request, env).catch((error) => { console.error("account_register_failed", error?.name || "unknown"); return json({ ok: false, message: "Account setup is temporarily unavailable. Please try again." }, 503); });
   if (request.method === "POST" && url.pathname === "/api/account/login") return handleAccountLogin(request, env);
   if (request.method === "POST" && url.pathname === "/api/account/verify-code") return handleAccountVerifyCode(request, env);
   if (request.method === "GET" && url.pathname === "/api/account/me") return handleAccountMe(request, env);
