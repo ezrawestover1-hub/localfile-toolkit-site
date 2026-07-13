@@ -21,14 +21,14 @@
   const destinationTypeForRole = (role) => role === "account" || role === "category" ? ["account"] : role === "name" ? ["vendor", "customer", "employee", "other-name"] : role === "vendor" ? ["vendor"] : role === "customer" ? ["customer"] : role === "employee" ? ["employee"] : role === "class" ? ["class"] : role === "customerJob" ? ["customer-job"] : role === "transactionType" ? ["transaction-type"] : role === "clearedStatus" ? ["cleared-status"] : role === "taxCode" ? ["tax-code"] : [];
   const typeLabel = (type) => DESTINATION_TYPES.find((item) => item.id === type)?.label || type;
 
-  function createAccountMapper({ review, mapper, tier = "free", templates = null } = {}) {
+  function createAccountMapper({ review, mapper, tier = "free", templates = null, initialDestinations = [], savedState = null } = {}) {
     const historyLimit = HISTORY_LIMITS[tier] || HISTORY_LIMITS.free;
-    let destinations = new Map();
+    let destinations = new Map((initialDestinations || []).filter((destination) => destination?.id && destination?.name).map((destination) => [destination.id, { ...destination, created: true, persistent: true }]));
     let records = new Map();
     let sourceAccount = { destinationId: "", accountType: "BANK" };
     let history = [];
     let future = [];
-    let sequence = 1;
+    let sequence = destinations.size + 1;
     let defaults = {};
     let sourceColumns = [];
     let notice = "";
@@ -116,7 +116,7 @@
       if (duplicate && !options.allowDuplicate) { pendingDuplicate = { existingId: duplicate.id, name }; return { ok: false, duplicate: { ...duplicate }, reason: "A destination with the same name already exists. Select it or confirm a deliberately separate value." }; }
       const parentId = type === "account" ? String(input.parentId || "") : "";
       if (parentId && (!destinations.has(parentId) || destinations.get(parentId).type !== "account")) return { ok: false, reason: "Choose an existing account as the parent." };
-      const destination = { id: `destination-${sequence++}`, type, name, accountType: type === "account" ? String(input.accountType) : "", parentId, description: text(input.description).trim().slice(0, 200), created: true };
+      const destination = { id: `destination-${Date.now()}-${sequence++}`, type, name, accountType: type === "account" ? String(input.accountType) : "", parentId, description: text(input.description).trim().slice(0, 200), created: true, persistent: true };
       const changed = transaction(`Create ${typeLabel(type)} ${name}`, () => { destinations.set(destination.id, destination); pendingDuplicate = null; return true; });
       return { ok: changed, destination: { ...destination } };
     }
@@ -180,8 +180,19 @@
     function redo() { const action = future.pop(); if (!action) return false; history.push(action); restore(action.after); notify("redo"); return true; }
     function sync() { discover(); notify("sync"); return getState(); }
 
+    function restoreSavedState(snapshot) {
+      if (!snapshot) return false;
+      (snapshot.destinations || []).forEach((destination) => { if (destination?.id && destination.name && !destinations.has(destination.id)) destinations.set(destination.id, { ...destination, created: true, persistent: true }); });
+      sequence = Math.max(sequence, destinations.size + 1);
+      if (snapshot.sourceAccount?.destinationId && destinations.has(snapshot.sourceAccount.destinationId)) sourceAccount = { destinationId: snapshot.sourceAccount.destinationId, accountType: snapshot.sourceAccount.accountType || destinations.get(snapshot.sourceAccount.destinationId).accountType || "BANK" };
+      defaults = Object.fromEntries(Object.entries(snapshot.defaults || {}).filter(([, id]) => destinations.has(id)));
+      (snapshot.records || []).forEach((saved) => { const record = records.get(saved.id); if (!record || !record.active) return; if (saved.destinationId && destinations.has(saved.destinationId)) record.destinationId = saved.destinationId; record.origin = saved.origin || record.origin; record.confirmed = Boolean(saved.confirmed); record.ignored = Boolean(saved.ignored); record.defaultMapping = Boolean(saved.defaultMapping); });
+      return true;
+    }
+
     discover();
-    return { HISTORY_LIMITS, DESTINATION_TYPES, ACCOUNT_TYPES, REQUIRED_ROLES, ELIGIBLE_ROLES, getState, getValidation: validation, getPreview, rowAssignments, getDestination: (id) => destinations.get(id), createDestination, editDestination, removeDestination, setDefaultSourceAccount, setDefault, setMapping, ignore, restoreIgnored, bulkAssign, bulkClear, bulkIgnore, resetRecord, resetColumn, clearAll, applyExactSuggestions, previewTemplate, applyTemplate, sync, undo, redo, getTemplateStore: () => templates, mappingTemplateBlueprint: () => ({ signature: signature(), entries: [...records.values()].filter((record) => record.active && (record.destinationId || record.ignored)).map((record) => { const destination = record.destinationId ? destinations.get(record.destinationId) : null; return { sourceRole: record.sourceRole, normalizedValue: record.normalizedValue, destinationType: destination?.type || "", destinationName: destination?.name || "", accountType: destination?.accountType || "", parentName: destination?.parentId ? destinationName(destination.parentId) : "", ignored: record.ignored, defaultMapping: record.defaultMapping }; }), defaults: { sourceAccountName: sourceAccount.destinationId ? destinationName(sourceAccount.destinationId) : "", sourceAccountType: sourceAccount.accountType, roles: Object.fromEntries(Object.entries(defaults).map(([role, id]) => [role, destinationName(id)])) } }), subscribe: (listener) => { listeners.add(listener); return () => listeners.delete(listener); } };
+    restoreSavedState(savedState);
+    return { HISTORY_LIMITS, DESTINATION_TYPES, ACCOUNT_TYPES, REQUIRED_ROLES, ELIGIBLE_ROLES, getState, getValidation: validation, getPreview, rowAssignments, getDestination: (id) => destinations.get(id), createDestination, editDestination, removeDestination, setDefaultSourceAccount, setDefault, setMapping, ignore, restoreIgnored, bulkAssign, bulkClear, bulkIgnore, resetRecord, resetColumn, clearAll, applyExactSuggestions, previewTemplate, applyTemplate, sync, restoreState: restoreSavedState, undo, redo, getTemplateStore: () => templates, mappingTemplateBlueprint: () => ({ signature: signature(), entries: [...records.values()].filter((record) => record.active && (record.destinationId || record.ignored)).map((record) => { const destination = record.destinationId ? destinations.get(record.destinationId) : null; return { sourceRole: record.sourceRole, normalizedValue: record.normalizedValue, destinationType: destination?.type || "", destinationName: destination?.name || "", accountType: destination?.accountType || "", parentName: destination?.parentId ? destinationName(destination.parentId) : "", ignored: record.ignored, defaultMapping: record.defaultMapping }; }), defaults: { sourceAccountName: sourceAccount.destinationId ? destinationName(sourceAccount.destinationId) : "", sourceAccountType: sourceAccount.accountType, roles: Object.fromEntries(Object.entries(defaults).map(([role, id]) => [role, destinationName(id)])) } }), subscribe: (listener) => { listeners.add(listener); return () => listeners.delete(listener); } };
   }
 
   window.LedgerLiftAccountMapper = { HISTORY_LIMITS, DESTINATION_TYPES, ACCOUNT_TYPES, REQUIRED_ROLES, ELIGIBLE_ROLES, create: createAccountMapper, normalize, punctuationNormalized };

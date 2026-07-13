@@ -1,7 +1,7 @@
 (() => {
   "use strict";
   const $ = (id) => document.getElementById(id);
-  const state = { headers: [], rows: [], tx: [], review: null, cleaner: null, mapper: null, accountMapper: null, validator: null, validationReport: null, source: false, name: "transactions", amountMode: "signed", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] };
+  const state = { headers: [], rows: [], tx: [], review: null, cleaner: null, mapper: null, accountMapper: null, validator: null, validationReport: null, projectStore: null, destinationLibrary: null, projectId: "", projectName: "", source: false, name: "transactions", amountMode: "signed", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] };
   const input = $("fileInput");
   const drop = $("dropZone");
   const status = $("fileStatus");
@@ -39,7 +39,7 @@
     if (!canReplaceFile()) { input.value = ""; return; }
     try {
       const preview = await window.LedgerLiftImporter.importFile(file, { tier: tier() });
-      Object.assign(state, { source: sample, name: displayName(file), importPreview: preview, fileMeta: preview.fileMeta, format: preview.format, delimiter: preview.delimiter, worksheetName: preview.worksheetName || "", worksheetIndex: preview.worksheetIndex || 0, headerRow: preview.headerRow, suggestions: preview.suggestions, importWarnings: preview.warnings, importErrors: preview.blocking, imported: false, review: null, cleaner: null, mapper: null, accountMapper: null, validator: null, validationReport: null, headers: preview.headers, rows: preview.rows, tx: [], cleaned: false, cleanSummary: null });
+      Object.assign(state, { source: sample, name: displayName(file), projectId: "", projectName: "", importPreview: preview, fileMeta: preview.fileMeta, format: preview.format, delimiter: preview.delimiter, worksheetName: preview.worksheetName || "", worksheetIndex: preview.worksheetIndex || 0, headerRow: preview.headerRow, suggestions: preview.suggestions, importWarnings: preview.warnings, importErrors: preview.blocking, imported: false, review: null, cleaner: null, mapper: null, accountMapper: null, validator: null, validationReport: null, headers: preview.headers, rows: preview.rows, tx: [], cleanSummary: null });
       ["date", "desc", "amount", "debit", "credit"].forEach(options);
       status.textContent = `${file.name} · ${preview.format} · ${Math.max(1, Math.round(file.size / 1024))} KB`;
       work.classList.add("hidden"); $("results").classList.add("hidden");
@@ -77,7 +77,8 @@
     state.review = window.LedgerLiftReviewModel?.create({ headers: preview.headers, rows: preview.rows, rowWarnings: preview.rowWarnings, tier: tier() }) || null;
     state.cleaner = state.review && window.LedgerLiftCleaner?.create({ review: state.review, tier: tier(), suggestedRoles: preview.suggestions?.roles || {} });
     state.mapper = state.review && window.LedgerLiftMapper?.create({ review: state.review, cleaner: state.cleaner, tier: tier(), suggestedRoles: preview.suggestions?.roles || {}, templates: window.LedgerLiftMappingTemplates?.create({ tier: tier() }) });
-    state.accountMapper = state.review && window.LedgerLiftAccountMapper?.create({ review: state.review, mapper: state.mapper, tier: tier(), templates: window.LedgerLiftAccountMappingTemplates?.create({ tier: tier() }) });
+    state.destinationLibrary = window.LedgerLiftDestinationLibrary?.create({ tier: tier() }) || null;
+    state.accountMapper = state.review && window.LedgerLiftAccountMapper?.create({ review: state.review, mapper: state.mapper, tier: tier(), initialDestinations: state.destinationLibrary?.list?.() || [], templates: window.LedgerLiftAccountMappingTemplates?.create({ tier: tier() }) });
     state.validator = state.review && window.LedgerLiftValidator?.create({ review: state.review, mapper: state.mapper, accountMapper: state.accountMapper, tier: tier() });
     Object.assign(state, { imported: true, headers: preview.headers, rows: state.review?.getWorkingRows() || preview.rows, tx: [], validationReport: null, cleaned: false, cleanSummary: null });
     ["date", "desc", "amount", "debit", "credit"].forEach(options);
@@ -176,7 +177,7 @@
 
   function resetImport() {
     input.value = "";
-    Object.assign(state, { headers: [], rows: [], tx: [], review: null, cleaner: null, mapper: null, accountMapper: null, validator: null, validationReport: null, source: false, name: "transactions", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] });
+    Object.assign(state, { headers: [], rows: [], tx: [], review: null, cleaner: null, mapper: null, accountMapper: null, validator: null, validationReport: null, projectId: "", projectName: "", source: false, name: "transactions", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] });
     work.classList.add("hidden"); $("results").classList.add("hidden"); status.textContent = "No file selected";
     window.SuiteGate.setActive(false);
     window.dispatchEvent(new CustomEvent("ledgerlift:cleared"));
@@ -235,6 +236,56 @@
     if (sourceAccount && $("bank")) $("bank").value = sourceAccount;
     state.accountMapping = mapping;
   }
+
+  function projectSnapshot() {
+    const reviewState = state.review?.getState?.() || { headers: state.headers, activeEntries: [], deletedEntries: [], originalOrder: [], currentOrder: [] };
+    const mapperState = state.mapper?.getState?.() || {};
+    const accountState = state.accountMapper?.getState?.() || {};
+    return {
+      schemaVersion: 1,
+      headers: [...state.headers],
+      fileMeta: state.fileMeta ? { name: state.fileMeta.name || "transactions", type: state.fileMeta.type || "", size: Number(state.fileMeta.size) || 0 } : { name: `${state.name || "transactions"}.csv`, type: "", size: 0 },
+      format: state.format, delimiter: state.delimiter, worksheetName: state.worksheetName, worksheetIndex: state.worksheetIndex, headerRow: state.headerRow,
+      importWarnings: (state.importWarnings || []).map((warning) => ({ level: warning.level || "info", message: warning.message || String(warning) })),
+      rowCount: reviewState.totalRows || reviewState.activeEntries?.length || 0,
+      review: { headers: [...(reviewState.headers || state.headers)], activeEntries: reviewState.activeEntries || [], deletedEntries: reviewState.deletedEntries || [], originalOrder: reviewState.originalOrder || [], currentOrder: reviewState.currentOrder || [], deletedOrder: (reviewState.deletedEntries || []).map((entry) => entry.id) },
+      mapping: { columns: (mapperState.columns || []).map((column) => ({ id: column.id, index: column.index, header: column.header, role: column.role, origin: column.origin, confirmed: column.confirmed })), mappings: mapperState.mappings || {}, amountMode: mapperState.amountMode || "unresolved" },
+      accountMapping: { destinations: accountState.destinations || [], sourceAccount: accountState.sourceAccount || { destinationId: "", accountType: "BANK" }, defaults: accountState.defaults || {}, records: (accountState.records || []).map((record) => ({ id: record.id, destinationId: record.destinationId || "", origin: record.origin || "none", confirmed: Boolean(record.confirmed), ignored: Boolean(record.ignored), defaultMapping: Boolean(record.defaultMapping) })) },
+      workflow: { cleaned: Boolean(state.cleaned), cleanSummary: state.cleaner?.getSummary?.() || state.cleanSummary || null, currentStep: Number(window.LedgerLiftWorkspace?.state?.current) || 2 },
+      currentStep: Number(window.LedgerLiftWorkspace?.state?.current) || 2
+    };
+  }
+
+  async function saveProject(name) {
+    if (!state.imported || !state.projectStore) return { ok: false, reason: "Import a file before saving a project." };
+    let result;
+    try { result = await state.projectStore.save(name, projectSnapshot(), state.projectId); } catch { return { ok: false, reason: "LedgerLift could not save this project on the device." }; }
+    if (result.ok) { state.projectId = result.project.id; state.projectName = result.project.name; window.dispatchEvent(new CustomEvent("ledgerlift:project-saved", { detail: { project: result.project } })); }
+    return result;
+  }
+
+  async function listProjects() { try { return await state.projectStore?.list?.() || []; } catch { return []; } }
+
+  async function loadProject(id) {
+    const project = await state.projectStore?.load?.(id);
+    if (!project) return { ok: false, reason: "That saved project could not be found on this device." };
+    const headers = project.headers || project.review?.headers || [];
+    state.review = window.LedgerLiftReviewModel?.create({ headers, rows: [], savedState: project.review, tier: tier() }) || null;
+    state.cleaner = state.review && window.LedgerLiftCleaner?.create({ review: state.review, tier: tier(), suggestedRoles: {} });
+    state.mapper = state.review && window.LedgerLiftMapper?.create({ review: state.review, cleaner: state.cleaner, tier: tier(), suggestedRoles: {}, savedState: project.mapping });
+    state.destinationLibrary = window.LedgerLiftDestinationLibrary?.create({ tier: tier() }) || null;
+    state.accountMapper = state.review && window.LedgerLiftAccountMapper?.create({ review: state.review, mapper: state.mapper, tier: tier(), initialDestinations: state.destinationLibrary?.list?.() || [], savedState: project.accountMapping, templates: window.LedgerLiftAccountMappingTemplates?.create({ tier: tier() }) });
+    state.validator = state.review && window.LedgerLiftValidator?.create({ review: state.review, mapper: state.mapper, accountMapper: state.accountMapper, tier: tier() });
+    Object.assign(state, { imported: true, source: false, projectId: project.id, projectName: project.name, name: project.name, fileMeta: project.fileMeta || { name: `${project.name}.csv` }, format: project.format || "", delimiter: project.delimiter || "", worksheetName: project.worksheetName || "", worksheetIndex: Number(project.worksheetIndex) || 0, headerRow: Number(project.headerRow) || 0, importWarnings: project.importWarnings || [], importErrors: [], importPreview: null, suggestions: null, headers, rows: state.review?.getWorkingRows?.() || [], tx: [], validationReport: null, cleaned: Boolean(project.workflow?.cleaned), cleanSummary: project.workflow?.cleanSummary || null });
+    ["date", "desc", "amount", "debit", "credit"].forEach(options);
+    window.SuiteGate.update(false);
+    window.dispatchEvent(new CustomEvent("ledgerlift:project-loaded", { detail: { project: { id: project.id, name: project.name, rowCount: project.rowCount, format: project.format, worksheetName: project.worksheetName, currentStep: project.currentStep }, workflow: project.workflow || {} } }));
+    return { ok: true, project: { id: project.id, name: project.name, rowCount: project.rowCount } };
+  }
+
+  async function deleteProject(id) { let result; try { result = await state.projectStore?.remove?.(id); } catch { result = { ok: false, reason: "LedgerLift could not remove this project." }; } if (result?.ok) window.dispatchEvent(new CustomEvent("ledgerlift:project-deleted", { detail: { id } })); return result || { ok: false, reason: "Saved projects are unavailable." }; }
+
+  window.addEventListener("ledgerlift:account-mapping-changed", () => { const destinations = state.accountMapper?.getState?.().destinations; if (destinations?.length || state.destinationLibrary?.limit) state.destinationLibrary?.replace?.(destinations || []); });
   const mapperScript = document.createElement("script");
   mapperScript.src = "mapper.js?v=8f5e2b2";
   const templateScript = document.createElement("script");
@@ -243,9 +294,13 @@
   accountTemplateScript.src = "account-mapping-templates.js?v=8f5e2b3";
   const accountMapperScript = document.createElement("script");
   accountMapperScript.src = "account-mapper.js?v=8f5e2b3";
+  const destinationLibraryScript = document.createElement("script");
+  destinationLibraryScript.src = "destination-library.js?v=8f5e2b5";
   const validatorScript = document.createElement("script");
   validatorScript.src = "validator.js?v=8f5e2b4";
-  window.LedgerLiftCore = { state, analyze, validate: validateCurrent, cleanRows, renderRows, exportIif: iif, getTier: tier, setMapping, setAccountMapping, markCleanReady: () => { state.cleaned = true; }, markMapColumnsReady: (mapping) => { setMapping(mapping); }, markMapAccountsReady: (mapping) => { setAccountMapping(mapping); }, syncReviewRows: () => { if (state.review) state.rows = state.review.getWorkingRows(); } };
+  const projectStoreScript = document.createElement("script");
+  projectStoreScript.src = "project-store.js?v=8f5e2b5";
+  window.LedgerLiftCore = { state, analyze, validate: validateCurrent, cleanRows, renderRows, exportIif: iif, getTier: tier, setMapping, setAccountMapping, saveProject, listProjects, loadProject, deleteProject, markCleanReady: () => { state.cleaned = true; }, markMapColumnsReady: (mapping) => { setMapping(mapping); }, markMapAccountsReady: (mapping) => { setAccountMapping(mapping); }, syncReviewRows: () => { if (state.review) state.rows = state.review.getWorkingRows(); } };
   const importerScript = document.createElement("script");
   importerScript.src = "importer.js?v=8f5e2b1";
   importerScript.onload = () => {
@@ -254,7 +309,7 @@
     reviewScript.onload = () => {
       const cleanerScript = document.createElement("script");
       cleanerScript.src = "cleaner.js?v=8f5e2b1";
-      cleanerScript.onload = () => { mapperScript.onload = () => { templateScript.onload = () => { accountTemplateScript.onload = () => { accountMapperScript.onload = () => { validatorScript.onload = () => { const workspaceScript = document.createElement("script"); workspaceScript.src = "workspace.js?v=8f5e2b4"; document.head.append(workspaceScript); }; document.head.append(validatorScript); }; document.head.append(accountMapperScript); }; document.head.append(accountTemplateScript); }; document.head.append(templateScript); }; document.head.append(mapperScript); };
+      cleanerScript.onload = () => { mapperScript.onload = () => { templateScript.onload = () => { accountTemplateScript.onload = () => { destinationLibraryScript.onload = () => { accountMapperScript.onload = () => { validatorScript.onload = () => { projectStoreScript.onload = () => { state.projectStore = window.LedgerLiftProjectStore?.create({ tier: tier() }) || null; const workspaceScript = document.createElement("script"); workspaceScript.src = "workspace.js?v=8f5e2b5"; document.head.append(workspaceScript); }; document.head.append(projectStoreScript); }; document.head.append(validatorScript); }; document.head.append(accountMapperScript); }; document.head.append(destinationLibraryScript); }; document.head.append(accountTemplateScript); }; document.head.append(templateScript); }; document.head.append(mapperScript); };
       document.head.append(cleanerScript);
     };
     document.head.append(reviewScript);

@@ -80,7 +80,7 @@
     });
   }
 
-  function createMapper({ review, cleaner = null, tier = "free", suggestedRoles = {}, templates = null } = {}) {
+  function createMapper({ review, cleaner = null, tier = "free", suggestedRoles = {}, templates = null, savedState = null } = {}) {
     const limit = HISTORY_LIMITS[tier] || HISTORY_LIMITS.free;
     const columns = createColumns(review?.headers || []);
     const byId = new Map(columns.map((column) => [column.id, column]));
@@ -191,6 +191,15 @@
       }
       notify("refresh");
       return getState();
+    }
+
+    function restoreSavedState(snapshot) {
+      if (!snapshot) return false;
+      const savedMappings = snapshot.mappings || Object.fromEntries((snapshot.columns || []).map((column) => [column.id, { role: column.role || "unmapped", origin: column.origin || "manual", confirmed: column.confirmed !== false }]));
+      mappings = new Map(columns.map((column) => [column.id, { ...(savedMappings[column.id] || { role: "unmapped", origin: "manual", confirmed: true }) }]));
+      amountMode = snapshot.amountMode || inferredAmountMode();
+      pendingConflict = snapshot.pendingConflict || null;
+      return true;
     }
 
     function mappingForRole(role) { return columns.find((column) => mappings.get(column.id)?.role === role); }
@@ -304,9 +313,10 @@
 
     sourceSuggestions();
     refresh();
+    restoreSavedState(savedState);
     review?.subscribe?.(() => refresh());
     cleaner?.subscribe?.(() => refresh());
-    return { columns: columns.map((column) => ({ ...column })), roles: ROLE_DEFINITIONS.map((role) => ({ ...role })), getState, getValidation, getPreview, getMapping: mappingPayload, getProfiles: () => [...profiles.values()].map((profile) => ({ ...profile })), getSuggestions: (columnId) => [...(suggestions.get(columnId) || [])], setRole, resolveConflict, setAmountMode, clearColumn, resetColumn, resetAll, clearAll, applyHighConfidence, applyTemplate, undo, redo, refresh, subscribe: (listener) => { listeners.add(listener); return () => listeners.delete(listener); }, getTemplateStore: () => templates, mappingTemplateBlueprint: () => ({ columns: columns.map((column) => ({ position: column.index, label: column.header })), assignments: columns.map((column) => ({ position: column.index, role: mappings.get(column.id)?.role || "unmapped" })), amountMode: getValidation().mode }) };
+    return { columns: columns.map((column) => ({ ...column })), roles: ROLE_DEFINITIONS.map((role) => ({ ...role })), getState, getValidation, getPreview, getMapping: mappingPayload, getProfiles: () => [...profiles.values()].map((profile) => ({ ...profile })), getSuggestions: (columnId) => [...(suggestions.get(columnId) || [])], setRole, resolveConflict, setAmountMode, clearColumn, resetColumn, resetAll, clearAll, applyHighConfidence, applyTemplate, undo, redo, refresh, restoreState: restoreSavedState, subscribe: (listener) => { listeners.add(listener); return () => listeners.delete(listener); }, getTemplateStore: () => templates, mappingTemplateBlueprint: () => ({ columns: columns.map((column) => ({ position: column.index, label: column.header })), assignments: columns.map((column) => ({ position: column.index, role: mappings.get(column.id)?.role || "unmapped" })), amountMode: getValidation().mode }) };
   }
 
   window.LedgerLiftMapper = { HISTORY_LIMITS, ROLE_DEFINITIONS, ROLE_LABELS, create: createMapper, profileColumns, confidenceLabel };

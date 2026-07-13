@@ -12,12 +12,11 @@
     { id: 7, label: "Preview", description: "Review the normalized transaction rows." },
     { id: 8, label: "Export", description: "Download the IIF after validation." }
   ];
-  const mode = new URLSearchParams(location.search).get("mode");
-  const tier = mode === "plus" ? "plus" : mode === "standard" ? "standard" : "free";
+  const tier = window.LedgerLiftCore?.state?.projectStore?.tier || "free";
   const converter = $("converter");
   if (!converter || $("ledgerliftWorkspace")) return;
 
-  const state = { current: 1, imported: false, cleaned: false, cleanVisited: false, mapColumnsVisited: false, mapAccountsVisited: false, analyzed: false, previewed: false, exported: false, cleanSummary: null };
+  const state = { current: 1, imported: false, cleaned: false, cleanVisited: false, mapColumnsVisited: false, mapAccountsVisited: false, analyzed: false, previewed: false, exported: false, cleanSummary: null, projects: [], projectsLoading: false };
   const accountView = { query: "", filter: "all", sort: "frequency", templatePreview: null };
   const validationView = { query: "", filter: "all" };
   const accountSelected = new Set();
@@ -30,6 +29,44 @@
     if (text !== undefined) element.textContent = text;
     return element;
   };
+
+  function projectStore() { return window.LedgerLiftCore?.state?.projectStore || null; }
+  function projectsAvailable() { return Number(projectStore()?.limit) > 0; }
+  function projectStatus(message, error = false) {
+    const status = $("projectPersistenceStatus");
+    if (!status) return;
+    status.textContent = message;
+    status.dataset.error = error ? "true" : "false";
+  }
+
+  function renderSavedProjects(projects = state.projects) {
+    const panel = $("savedProjectsPanel"), list = $("savedProjectList");
+    if (!panel || !list) return;
+    const available = projectsAvailable();
+    panel.hidden = !available;
+    list.replaceChildren();
+    if (!available) return;
+    if (state.projectsLoading) { list.append(make("p", "saved-projects-empty", "Loading saved projects…")); return; }
+    if (!projects.length) { list.append(make("p", "saved-projects-empty", "No projects saved on this device yet.")); return; }
+    projects.forEach((project) => {
+      const item = make("article", "saved-project-item");
+      const copy = make("div", "saved-project-copy");
+      const updated = project.updatedAt ? new Date(project.updatedAt).toLocaleString() : "recently";
+      copy.append(make("strong", "", project.name), make("span", "", `${project.rowCount} rows · ${project.format || "file"}${project.worksheetName ? ` · ${project.worksheetName}` : ""}`), make("small", "", `Updated ${updated}`));
+      const actions = make("div", "saved-project-actions");
+      const open = make("button", "button secondary", "Open"); open.type = "button"; open.dataset.projectOpen = project.id; open.setAttribute("aria-label", `Open saved project ${project.name}`);
+      const remove = make("button", "button quiet", "Delete"); remove.type = "button"; remove.dataset.projectDelete = project.id; remove.setAttribute("aria-label", `Delete saved project ${project.name}`);
+      actions.append(open, remove); item.append(copy, actions); list.append(item);
+    });
+  }
+
+  async function refreshSavedProjects() {
+    if (!projectsAvailable()) { state.projects = []; renderSavedProjects(); return; }
+    state.projectsLoading = true; renderSavedProjects();
+    try { state.projects = await window.LedgerLiftCore.listProjects(); projectStatus(`${state.projects.length} saved project${state.projects.length === 1 ? "" : "s"} on this device.`); }
+    catch { state.projects = []; projectStatus("Saved projects could not be read from this device.", true); }
+    finally { state.projectsLoading = false; renderSavedProjects(); }
+  }
 
   function tierCopy() {
     if (tier === "plus") return { label: "Plus workspace", description: "Import larger files locally and keep room for future batch workflows.", note: "Supported here: CSV, TSV, and XLSX. OFX, QFX, QBO, IIF, and batch importing are planned for later phases." };
@@ -96,7 +133,12 @@
     const tierBadge = make("span", "workspace-tier", copy.label);
     tierBadge.id = "workspaceTier";
     tierBadge.dataset.tier = tier;
-    heading.append(headingCopy, tierBadge);
+    const projectControls = make("div", "workspace-project-controls");
+    const projectName = make("input"); projectName.id = "projectName"; projectName.placeholder = "Project name"; projectName.setAttribute("aria-label", "Saved project name");
+    const saveProject = make("button", "button secondary", "Save project"); saveProject.type = "button"; saveProject.id = "saveCurrentProject";
+    const projectPersistenceStatus = make("span", "workspace-project-status", "Saved projects are available in Standard and Plus."); projectPersistenceStatus.id = "projectPersistenceStatus"; projectPersistenceStatus.setAttribute("role", "status"); projectPersistenceStatus.setAttribute("aria-live", "polite");
+    projectControls.append(projectName, saveProject, projectPersistenceStatus);
+    heading.append(headingCopy, projectControls, tierBadge);
     const list = make("ol", "workflow-steps");
     list.setAttribute("aria-label", "LedgerLift conversion steps");
     steps.forEach((step) => list.append(createStepButton(step)));
@@ -123,7 +165,13 @@
     entryActions.append(start, upload);
     const entryNote = make("p", "workspace-entry-note", `${copy.note} Files are inspected locally; transaction rows are not uploaded.`);
     entryNote.id = "workspaceEntryNote";
-    entry.append(entryHeading, entryActions, entryNote);
+    const savedProjects = make("section", "saved-projects");
+    savedProjects.id = "savedProjectsPanel";
+    savedProjects.setAttribute("aria-labelledby", "savedProjectsTitle");
+    savedProjects.append(make("h4", "", "Open an existing project"), make("p", "saved-projects-note", "Saved projects stay on this device and are never uploaded."));
+    savedProjects.querySelector("h4").id = "savedProjectsTitle";
+    const savedProjectList = make("div", "saved-project-list"); savedProjectList.id = "savedProjectList"; savedProjects.append(savedProjectList);
+    entry.append(entryHeading, entryActions, entryNote, savedProjects);
 
     const importPreview = make("section", "import-preview hidden");
     importPreview.id = "importPreview";
@@ -330,7 +378,7 @@
     const bulkLabel = make("label", "", "Assign selected to"); const bulkDestination = make("select"); bulkDestination.id = "accountBulkDestination"; bulkDestination.setAttribute("aria-label", "Bulk destination"); bulkLabel.append(bulkDestination); const bulkAssign = make("button", "button secondary", "Assign selected"); bulkAssign.type = "button"; bulkAssign.id = "accountBulkAssign"; const bulkClear = make("button", "button quiet", "Clear selected"); bulkClear.type = "button"; bulkClear.id = "accountBulkClear"; const bulkIgnore = make("button", "button quiet", "Ignore selected"); bulkIgnore.type = "button"; bulkIgnore.id = "accountBulkIgnore"; const accountSuggestions = make("button", "button secondary", "Apply exact suggestions"); accountSuggestions.type = "button"; accountSuggestions.id = "accountApplySuggestions"; const accountUndo = make("button", "button secondary", "Undo"); accountUndo.type = "button"; accountUndo.id = "accountUndo"; const accountRedo = make("button", "button secondary", "Redo"); accountRedo.type = "button"; accountRedo.id = "accountRedo"; accountActions.append(selectValues, selectedValues, bulkLabel, bulkAssign, bulkClear, bulkIgnore, accountSuggestions, accountUndo, accountRedo);
     const accountIssues = make("div", "account-issues"); accountIssues.id = "accountMappingIssues"; accountIssues.setAttribute("role", "alert");
     const valueList = make("div", "account-value-list"); valueList.id = "accountValueList";
-    const destinationPanel = make("details", "destination-library"); destinationPanel.open = true; const destinationSummary = make("summary", "", "Destination library and creation"); destinationPanel.append(destinationSummary);
+    const destinationPanel = make("details", "destination-library"); destinationPanel.open = true; const destinationSummary = make("summary", "", "Destination library and creation"); const destinationLibraryNote = make("p", "destination-library-note", "Destinations are kept for this project session in the Free workspace."); destinationLibraryNote.id = "accountDestinationLibraryNote"; destinationPanel.append(destinationSummary, destinationLibraryNote);
     const destinationForm = make("div", "destination-form"); const destinationTypeLabel = make("label", "", "Destination type"); const destinationType = make("select"); destinationType.id = "accountDestinationType"; (window.LedgerLiftAccountMapper?.DESTINATION_TYPES || []).forEach((item) => { const option = make("option", "", item.label); option.value = item.id; destinationType.append(option); }); destinationTypeLabel.append(destinationType);
     const destinationNameLabel = make("label", "", "Name"); const destinationName = make("input"); destinationName.id = "accountDestinationName"; destinationName.placeholder = "e.g. Checking or Office Supplies"; destinationNameLabel.append(destinationName);
     const destinationAccountTypeLabel = make("label", "", "Account type"); const destinationAccountType = make("select"); destinationAccountType.id = "accountDestinationAccountType"; (window.LedgerLiftAccountMapper?.ACCOUNT_TYPES || []).forEach((item) => { const option = make("option", "", item.label); option.value = item.id; destinationAccountType.append(option); }); destinationAccountTypeLabel.append(destinationAccountType);
@@ -395,6 +443,26 @@
     if (fileStatus) entryActions.append(fileStatus);
     start.addEventListener("click", () => { clear?.click(); $("fileInput")?.focus(); });
     upload.addEventListener("click", () => $("fileInput")?.click());
+    $("saveCurrentProject").addEventListener("click", async () => {
+      const name = $("projectName").value.trim() || window.LedgerLiftCore?.state?.name || "LedgerLift project";
+      const result = await window.LedgerLiftCore?.saveProject?.(name);
+      if (result?.ok) { state.projectName = result.project.name; $("projectName").value = result.project.name; projectStatus(`Saved “${result.project.name}” on this device.`); await refreshSavedProjects(); }
+      else projectStatus(result?.reason || "LedgerLift could not save this project.", true);
+    });
+    $("savedProjectList").addEventListener("click", async (event) => {
+      const open = event.target.closest("[data-project-open]");
+      const remove = event.target.closest("[data-project-delete]");
+      if (open) {
+        const result = await window.LedgerLiftCore?.loadProject?.(open.dataset.projectOpen);
+        if (!result?.ok) { projectStatus(result?.reason || "That saved project could not be opened.", true); return; }
+        projectStatus(`Opened “${result.project.name}”.`);
+      } else if (remove) {
+        const project = state.projects.find((item) => item.id === remove.dataset.projectDelete);
+        if (!project || !window.confirm(`Delete saved project “${project.name}” from this device?`)) return;
+        const result = await window.LedgerLiftCore?.deleteProject?.(project.id);
+        if (!result?.ok) projectStatus(result?.reason || "That saved project could not be deleted.", true);
+      }
+    });
     $("importWorksheetSelect").addEventListener("change", (event) => window.dispatchEvent(new CustomEvent("ledgerlift:import-config-changed", { detail: { worksheetIndex: Number(event.target.value), headerRow: window.LedgerLiftCore?.state?.headerRow ?? 0 } })));
     $("importHeaderSelect").addEventListener("change", (event) => window.dispatchEvent(new CustomEvent("ledgerlift:import-config-changed", { detail: { headerRow: Number(event.target.value) } })));
     let searchTimer;
@@ -661,6 +729,7 @@
     const bulk = $("accountBulkDestination"); bulk.replaceChildren(make("option", "", "Choose destination")); bulk.firstChild.value = ""; modelState.destinations.forEach((destination) => { const option = make("option", "", destination.name); option.value = destination.id; bulk.append(option); });
     const destinationAccountType = $("accountDestinationAccountType"), destinationParent = $("accountDestinationParent"); const accountTypeVisible = $("accountDestinationType").value === "account"; destinationAccountType.closest("label").hidden = !accountTypeVisible; destinationParent.closest("label").hidden = !accountTypeVisible; destinationParent.replaceChildren(make("option", "", "No parent")); destinationParent.firstChild.value = ""; modelState.destinations.filter((destination) => destination.type === "account").forEach((destination) => { const option = make("option", "", destination.parentId ? `${accountDestinationName(destination.parentId)}:${destination.name}` : destination.name); option.value = destination.id; destinationParent.append(option); });
     const destinationList = $("accountDestinationList"); destinationList.replaceChildren(); if (!modelState.destinations.length) destinationList.append(make("p", "destination-empty", "No destinations created in this session yet.")); modelState.destinations.forEach((destination) => { const item = make("div", "destination-item"); item.append(make("strong", "", destination.parentId ? `${accountDestinationName(destination.parentId)}:${destination.name}` : destination.name), make("span", "", `${destinationTypeLabel(destination.type)}${destination.accountType ? ` · ${destination.accountType}` : ""}`)); destinationList.append(item); });
+    const destinationLibrary = core?.destinationLibrary; $("accountDestinationLibraryNote").textContent = destinationLibrary?.limit ? "Created destinations are reused across eligible LedgerLift projects on this device. Transaction rows are not stored in this library." : "Destinations are kept for this project session in the Free workspace.";
     const store = model.getTemplateStore?.(), eligible = Boolean(store && store.limit > 0); $("accountTemplateControls").hidden = !eligible; $("accountTemplateUnavailable").hidden = eligible; if (eligible) { const select = $("accountTemplateSelect"); select.replaceChildren(); store.list().forEach((template) => { const option = make("option", "", template.name); option.value = template.id; select.append(option); }); const has = select.options.length > 0; $("accountPreviewTemplate").disabled = !has; $("accountApplyTemplate").disabled = !has || !accountView.templatePreview?.matches?.length; $("accountRenameTemplate").disabled = !has; $("accountDeleteTemplate").disabled = !has; }
     const preview = model.getPreview(6); $("accountPreviewMeta").textContent = `${preview.length} sample rows shown · unresolved fields are not final validation results.`; const previewHead = $("accountPreviewHead"); previewHead.replaceChildren(); ["Date", "Description", "Amount", "Source account", "Destination account/category", "Name", "Class", "Customer/job", "Status"].forEach((label) => { const th = make("th", "", label); th.scope = "col"; previewHead.append(th); }); const previewBody = $("accountPreviewRows"); previewBody.replaceChildren(); preview.forEach((row) => { const tr = make("tr"); [row.date, row.description, row.amount || `${row.debit || ""} / ${row.credit || ""}`, row.sourceAccount, row.destination, row.name, row.className, row.customerJob, row.status].forEach((value) => tr.append(make("td", "", textForDisplay(value) || "—"))); previewBody.append(tr); });
     if (accountView.templatePreview) { const summary = accountView.templatePreview; $("accountMappingNotice").textContent = `${summary.matches?.length || 0} template matches previewed; ${summary.unmatched?.length || 0} current values have no saved match. Applying will remain local and reversible.`; }
@@ -1165,6 +1234,12 @@
   function render() {
     const shell = $("ledgerliftWorkspace");
     if (!shell) return;
+    const eligible = projectsAvailable();
+    $("projectName").value = state.projectName || $("projectName").value || "";
+    $("saveCurrentProject").disabled = !state.imported || !eligible;
+    $("projectName").disabled = !state.imported || !eligible;
+    if (!eligible) projectStatus("Saved projects are available in Standard and Plus.");
+    renderSavedProjects();
     shell.dataset.currentStep = String(state.current);
     $("workflowMessage").textContent = messageForCurrentStep();
     delete $("workflowMessage").dataset.error;
@@ -1257,6 +1332,7 @@
   createShell();
   createResultsControls();
   render();
+  refreshSavedProjects();
 
   window.addEventListener("ledgerlift:review-changed", (event) => {
     if (!reviewModel()) return;
@@ -1275,7 +1351,27 @@
   });
   window.addEventListener("ledgerlift:import-preview-ready", (event) => { state.imported = false; state.current = 1; renderImportPreview(event.detail?.preview); render(); $("importPreviewTitle")?.focus(); });
   window.addEventListener("ledgerlift:import-error", (event) => { $("workflowMessage").textContent = event.detail?.message || "LedgerLift could not read that file. Choose another file and try again."; $("workflowMessage").dataset.error = "true"; $("workflowMessage")?.focus(); });
-  window.addEventListener("ledgerlift:data-loaded", () => { accountSelected.clear(); state.imported = true; state.cleaned = false; state.cleanVisited = false; state.cleanSummary = null; state.mapColumnsVisited = false; state.mapAccountsVisited = false; state.analyzed = false; state.previewed = false; state.exported = false; state.current = 2; renderReviewTable(); render(); $("workspaceReviewTitle")?.focus(); });
+  window.addEventListener("ledgerlift:data-loaded", () => { accountSelected.clear(); state.projectId = ""; state.projectName = ""; state.imported = true; state.cleaned = false; state.cleanVisited = false; state.cleanSummary = null; state.mapColumnsVisited = false; state.mapAccountsVisited = false; state.analyzed = false; state.previewed = false; state.exported = false; state.current = 2; renderReviewTable(); render(); $("workspaceReviewTitle")?.focus(); });
+  window.addEventListener("ledgerlift:project-saved", (event) => { state.projectId = event.detail?.project?.id || state.projectId; state.projectName = event.detail?.project?.name || state.projectName; render(); });
+  window.addEventListener("ledgerlift:project-loaded", (event) => {
+    const workflow = event.detail?.workflow || {};
+    const savedStep = Number(workflow.currentStep) || 2;
+    state.projectId = event.detail?.project?.id || "";
+    state.projectName = event.detail?.project?.name || "";
+    state.imported = true;
+    state.cleaned = Boolean(workflow.cleaned);
+    state.cleanVisited = savedStep >= 3 || state.cleaned;
+    state.mapColumnsVisited = savedStep >= 5;
+    state.mapAccountsVisited = false;
+    state.analyzed = false;
+    state.previewed = false;
+    state.exported = false;
+    state.current = Math.max(2, Math.min(savedStep, 5));
+    render();
+    refreshSavedProjects();
+    $("workspaceTitle")?.focus();
+  });
+  window.addEventListener("ledgerlift:project-deleted", () => refreshSavedProjects());
   window.addEventListener("ledgerlift:clean-state-changed", (event) => { state.cleanSummary = cleanerModel()?.getSummary?.() || state.cleanSummary; if (event.detail?.type !== "review-change") state.cleaned = true; if (state.current === 3) { if (event.detail?.type === "preview") renderCleanPreview(); else render(); } });
   window.addEventListener("ledgerlift:mapping-changed", () => { accountMapperModel()?.sync(); if (state.current === 4) renderMapping(); else { state.mapAccountsVisited = false; state.analyzed = false; if (window.LedgerLiftCore?.state) window.LedgerLiftCore.state.validationReport = null; if (state.current === 5) renderAccountMapping(); render(); } });
   window.addEventListener("ledgerlift:account-mapping-changed", () => { if (state.current === 5) renderAccountMapping(); });
@@ -1285,5 +1381,5 @@
   window.addEventListener("ledgerlift:analyzed", () => { state.imported = true; state.mapColumnsVisited = true; state.mapAccountsVisited = true; state.analyzed = true; state.previewed = false; state.exported = false; state.current = 6; render(); });
   window.addEventListener("ledgerlift:cleared", () => { accountSelected.clear(); syncFromCore(); state.current = 1; render(); });
   window.addEventListener("ledgerlift:exported", () => { state.exported = true; state.current = 8; render(); });
-  window.LedgerLiftWorkspace = { state, setStep, canExport: () => state.previewed && allRowsValid() };
+  window.LedgerLiftWorkspace = { state, setStep, canExport: () => state.previewed && allRowsValid(), refreshSavedProjects };
 })();

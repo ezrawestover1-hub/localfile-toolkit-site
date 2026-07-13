@@ -63,6 +63,10 @@ test("LedgerLift guided workspace defines the eight honest workflow steps", () =
   assert.match(workspace, /workspaceValidate/);
   assert.match(workspace, /validationFilter/);
   assert.match(workspace, /validationContinueToPreview/);
+  assert.match(workspace, /savedProjectsPanel/);
+  assert.match(workspace, /saveCurrentProject/);
+  assert.match(workspace, /Saved projects stay on this device/);
+  assert.match(workspace, /project-loaded/);
   assert.match(read("ledgerlift/validator.js"), /createValidator/);
   assert.match(read("ledgerlift/validator.js"), /possible-duplicate/);
   assert.match(app, /Clean your rows before validating/);
@@ -107,4 +111,6 @@ test("LedgerLift tier state stays local to the LedgerLift workspace", () => {
   assert.match(read("ledgerlift/mapping-templates.js"), /transaction values/);
   assert.match(read("ledgerlift/account-mapper.js"), /missing-source-account/);
   assert.match(read("ledgerlift/account-mapping-templates.js"), /transaction rows/);
+  assert.match(read("ledgerlift/project-store.js"), /indexedDB/);
+  assert.match(read("ledgerlift/destination-library.js"), /localStorage/);
 });
