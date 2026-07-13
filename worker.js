@@ -108,6 +108,25 @@ async function issueVerificationCode(env, userId, email, purpose) {
   return sendVerificationCode(env, email, code);
 }
 
+async function stagePassword(env, userId, password, createdAt) {
+  const salt = new Uint8Array(16);
+  crypto.getRandomValues(salt);
+  const hash = bytesToBase64Url(await passwordHash(password, salt));
+  await env.LICENSE_DB.prepare("INSERT INTO account_pending_passwords (user_id,password_hash,password_salt,iterations,created_at) VALUES (?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, iterations = excluded.iterations, created_at = excluded.created_at").bind(userId, hash, bytesToBase64Url(salt), PASSWORD_ITERATIONS, createdAt).run();
+  await env.LICENSE_DB.prepare("INSERT INTO account_passwords (user_id,password_hash,password_salt,iterations,verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id) DO NOTHING").bind(userId, hash, bytesToBase64Url(salt), PASSWORD_ITERATIONS, null, createdAt, createdAt).run();
+}
+
+async function activateStagedPassword(env, userId, now) {
+  const pending = await env.LICENSE_DB.prepare("SELECT password_hash,password_salt,iterations FROM account_pending_passwords WHERE user_id = ?").bind(userId).first();
+  if (!pending) throw new Error("pending_password_missing");
+  const current = await env.LICENSE_DB.prepare("SELECT password_hash,password_salt,iterations FROM account_passwords WHERE user_id = ?").bind(userId).first();
+  if (current?.password_hash) {
+    await env.LICENSE_DB.prepare("INSERT INTO account_password_history (id,user_id,password_hash,password_salt,iterations,created_at) VALUES (?,?,?,?,?,?)").bind(id("pwdhist"), userId, current.password_hash, current.password_salt, current.iterations, now).run();
+  }
+  await env.LICENSE_DB.prepare("UPDATE account_passwords SET password_hash = ?, password_salt = ?, iterations = ?, verified_at = ?, updated_at = ? WHERE user_id = ?").bind(pending.password_hash, pending.password_salt, pending.iterations, now, now, userId).run();
+  await env.LICENSE_DB.prepare("DELETE FROM account_pending_passwords WHERE user_id = ?").bind(userId).run();
+}
+
 async function handleAccountRegister(request, env) {
   if (!(await allowSubmission(request, env))) return json({ ok: false, message: "Too many requests. Please try again later." }, 429);
   const body = await readJsonObject(request);
@@ -122,12 +141,7 @@ async function handleAccountRegister(request, env) {
   if (!user?.id) return json({ ok: false, message: "We could not create the account right now." }, 503);
   let existing;
   try { existing = await env.LICENSE_DB.prepare("SELECT verified_at FROM account_passwords WHERE user_id = ?").bind(user.id).first(); } catch { throw new Error("account_password_read"); }
-  if (existing?.verified_at) return json({ ok: false, message: "That account already exists. Sign in instead." }, 409);
-  const salt = new Uint8Array(16);
-  crypto.getRandomValues(salt);
-  let hashedPassword;
-  try { hashedPassword = bytesToBase64Url(await passwordHash(password, salt)); } catch { throw new Error("password_hash"); }
-  try { await env.LICENSE_DB.prepare("INSERT INTO account_passwords (user_id,password_hash,password_salt,iterations,verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, iterations = excluded.iterations, updated_at = excluded.updated_at").bind(user.id, hashedPassword, bytesToBase64Url(salt), PASSWORD_ITERATIONS, null, createdAt, createdAt).run(); } catch { throw new Error("account_password_write"); }
+  try { await stagePassword(env, user.id, password, createdAt); } catch { throw new Error("account_password_write"); }
   let delivery;
   try { delivery = await issueVerificationCode(env, user.id, email, "signup"); } catch { throw new Error("verification_code_write"); }
   if (!delivery.ok) return json({ ok: false, message: delivery.setup ? "Email delivery is not configured yet." : "We could not send the verification email right now." }, delivery.setup ? 503 : 502);
@@ -169,12 +183,11 @@ async function handlePasswordResetComplete(request, env) {
   const user = await env.LICENSE_DB.prepare("SELECT id FROM account_users WHERE normalized_email = ?").bind(email).first();
   const row = user?.id ? await env.LICENSE_DB.prepare("SELECT id,user_id,expires_at,used_at FROM account_verification_codes WHERE user_id = ? AND purpose = 'reset' AND code_hash = ? ORDER BY created_at DESC LIMIT 1").bind(user.id, await sha256(code)).first() : null;
   if (!row || row.used_at || new Date(row.expires_at).getTime() <= Date.now()) return json({ ok: false, message: "That code is invalid or expired." }, 400);
-  const salt = new Uint8Array(16); crypto.getRandomValues(salt);
-  const hash = bytesToBase64Url(await passwordHash(password, salt));
   const now = nowIso();
   const consumed = await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?").bind(now, row.id, now).run();
   if (!consumed?.meta?.changes) return json({ ok: false, message: "That code is no longer valid." }, 400);
-  await env.LICENSE_DB.prepare("UPDATE account_passwords SET password_hash = ?, password_salt = ?, iterations = ?, verified_at = ?, updated_at = ? WHERE user_id = ?").bind(hash, bytesToBase64Url(salt), PASSWORD_ITERATIONS, now, now, row.user_id).run();
+  await stagePassword(env, row.user_id, password, now);
+  await activateStagedPassword(env, row.user_id, now);
   return createAccountSession(env, row.user_id, request);
 }
 
@@ -202,7 +215,7 @@ async function handleAccountVerifyCode(request, env) {
   const now = nowIso();
   const consumed = await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?").bind(now, row.id, now).run();
   if (!consumed?.meta?.changes) return json({ ok: false, message: "That code is no longer valid." }, 400);
-  await env.LICENSE_DB.prepare("UPDATE account_passwords SET verified_at = ?, updated_at = ? WHERE user_id = ?").bind(now, now, row.user_id).run();
+  await activateStagedPassword(env, row.user_id, now);
   return createAccountSession(env, row.user_id, request);
 }
 
