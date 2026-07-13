@@ -151,6 +151,8 @@ test("LedgerLift ownership is product-specific and routes owned users into a qui
   assert.match(read("checkout-portal/checkout.js"), /This purchase unlocks LedgerLift only/);
   assert.match(read("checkout-portal/success.js"), /handoffAuthenticatedBuyer/);
   assert.match(read("checkout-portal/purchase-success.html"), /connect-src 'self'/);
+  assert.match(read("_headers"), /\/ledgerlift\/\*[\s\S]*connect-src 'self'/);
+  assert.match(read("ledgerlift/_headers"), /connect-src 'self'/);
 });
 
 test("final pricing source of truth matches every displayed plan", () => {
