@@ -152,6 +152,7 @@ test("LedgerLift ownership is product-specific and routes owned users into a qui
   assert.match(read("checkout-portal/success.js"), /handoffAuthenticatedBuyer/);
   assert.match(read("checkout-portal/purchase-success.html"), /connect-src 'self'/);
   assert.match(read("_headers"), /\/ledgerlift\/\*[\s\S]*connect-src 'self'/);
+  assert.match(read("_headers"), /^\/\n  Content-Security-Policy:[^\n]*connect-src 'self'/m);
   assert.match(read("ledgerlift/_headers"), /connect-src 'self'/);
 });
 
