@@ -75,6 +75,7 @@ test("Plus routes are separate, entitlement-gated workspaces with a post-checkou
   assert.match(mode, /plus-locked/);
   assert.match(mode, /Retry Plus restore/);
   assert.match(mode, /setPaidAccess/);
+  assert.match(mode, /waitForSuiteGate/);
   assert.match(mode, /plus-mode:ready/);
   assert.match(styles, /#pricing/);
   assert.match(styles, /#sampleBtn/);
@@ -86,8 +87,10 @@ test("Plus routes are separate, entitlement-gated workspaces with a post-checkou
   assert.match(read("checkout-portal/checkout.js"), /plusHome/);
   assert.match(read("checkout-portal/checkout.js"), /successUrl/);
   assert.match(read("checkout-portal/success.js"), /mode=plus/);
+  assert.match(read("checkout-portal/success.js"), /productLink\.href = paidPath/);
   assert.match(read("account/verify.js"), /lft_pending_next/);
   assert.match(read("account/login.js"), /safeNext/);
+  assert.match(read("account/login.js"), /sessionIsActive/);
   ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"].forEach((product) => {
     const common = read(`${product}/common.js`);
     const page = read(`${product}/index.html`);
@@ -109,6 +112,7 @@ test("Standard routes are separate paid workspaces with core entitlement gating"
   assert.match(mode, /standard-locked/);
   assert.match(mode, /Retry Standard restore/);
   assert.match(mode, /setPaidAccess/);
+  assert.match(mode, /waitForSuiteGate/);
   assert.match(styles, /#pricing/);
   assert.match(styles, /#sampleBtn/);
   assert.match(styles, /standard-locked/);
@@ -214,7 +218,7 @@ test("LedgerLift SEO pages have unique metadata, structured data, headings, and 
   pages.forEach((file) => {
     const content = read(file);
     const title = content.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
-    const description = content.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i)?.[1];
+    const description = content.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i)?.[1] || content.match(/<meta[^>]+content="([^"]+)"[^>]+name="description"/i)?.[1];
     assert.ok(title && description, `${file} metadata`);
     assert.equal((content.match(/<h1\b/gi) || []).length, 1, `${file} one H1`);
     assert.doesNotMatch(content, /name="robots"[^>]+content="[^"]*noindex/i, `${file} indexable`);
@@ -262,6 +266,39 @@ test("PixelPort SEO pages have unique metadata, format guidance, structured data
   pages.forEach((file) => { const url = file === "pixelport/index.html" ? "https://localfiletoolkit.com/pixelport/" : `https://localfiletoolkit.com/${file}`; assert.match(sitemap, new RegExp(url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${file} sitemap`); });
   const index = read("pixelport/index.html");
   ["png-to-jpg-converter.html", "jpg-to-png-converter.html", "webp-to-png-converter.html", "png-to-webp-converter.html", "avif-to-jpg-converter.html", "avif-to-png-converter.html", "private-image-converter.html", "../index.html", "../pricing.html", "../account/", "privacy.html", "security.html"].forEach((href) => assert.match(index, new RegExp(`href="${href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), `PixelPort link ${href}`));
+});
+
+test("ContactCraft SEO pages have unique metadata, field guidance, structured data, and sitemap coverage", () => {
+  const pages = ["contactcraft/index.html", "contactcraft/vcf-to-csv-converter.html", "contactcraft/csv-to-vcard-converter.html", "contactcraft/csv-to-vcf-converter.html", "contactcraft/open-vcf-in-excel.html", "contactcraft/export-contacts-to-csv.html", "contactcraft/private-contact-converter.html"];
+  const titles = new Set(); const descriptions = new Set();
+  pages.forEach((file) => {
+    const content = read(file);
+    const title = content.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
+    const description = content.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i)?.[1] || content.match(/<meta[^>]+content="([^"]+)"[^>]+name="description"/i)?.[1];
+    assert.ok(title && description, `${file} metadata`);
+    assert.equal((content.match(/<h1\b/gi) || []).length, 1, `${file} one H1`);
+    assert.doesNotMatch(content, /name="robots"[^>]+content="[^"]*noindex/i, `${file} indexable`);
+    assert.match(content, /<link[^>]+rel="canonical"[^>]+https:\/\/localfiletoolkit\.com\/contactcraft\//i, `${file} canonical`);
+    assert.match(content, /property="og:title"/i, `${file} Open Graph title`);
+    assert.match(content, /name="twitter:title"/i, `${file} Twitter title`);
+    assert.match(content, /<h2>FAQ<\/h2>|class="[^\"]*\bfaq\b/i, `${file} visible FAQ`);
+    titles.add(title); descriptions.add(description);
+    const jsonScripts = [...content.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
+    assert.ok(jsonScripts.length, `${file} JSON-LD`);
+    jsonScripts.forEach((match) => { const data = JSON.parse(match[1]); const graph = data["@graph"] || [data]; assert.ok(graph.some((item) => item["@type"] === "SoftwareApplication"), `${file} SoftwareApplication`); assert.ok(graph.some((item) => item["@type"] === "BreadcrumbList"), `${file} BreadcrumbList`); assert.ok(graph.some((item) => item["@type"] === "FAQPage"), `${file} FAQPage`); });
+  });
+  assert.equal(titles.size, pages.length);
+  assert.equal(descriptions.size, pages.length);
+  assert.match(read("contactcraft/index.html"), /<title>VCF, vCard and CSV Contact Converter \| ContactCraft<\/title>/);
+  assert.match(read("contactcraft/index.html"), /<h1>Convert Contact Lists Between VCF, vCard and CSV<\/h1>/);
+  const routes = pages.slice(1).map((file) => file.replace("contactcraft/", ""));
+  routes.forEach((route) => assert.ok(fs.existsSync(path.join(root, "contactcraft", route)), route));
+  const sitemap = read("sitemap.xml");
+  pages.forEach((file) => { const url = file === "contactcraft/index.html" ? "https://localfiletoolkit.com/contactcraft/" : `https://localfiletoolkit.com/${file}`; assert.match(sitemap, new RegExp(url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${file} sitemap`); });
+  const index = read("contactcraft/index.html");
+  ["vcf-to-csv-converter.html", "csv-to-vcard-converter.html", "csv-to-vcf-converter.html", "open-vcf-in-excel.html", "export-contacts-to-csv.html", "private-contact-converter.html", "../index.html", "../pricing.html", "../account/", "../privacy.html", "security.html"].forEach((href) => assert.match(index, new RegExp(`href="${href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), `ContactCraft link ${href}`));
+  assert.match(index, /<caption>Basic ContactCraft field mapping/);
+  assert.match(index, /What CSV structure should I prepare\?/);
 });
 
 test("root favicon is linked by suite pages", () => {
