@@ -502,6 +502,21 @@ test("ContactCraft has product-specific tier routing, free messaging, and promot
   assert.match(read("contactcraft/_headers"), /connect-src 'self'/);
 });
 
+test("CalendarFlow has product-specific tier routing, free messaging, and promotion suppression", () => {
+  const access = read("account-access.js");
+  const common = read("calendarflow/common.js");
+  assert.match(access, /routeOwnedCalendarFlow\(map, account\)/);
+  assert.match(access, /account\.products\.calendarflow/);
+  assert.match(access, /suppressUnpurchasedCalendarFlowPromotion/);
+  assert.match(access, /setTier\?\.\(entitlement\?\.plan_key \|\| "free", entitlement\?\.source\)/);
+  assert.match(common, /setTier/);
+  assert.match(common, /INCLUDED WITH BUNDLE · CalendarFlow Plus workspace/);
+  assert.match(common, /FREE · 1 complete calendar file per browser installation · 10 MB maximum/);
+  assert.match(read("calendarflow/plus.js"), /canUsePlus\("calendarflow"\)/, "CalendarFlow Plus remains license-gated");
+  assert.match(read("CALENDARFLOW_PRODUCT_MATRIX.md"), /highest active CalendarFlow entitlement wins/);
+  assert.match(read("calendarflow/_headers"), /connect-src 'self'/);
+});
+
 test("CalendarFlow Plus promises are implemented and license-gated", () => {
   const plus = read("calendarflow/plus.js");
   assert.match(plus, /Merge calendars/);
@@ -512,7 +527,8 @@ test("CalendarFlow Plus promises are implemented and license-gated", () => {
   assert.match(plus, /canUsePlus\("calendarflow"\)/);
   assert.match(read("calendarflow/app.js"), /window\.CalendarFlowCore/);
   assert.match(read("calendarflow/common.js"), /calendar merging, filtering, recurrence normalization, saved presets, and validation reporting/i);
-  assert.match(read("checkout-portal/checkout.js"), /Calendar merging, filtering, and duplicate removal/);
+  assert.match(read("checkout-portal/checkout.js"), /Merge calendars and remove duplicate events/);
+  assert.match(read("checkout-portal/checkout.js"), /Saved filters and recurrence normalization/);
 });
 
 test("CaptionShift Plus promises are implemented and license-gated", () => {
