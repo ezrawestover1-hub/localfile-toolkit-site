@@ -197,9 +197,11 @@ async function handlePasswordResetComplete(request, env) {
   try {
     const now = nowIso();
     const salt = new Uint8Array(16);
-    crypto.getRandomValues(salt);
-    const hash = bytesToBase64Url(await passwordHash(password, salt));
-    const current = await env.LICENSE_DB.prepare("SELECT password_hash,password_salt,iterations FROM account_passwords WHERE user_id = ?").bind(row.user_id).first();
+    try { crypto.getRandomValues(salt); } catch { throw new Error("reset_randomness_failed"); }
+    let hash;
+    try { hash = bytesToBase64Url(await passwordHash(password, salt)); } catch { throw new Error("reset_hash_failed"); }
+    let current;
+    try { current = await env.LICENSE_DB.prepare("SELECT password_hash,password_salt,iterations FROM account_passwords WHERE user_id = ?").bind(row.user_id).first(); } catch { throw new Error("reset_current_password_read_failed"); }
     if (current?.password_hash) {
       try {
         await env.LICENSE_DB.prepare("INSERT INTO account_password_history (id,user_id,password_hash,password_salt,iterations,created_at) VALUES (?,?,?,?,?,?)").bind(id("pwdhist"), row.user_id, current.password_hash, current.password_salt, current.iterations, now).run();
@@ -215,7 +217,8 @@ async function handlePasswordResetComplete(request, env) {
       return json({ ok: true, message: "Password reset successfully. Please sign in with your new password." }, 200);
     }
   } catch (error) {
-    const reason = new Set(["reset_password_write_failed", "reset_code_consume_failed"]).has(error?.message) ? error.message : "password_reset_completion_failed";
+    const knownReasons = new Set(["reset_randomness_failed", "reset_hash_failed", "reset_current_password_read_failed", "reset_password_write_failed", "reset_code_consume_failed"]);
+    const reason = knownReasons.has(error?.message) ? error.message : "password_reset_completion_failed";
     console.error("account_password_reset_failed", reason);
     const message = reason === "reset_password_write_failed"
       ? "We could not save the new password. Your verification code remains available; please try again."
