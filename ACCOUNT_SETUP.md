@@ -14,7 +14,7 @@ The suite now has one email-and-password account at `/account/login.html` and a 
    - `AUTH_EMAIL_API_KEY`
    - `AUTH_EMAIL_FROM_ADDRESS`
 
-   New accounts receive a six-digit verification code by email. Passwords are hashed with PBKDF2 in the Worker and are never emailed or stored in plaintext. Password reset/recovery must use the same verified-email channel before launch.
+   New accounts receive a six-digit verification code by email. Passwords must be at least 8 characters, are hashed with PBKDF2 in the Worker, and are never emailed or stored in plaintext. Password reset/recovery must use the same verified-email channel before launch.
 
 3. Set `PADDLE_API_KEY` as a Worker secret. It must have the Paddle `customer_portal_session.write` permission. `PADDLE_API_BASE_URL` is set to the sandbox API URL in `wrangler.jsonc`; change it only during a deliberate live rollout.
 

@@ -20,7 +20,7 @@ const ACCOUNT_COOKIE = "__Host-lft_account_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 const SESSION_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 const PASSWORD_ITERATIONS = 120000;
-const PASSWORD_MIN_LENGTH = 12;
+const PASSWORD_MIN_LENGTH = 8;
 
 function randomToken(prefix) {
   const bytes = new Uint8Array(32);
