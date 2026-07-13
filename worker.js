@@ -109,16 +109,20 @@ async function handleAccountRegister(request, env) {
   if (!validEmail(email) || password.length < PASSWORD_MIN_LENGTH || password.length > 256) return json({ ok: false, message: `Use a valid email and a password of at least ${PASSWORD_MIN_LENGTH} characters.` }, 400);
   const createdAt = nowIso();
   const userId = id("user");
-  await env.LICENSE_DB.prepare("INSERT INTO account_users (id,normalized_email,created_at,updated_at) VALUES (?,?,?,?) ON CONFLICT(normalized_email) DO UPDATE SET updated_at = excluded.updated_at").bind(userId, email, createdAt, createdAt).run();
-  const user = await env.LICENSE_DB.prepare("SELECT id FROM account_users WHERE normalized_email = ?").bind(email).first();
+  try { await env.LICENSE_DB.prepare("INSERT INTO account_users (id,normalized_email,created_at,updated_at) VALUES (?,?,?,?) ON CONFLICT(normalized_email) DO UPDATE SET updated_at = excluded.updated_at").bind(userId, email, createdAt, createdAt).run(); } catch { throw new Error("account_user_write"); }
+  let user;
+  try { user = await env.LICENSE_DB.prepare("SELECT id FROM account_users WHERE normalized_email = ?").bind(email).first(); } catch { throw new Error("account_user_read"); }
   if (!user?.id) return json({ ok: false, message: "We could not create the account right now." }, 503);
-  const existing = await env.LICENSE_DB.prepare("SELECT verified_at FROM account_passwords WHERE user_id = ?").bind(user.id).first();
+  let existing;
+  try { existing = await env.LICENSE_DB.prepare("SELECT verified_at FROM account_passwords WHERE user_id = ?").bind(user.id).first(); } catch { throw new Error("account_password_read"); }
   if (existing?.verified_at) return json({ ok: false, message: "That account already exists. Sign in instead." }, 409);
   const salt = new Uint8Array(16);
   crypto.getRandomValues(salt);
   const code = randomVerificationCode();
-  await env.LICENSE_DB.prepare("INSERT INTO account_passwords (user_id,password_hash,password_salt,iterations,verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, iterations = excluded.iterations, updated_at = excluded.updated_at").bind(user.id, bytesToBase64Url(await passwordHash(password, salt)), bytesToBase64Url(salt), PASSWORD_ITERATIONS, null, createdAt, createdAt).run();
-  await env.LICENSE_DB.prepare("INSERT INTO account_verification_codes (id,user_id,code_hash,purpose,expires_at,used_at,created_at) VALUES (?,?,?,?,?,?,?)").bind(id("verify"), user.id, await sha256(code), "signup", new Date(Date.now() + 15 * 60 * 1000).toISOString(), null, createdAt).run();
+  let hashedPassword;
+  try { hashedPassword = bytesToBase64Url(await passwordHash(password, salt)); } catch { throw new Error("password_hash"); }
+  try { await env.LICENSE_DB.prepare("INSERT INTO account_passwords (user_id,password_hash,password_salt,iterations,verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, iterations = excluded.iterations, updated_at = excluded.updated_at").bind(user.id, hashedPassword, bytesToBase64Url(salt), PASSWORD_ITERATIONS, null, createdAt, createdAt).run(); } catch { throw new Error("account_password_write"); }
+  try { await env.LICENSE_DB.prepare("INSERT INTO account_verification_codes (id,user_id,code_hash,purpose,expires_at,used_at,created_at) VALUES (?,?,?,?,?,?,?)").bind(id("verify"), user.id, await sha256(code), "signup", new Date(Date.now() + 15 * 60 * 1000).toISOString(), null, createdAt).run(); } catch { throw new Error("verification_code_write"); }
   const delivery = await sendVerificationCode(env, email, code);
   if (!delivery.ok) return json({ ok: false, message: delivery.setup ? "Email delivery is not configured yet." : "We could not send the verification email right now." }, delivery.setup ? 503 : 502);
   return json({ ok: true, message: "Check your email for the six-digit verification code." }, 202);
@@ -580,7 +584,7 @@ async function handleVerify(request, env) {
 export async function handleRequest(request, env) {
   const url = new URL(request.url);
   if (request.method === "GET" && url.pathname === "/api/health") return json({ status: "ok" });
-  if (request.method === "POST" && url.pathname === "/api/account/register") return handleAccountRegister(request, env).catch((error) => { console.error("account_register_failed", error?.name || "unknown"); return json({ ok: false, message: "Account setup is temporarily unavailable. Please try again." }, 503); });
+  if (request.method === "POST" && url.pathname === "/api/account/register") return handleAccountRegister(request, env).catch((error) => { const reason = new Set(["account_user_write", "account_user_read", "account_password_read", "password_hash", "account_password_write", "verification_code_write"]).has(error?.message) ? error.message : "account_register_failed"; console.error("account_register_failed", reason); return json({ ok: false, message: "Account setup is temporarily unavailable. Please try again.", error: reason }, 503); });
   if (request.method === "POST" && url.pathname === "/api/account/login") return handleAccountLogin(request, env);
   if (request.method === "POST" && url.pathname === "/api/account/verify-code") return handleAccountVerifyCode(request, env);
   if (request.method === "GET" && url.pathname === "/api/account/me") return handleAccountMe(request, env);
