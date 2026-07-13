@@ -40,11 +40,12 @@
   function apply(map) {
     const paid = map.size > 0;
     const fullPlus = isBundleOwner(map);
+    const currentProduct = document.body.dataset.product;
     document.querySelectorAll("a[href*='product=suite'], .bundle-menu-button, [data-checkout='bundle'], .product-bundle-card").forEach((element) => {
       if (!paid || element.dataset.accountAccessApplied === "true") return;
-      makeAccessButton(element, "Access other products", "/account/");
+      const isSuiteHeader = !currentProduct && element.classList.contains("suite-bundle-link");
+      makeAccessButton(element, isSuiteHeader ? "My Account" : "Access other products", "/account/");
     });
-    const currentProduct = document.body.dataset.product;
     document.querySelectorAll("a[href*='checkout-portal/index.html?product='], [data-checkout]:not([data-checkout='bundle'])").forEach((element) => {
       if (element.dataset.accountAccessApplied === "true") return;
       let product = currentProduct;
@@ -54,7 +55,10 @@
       if (!map.has(product) || !planRank[plan] || planRank[map.get(product).plan_key] < planRank[plan]) return;
       makeAccessButton(element, accessLabel(product, plan), productHome(product));
     });
-    if (paid) addAccountLink();
+    if (paid) {
+      if (!currentProduct && document.querySelector(".suite-bundle-link")) document.querySelector("a.account-access-link")?.remove();
+      else addAccountLink();
+    }
     if (fullPlus && !currentProduct) {
       document.body.classList.add("account-active");
       const badge = document.querySelector(".hero .badge");
