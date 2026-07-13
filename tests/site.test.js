@@ -236,6 +236,7 @@ test("account setup stages passwords until email verification", () => {
   assert.match(read("worker.js"), /purpose IN \('reset','signup'\)/);
   assert.match(read("worker.js"), /purpose IN \('signup','reset'\)/);
   assert.match(read("worker.js"), /Your code remains available/);
+  assert.match(read("worker.js"), /ON CONFLICT\(user_id\) DO UPDATE SET password_hash/);
   assert.match(read("account/reset.js"), /replace\(\/\\D\/g/);
   assert.match(read("worker.js"), /SELECT id FROM customers WHERE normalized_email/);
 });

@@ -121,9 +121,11 @@ async function activateStagedPassword(env, userId, now) {
   if (!pending) throw new Error("pending_password_missing");
   const current = await env.LICENSE_DB.prepare("SELECT password_hash,password_salt,iterations FROM account_passwords WHERE user_id = ?").bind(userId).first();
   if (current?.password_hash) {
-    await env.LICENSE_DB.prepare("INSERT INTO account_password_history (id,user_id,password_hash,password_salt,iterations,created_at) VALUES (?,?,?,?,?,?)").bind(id("pwdhist"), userId, current.password_hash, current.password_salt, current.iterations, now).run();
+    try {
+      await env.LICENSE_DB.prepare("INSERT INTO account_password_history (id,user_id,password_hash,password_salt,iterations,created_at) VALUES (?,?,?,?,?,?)").bind(id("pwdhist"), userId, current.password_hash, current.password_salt, current.iterations, now).run();
+    } catch { console.error("password_history_write_failed"); }
   }
-  await env.LICENSE_DB.prepare("UPDATE account_passwords SET password_hash = ?, password_salt = ?, iterations = ?, verified_at = ?, updated_at = ? WHERE user_id = ?").bind(pending.password_hash, pending.password_salt, pending.iterations, now, now, userId).run();
+  await env.LICENSE_DB.prepare("INSERT INTO account_passwords (user_id,password_hash,password_salt,iterations,verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, iterations = excluded.iterations, verified_at = excluded.verified_at, updated_at = excluded.updated_at").bind(userId, pending.password_hash, pending.password_salt, pending.iterations, now, now, now).run();
   await env.LICENSE_DB.prepare("DELETE FROM account_pending_passwords WHERE user_id = ?").bind(userId).run();
 }
 
