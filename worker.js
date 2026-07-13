@@ -153,8 +153,8 @@ async function handleResendCode(request, env) {
   const body = await readJsonObject(request);
   const email = normalizeEmail(body?.email);
   if (!validEmail(email)) return json({ ok: false, message: "Enter a valid email address." }, 400);
-  const user = await env.LICENSE_DB.prepare("SELECT u.id,p.verified_at FROM account_users u JOIN account_passwords p ON p.user_id = u.id WHERE u.normalized_email = ?").bind(email).first();
-  if (!user?.id || user.verified_at) return json({ ok: true, message: "If the account can receive mail, a new code has been sent." }, 202);
+  const user = await env.LICENSE_DB.prepare("SELECT u.id,p.verified_at,pp.user_id AS pending_user_id FROM account_users u LEFT JOIN account_passwords p ON p.user_id = u.id LEFT JOIN account_pending_passwords pp ON pp.user_id = u.id WHERE u.normalized_email = ?").bind(email).first();
+  if (!user?.id || (!user.pending_user_id && user.verified_at)) return json({ ok: true, message: "If the account can receive mail, a new code has been sent." }, 202);
   const delivery = await issueVerificationCode(env, user.id, email, "signup");
   if (!delivery.ok) return json({ ok: false, message: delivery.setup ? "Email delivery is not configured yet." : "We could not send a new code right now." }, delivery.setup ? 503 : 502);
   return json({ ok: true, message: "A new verification code has been sent." }, 202);
@@ -213,11 +213,16 @@ async function handleAccountVerifyCode(request, env) {
   const row = user?.id ? await env.LICENSE_DB.prepare("SELECT id,user_id,expires_at,used_at FROM account_verification_codes WHERE user_id = ? AND purpose = 'signup' AND code_hash = ? ORDER BY created_at DESC LIMIT 1").bind(user.id, await sha256(code)).first() : null;
   if (row?.used_at && user?.verified_at) return createAccountSession(env, row.user_id, request);
   if (!row || row.used_at || new Date(row.expires_at).getTime() <= Date.now()) return json({ ok: false, message: "That code is invalid or expired." }, 400);
-  const now = nowIso();
-  const consumed = await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?").bind(now, row.id, now).run();
-  if (!consumed?.meta?.changes) return json({ ok: false, message: "That code is no longer valid." }, 400);
-  await activateStagedPassword(env, row.user_id, now);
-  return createAccountSession(env, row.user_id, request);
+  try {
+    const now = nowIso();
+    await activateStagedPassword(env, row.user_id, now);
+    const consumed = await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?").bind(now, row.id, now).run();
+    if (!consumed?.meta?.changes) return createAccountSession(env, row.user_id, request);
+    return createAccountSession(env, row.user_id, request);
+  } catch (error) {
+    console.error("account_verify_failed", error?.message === "pending_password_missing" ? "pending_password_missing" : "verification_completion_failed");
+    return json({ ok: false, message: "We could not complete verification. Request a new code and try again." }, 503);
+  }
 }
 
 async function handleAccountMe(request, env) {
