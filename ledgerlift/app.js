@@ -1,1 +1,319 @@
-(() => {"use strict";const $=id=>document.getElementById(id),state={headers:[],rows:[],tx:[],source:false,name:'transactions'};const input=$("fileInput"),drop=$("dropZone"),status=$("fileStatus");const work=$("work");function parse(t){const m=[];let r=[],f='',q=false;for(let i=0;i<t.length;i++){const c=t[i],n=t[i+1];if(c==='"'){if(q&&n==='"'){f+='"';i++}else q=!q}else if(c===','&&!q){r.push(f.trim());f=''}else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&n==='\n')i++;r.push(f.trim());f='';if(r.some(Boolean))m.push(r);r=[]}else f+=c}r.push(f.trim());if(r.some(Boolean))m.push(r);if(m.length<2)throw Error('The CSV needs headers and at least one transaction.');const h=m.shift();return{headers:h,rows:m.map(a=>Object.fromEntries(h.map((x,i)=>[x,a[i]||''])))} }function options(id){const s=$(id);s.replaceChildren(...state.headers.map(h=>{const o=document.createElement('option');o.value=o.textContent=h;return o}))}function guess(words){return state.headers.find(h=>words.some(w=>h.toLowerCase().replace(/[^a-z]/g,'').includes(w)))||state.headers[0]}function load(file,sample=false){if(!sample&&!SuiteGate.mayOpenRealDocument()){SuiteGate.showUpgrade();return}if(!file||file.size>10*1024*1024){SuiteGate.message('Choose a CSV smaller than 10 MB.');return}const r=new FileReader();r.onload=()=>{try{Object.assign(state,parse(String(r.result)));state.source=sample;state.name=file.name.replace(/\.[^.]+$/,'');['date','desc','amount'].forEach(options);$('date').value=guess(['date']);$('desc').value=guess(['description','memo','payee','details']);$('amount').value=guess(['amount','value']);status.textContent=`${file.name} · ${state.rows.length} rows`;work.classList.remove('hidden');$('results').classList.add('hidden');SuiteGate.update(sample)}catch(e){SuiteGate.message(e.message)}};r.readAsText(file)}function money(v){const s=String(v).trim(),neg=/^\(.*\)$/.test(s),n=Number(s.replace(/[,$£€¥\s()]/g,''));return Number.isFinite(n)?(neg?-Math.abs(n):n):NaN}function date(v){const raw=String(v||'').trim();let y,m,d;let x=raw.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);if(x){y=+x[1];m=+x[2];d=+x[3]}else{x=raw.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);if(!x)return null;m=+x[1];d=+x[2];y=+x[3];if(y<100)y+=y>=70?1900:2000}const check=new Date(y,m-1,d);return check.getFullYear()===y&&check.getMonth()===m-1&&check.getDate()===d?`${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}/${y}`:null}function clean(v){return String(v||'').replace(/[\t\r\n\x00-\x1f\x7f]/g,' ').trim().slice(0,512)}function analyze(){state.tx=state.rows.map(r=>{const d=date(r[$('date').value]),a=money(r[$('amount').value]),memo=clean(r[$('desc').value]);return{d,a,memo,ok:!!d&&Number.isFinite(a)&&a!==0}});const body=$('rows');body.replaceChildren(...state.tx.slice(0,200).map(t=>{const tr=document.createElement('tr');[t.d||'—',t.memo||'—',Number.isFinite(t.a)?t.a.toFixed(2):'—',t.ok?'Ready':'Review'].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.append(td)});return tr}));const good=state.tx.filter(t=>t.ok).length;$('validation').textContent=`${good} of ${state.tx.length} rows are ready for export.`;$('results').classList.remove('hidden')}function iif(){const b=clean($('bank').value),e=clean($('expense').value),inc=clean($('income').value);if(!b||!e||!inc)throw Error('Enter all account names.');const l=['!TRNS\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO','!SPL\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO','!ENDTRNS'];state.tx.filter(t=>t.ok).forEach(t=>{const type=t.a<0?'CHK':'DEP',other=t.a<0?e:inc;l.push(`TRNS\t${type}\t${t.d}\t${b}\t\t${t.a.toFixed(2)}\t${t.memo}`,`SPL\t${type}\t${t.d}\t${other}\t\t${(-t.a).toFixed(2)}\t${t.memo}`,'ENDTRNS')});return l.join('\r\n')+'\r\n'}input.addEventListener('change',e=>load(e.target.files[0]));drop.addEventListener('dragover',e=>e.preventDefault());drop.addEventListener('drop',e=>{e.preventDefault();load(e.dataTransfer.files[0])});$('sampleBtn').addEventListener('click',()=>load(new File([`Date,Description,Amount\n07/01/2026,Coffee Shop,-6.45\n07/02/2026,Client Payment,725.00`],'sample.csv',{type:'text/csv'}),true));$('clearBtn').addEventListener('click',()=>{input.value='';state.rows=[];work.classList.add('hidden');status.textContent='No file selected';SuiteGate.setActive(false)});$('analyze').addEventListener('click',analyze);$('download').addEventListener('click',()=>{try{const blob=new Blob([iif()],{type:'text/plain'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=state.name+'.iif';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);if(!state.source)SuiteGate.markUsed()}catch(e){SuiteGate.message(e.message)}})})();
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const state = { headers: [], rows: [], tx: [], review: null, cleaner: null, mapper: null, accountMapper: null, validator: null, validationReport: null, projectStore: null, destinationLibrary: null, projectId: "", projectName: "", source: false, name: "transactions", amountMode: "signed", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] };
+  const input = $("fileInput");
+  const drop = $("dropZone");
+  const status = $("fileStatus");
+  const work = $("work");
+
+  function options(id) {
+    const select = $(id);
+    if (!select) return;
+    select.replaceChildren(...state.headers.map((header) => {
+      const option = document.createElement("option"); option.value = option.textContent = header; return option;
+    }));
+  }
+
+  function tier() {
+    const mode = new URLSearchParams(location.search).get("mode");
+    if (typeof window.SuiteGate?.paid !== "function" || !window.SuiteGate.paid()) return "free";
+    return mode === "plus" ? "plus" : "standard";
+  }
+
+  function canReplaceFile() {
+    if (!state.imported || !state.rows.length) return true;
+    return window.confirm("Replacing this file will discard the current import and any edits. Continue?");
+  }
+
+  function displayName(file) { return file.name.replace(/\.[^.]+$/, ""); }
+
+  function applySuggestions(preview) {
+    const roles = preview.suggestions?.roles || {};
+    [["date", roles.date], ["desc", roles.description || roles.memo], ["amount", roles.amount], ["debit", roles.debit], ["credit", roles.credit]].forEach(([id, suggestion]) => { const select = $(id); if (select && suggestion?.column && Array.from(select.options).some((option) => option.value === suggestion.column)) select.value = suggestion.column; });
+  }
+
+  async function load(file, sample = false) {
+    if (!file) return;
+    if (!sample && !window.SuiteGate.mayOpenRealDocument()) { window.SuiteGate.showUpgrade(); return; }
+    if (!canReplaceFile()) { input.value = ""; return; }
+    try {
+      const preview = await window.LedgerLiftImporter.importFile(file, { tier: tier() });
+      Object.assign(state, { source: sample, name: displayName(file), projectId: "", projectName: "", importPreview: preview, fileMeta: preview.fileMeta, format: preview.format, delimiter: preview.delimiter, worksheetName: preview.worksheetName || "", worksheetIndex: preview.worksheetIndex || 0, headerRow: preview.headerRow, suggestions: preview.suggestions, importWarnings: preview.warnings, importErrors: preview.blocking, imported: false, review: null, cleaner: null, mapper: null, accountMapper: null, validator: null, validationReport: null, headers: preview.headers, rows: preview.rows, tx: [], cleanSummary: null });
+      ["date", "desc", "amount", "debit", "credit"].forEach(options);
+      status.textContent = `${file.name} · ${preview.format} · ${Math.max(1, Math.round(file.size / 1024))} KB`;
+      work.classList.add("hidden"); $("results").classList.add("hidden");
+      window.SuiteGate.update(sample);
+      window.dispatchEvent(new CustomEvent("ledgerlift:import-preview-ready", { detail: { preview } }));
+    } catch (problem) {
+      window.dispatchEvent(new CustomEvent("ledgerlift:import-error", { detail: { message: problem.message, code: problem.code } }));
+      window.SuiteGate.message(problem.message);
+    }
+  }
+
+  function configureImport({ worksheetIndex = state.worksheetIndex, headerRow = state.headerRow } = {}) {
+    const current = state.importPreview;
+    if (!current) return null;
+    const sheet = current.worksheets?.[worksheetIndex];
+    const base = sheet ? { ...current, worksheetIndex, worksheetName: sheet.name, matrix: sheet.matrix, formulaWithoutCache: sheet.formulaWithoutCache, warnings: [] } : { ...current, matrix: current.matrix, warnings: [] };
+    const preview = window.LedgerLiftImporter.buildPreview(base, { worksheetIndex, headerRow });
+    state.importPreview = preview;
+    state.headers = preview.headers;
+    state.rows = preview.rows;
+    state.worksheetIndex = preview.worksheetIndex || 0;
+    state.worksheetName = preview.worksheetName || "";
+    state.headerRow = preview.headerRow;
+    state.suggestions = preview.suggestions;
+    state.importWarnings = preview.warnings;
+    state.importErrors = preview.blocking;
+    window.dispatchEvent(new CustomEvent("ledgerlift:import-preview-ready", { detail: { preview } }));
+    return preview;
+  }
+
+  function confirmImport() {
+    const preview = state.importPreview;
+    if (!preview) { window.SuiteGate.message("Choose a file before confirming the import."); return false; }
+    if (preview.blocking.length) { window.SuiteGate.message(preview.blocking[0]); return false; }
+    state.review = window.LedgerLiftReviewModel?.create({ headers: preview.headers, rows: preview.rows, rowWarnings: preview.rowWarnings, tier: tier() }) || null;
+    state.cleaner = state.review && window.LedgerLiftCleaner?.create({ review: state.review, tier: tier(), suggestedRoles: preview.suggestions?.roles || {} });
+    state.mapper = state.review && window.LedgerLiftMapper?.create({ review: state.review, cleaner: state.cleaner, tier: tier(), suggestedRoles: preview.suggestions?.roles || {}, templates: window.LedgerLiftMappingTemplates?.create({ tier: tier() }) });
+    state.destinationLibrary = window.LedgerLiftDestinationLibrary?.create({ tier: tier() }) || null;
+    state.accountMapper = state.review && window.LedgerLiftAccountMapper?.create({ review: state.review, mapper: state.mapper, tier: tier(), initialDestinations: state.destinationLibrary?.list?.() || [], templates: window.LedgerLiftAccountMappingTemplates?.create({ tier: tier() }) });
+    state.validator = state.review && window.LedgerLiftValidator?.create({ review: state.review, mapper: state.mapper, accountMapper: state.accountMapper, tier: tier() });
+    Object.assign(state, { imported: true, headers: preview.headers, rows: state.review?.getWorkingRows() || preview.rows, tx: [], validationReport: null, cleaned: false, cleanSummary: null });
+    ["date", "desc", "amount", "debit", "credit"].forEach(options);
+    applySuggestions(preview);
+    status.textContent = `${preview.fileMeta.name} · ${preview.format} · ${preview.rows.length} rows ready`;
+    work.classList.remove("hidden"); $("results").classList.add("hidden");
+    window.dispatchEvent(new CustomEvent("ledgerlift:data-loaded", { detail: { preview } }));
+    return true;
+  }
+
+  function money(value) {
+    const raw = String(value || "").trim(), negative = /^\(.*\)$/.test(raw);
+    const number = Number(raw.replace(/[,$£€¥\s()]/g, ""));
+    return Number.isFinite(number) ? (negative ? -Math.abs(number) : number) : NaN;
+  }
+
+  function date(value) {
+    const raw = String(value || "").trim(); let year, month, day;
+    let match = raw.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+    if (match) { year = +match[1]; month = +match[2]; day = +match[3]; }
+    else { match = raw.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/); if (!match) return null; month = +match[1]; day = +match[2]; year = +match[3]; if (year < 100) year += year >= 70 ? 1900 : 2000; }
+    const check = new Date(year, month - 1, day);
+    return check.getFullYear() === year && check.getMonth() === month - 1 && check.getDate() === day ? `${String(month).padStart(2, "0")}/${String(day).padStart(2, "0")}/${year}` : null;
+  }
+
+  function clean(value) { return String(value || "").replace(/[\t\r\n\x00-\x1f\x7f]/g, " ").trim().slice(0, 512); }
+
+  function cleanRows() {
+    const dateColumn = $("date")?.value, descColumn = $("desc")?.value, amountColumn = $("amount")?.value;
+    if (!dateColumn || !descColumn || !amountColumn) throw Error("Load a file before cleaning rows.");
+    const changes = [], warnings = [];
+    let changedRows = 0, changedCells = 0;
+    state.rows.forEach((row, index) => {
+      const rowChanges = [];
+      [[dateColumn, date(row[dateColumn]) || clean(row[dateColumn])], [descColumn, clean(row[descColumn])], [amountColumn, Number.isFinite(money(row[amountColumn])) ? money(row[amountColumn]).toFixed(2) : clean(row[amountColumn])]].forEach(([column, value]) => {
+        const before = String(row[column] ?? ""), after = String(value ?? "");
+        if (before !== after) { row[column] = after; changedCells += 1; rowChanges.push({ column, before, after }); }
+      });
+      if (rowChanges.length) { changedRows += 1; changes.push({ index, fields: rowChanges }); }
+      const normalizedDate = date(row[dateColumn]);
+      const normalizedAmount = money(row[amountColumn]);
+      if (!normalizedDate || !Number.isFinite(normalizedAmount) || normalizedAmount === 0) warnings.push({ index, date: !normalizedDate, amount: !Number.isFinite(normalizedAmount) || normalizedAmount === 0 });
+    });
+    state.cleaned = true;
+    state.cleanSummary = { changedRows, changedCells, changes: changes.slice(0, 25), warnings, totalRows: state.rows.length };
+    state.tx = [];
+    $("results").classList.add("hidden");
+    status.textContent = `${state.name} · ${state.rows.length} rows · cleaned`;
+    window.dispatchEvent(new CustomEvent("ledgerlift:cleaned", { detail: { summary: state.cleanSummary } }));
+    return state.cleanSummary;
+  }
+
+  function validateCurrent() {
+    if (!state.cleaned) { window.SuiteGate.message("Clean your rows before validating the mapping."); return; }
+    if (state.mapper && !window.LedgerLiftWorkspace?.state?.mapColumnsVisited) { window.SuiteGate.message("Complete Map Columns before validating the mapping."); return; }
+    if (state.mapper && !state.mapper.getValidation().canContinue) { window.SuiteGate.message("Resolve the required Map Columns issues before validating the mapping."); return; }
+    if (state.accountMapper && !window.LedgerLiftWorkspace?.state?.mapAccountsVisited) { window.SuiteGate.message("Complete Map Accounts before validating the mapping."); return; }
+    if (!state.validator) { window.SuiteGate.message("LedgerLift could not initialize local validation for this import."); return; }
+    const report = state.validator.validate();
+    state.validationReport = report;
+    state.amountMode = report.mode;
+    state.tx = report.transactions;
+    renderRows();
+    const good = report.summary.ready;
+    $("validation").textContent = `${good} of ${report.summary.total} rows passed the required checks.`;
+    window.dispatchEvent(new CustomEvent("ledgerlift:validated", { detail: { report } }));
+    window.dispatchEvent(new CustomEvent("ledgerlift:analyzed", { detail: { state, report } }));
+    return report;
+  }
+
+  function analyze() {
+    const report = validateCurrent();
+    if (!report) return;
+    $("results").classList.remove("hidden");
+  }
+
+  function renderRows() {
+    const body = $("rows");
+    body.replaceChildren(...state.tx.slice(0, 200).map((transaction) => {
+      const tr = document.createElement("tr");
+      [transaction.d || "—", transaction.memo || "—", Number.isFinite(transaction.a) ? transaction.a.toFixed(2) : "—", transaction.ok ? "Ready" : "Review"].forEach((value) => { const td = document.createElement("td"); td.textContent = value; tr.append(td); });
+      return tr;
+    }));
+  }
+
+  function iif() {
+    const bank = clean($("bank").value), expense = clean($("expense").value), income = clean($("income").value);
+    if (!bank || !expense || !income) throw Error("Enter all account names.");
+    const lines = ["!TRNS\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO", "!SPL\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO", "!ENDTRNS"];
+    state.tx.filter((transaction) => transaction.ok && !transaction.duplicate).forEach((transaction) => {
+      const type = transaction.a < 0 ? "CHK" : "DEP", other = transaction.a < 0 ? (transaction.category || expense) : income;
+      lines.push(`TRNS\t${type}\t${transaction.d}\t${bank}\t\t${transaction.a.toFixed(2)}\t${transaction.memo}`, `SPL\t${type}\t${transaction.d}\t${other}\t\t${(-transaction.a).toFixed(2)}\t${transaction.memo}`, "ENDTRNS");
+    });
+    return `${lines.join("\r\n")}\r\n`;
+  }
+
+  function resetImport() {
+    input.value = "";
+    Object.assign(state, { headers: [], rows: [], tx: [], review: null, cleaner: null, mapper: null, accountMapper: null, validator: null, validationReport: null, projectId: "", projectName: "", source: false, name: "transactions", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] });
+    work.classList.add("hidden"); $("results").classList.add("hidden"); status.textContent = "No file selected";
+    window.SuiteGate.setActive(false);
+    window.dispatchEvent(new CustomEvent("ledgerlift:cleared"));
+  }
+
+  input.addEventListener("change", (event) => load(event.target.files[0]));
+  drop.addEventListener("dragover", (event) => event.preventDefault());
+  drop.addEventListener("drop", (event) => { event.preventDefault(); load(event.dataTransfer.files[0]); });
+  drop.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); input.click(); } });
+  $("sampleBtn").addEventListener("click", () => load(new File(["Date,Description,Amount\n07/01/2026,Coffee Shop,-6.45\n07/02/2026,Client Payment,725.00\n07/03/2026,Coffee Shop,-6.45"], "sample.csv", { type: "text/csv" }), true));
+  $("clearBtn").addEventListener("click", () => { if (canReplaceFile()) resetImport(); });
+  window.addEventListener("ledgerlift:import-config-changed", (event) => configureImport(event.detail || {}));
+  window.addEventListener("ledgerlift:confirm-import", confirmImport);
+  window.addEventListener("ledgerlift:clean-rows", () => { try { cleanRows(); } catch (error) { window.SuiteGate.message(error.message); } });
+  window.addEventListener("ledgerlift:review-changed", (event) => {
+    if (!state.review) return;
+    state.cleaner?.syncReviewData();
+    state.mapper?.refresh();
+    state.accountMapper?.sync();
+    state.rows = state.review.getWorkingRows();
+    if (["edit", "restore", "add", "delete", "restore-deleted", "undo", "redo"].includes(event.detail?.type)) {
+      state.cleaned = false;
+      state.cleanSummary = null;
+      state.tx = [];
+      state.validationReport = null;
+      $("results").classList.add("hidden");
+    }
+  });
+  window.addEventListener("ledgerlift:clean-state-changed", (event) => {
+    if (!state.cleaner) return;
+    state.rows = state.review.getWorkingRows();
+    state.cleanSummary = state.cleaner.getSummary();
+    state.mapper?.refresh();
+    state.accountMapper?.sync();
+    state.validationReport = null;
+    if (event.detail?.type !== "review-change") state.cleaned = true;
+    state.tx = [];
+    $("results").classList.add("hidden");
+  });
+  window.addEventListener("ledgerlift:review-edited", () => { state.cleaned = false; state.cleanSummary = null; state.tx = []; state.validationReport = null; $("results").classList.add("hidden"); });
+  $("analyze").addEventListener("click", analyze);
+  $("download").addEventListener("click", () => { try { if (window.LedgerLiftWorkspace && !window.LedgerLiftWorkspace.canExport()) { window.SuiteGate.message("Review the preview and resolve every row marked Review before exporting."); return; } if (state.tx.some((transaction) => !transaction.ok)) { window.SuiteGate.message("Resolve every row marked Review before exporting."); return; } if (!state.source && window.SuiteGate.used()) { window.SuiteGate.showUpgrade(); return; } const blob = new Blob([iif()], { type: "text/plain" }), anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob); anchor.download = `${state.name}.iif`; anchor.click(); setTimeout(() => URL.revokeObjectURL(anchor.href), 1000); if (!state.source) window.SuiteGate.markUsed(); window.dispatchEvent(new Event("ledgerlift:exported")); } catch (error) { window.SuiteGate.message(error.message); } });
+  function setMapping(mapping) {
+    const byRole = mapping?.byRole || {};
+    [["date", byRole.transactionDate || byRole.postedDate], ["desc", byRole.description || byRole.memo || byRole.vendor || byRole.name], ["amount", byRole.amount], ["debit", byRole.debit], ["credit", byRole.credit]].forEach(([id, value]) => {
+      const select = $(id);
+      if (select && value && Array.from(select.options).some((option) => option.value === value)) select.value = value;
+    });
+    state.amountMode = mapping?.amountMode === "debit-credit" ? "debit-credit" : "signed";
+    const amountMode = $("amountMode");
+    if (amountMode) amountMode.value = state.amountMode;
+    state.mapping = mapping;
+  }
+  function setAccountMapping(mapping) {
+    const sourceAccount = mapping?.sourceAccount?.name;
+    if (sourceAccount && $("bank")) $("bank").value = sourceAccount;
+    state.accountMapping = mapping;
+  }
+
+  function projectSnapshot() {
+    const reviewState = state.review?.getState?.() || { headers: state.headers, activeEntries: [], deletedEntries: [], originalOrder: [], currentOrder: [] };
+    const mapperState = state.mapper?.getState?.() || {};
+    const accountState = state.accountMapper?.getState?.() || {};
+    return {
+      schemaVersion: 1,
+      headers: [...state.headers],
+      fileMeta: state.fileMeta ? { name: state.fileMeta.name || "transactions", type: state.fileMeta.type || "", size: Number(state.fileMeta.size) || 0 } : { name: `${state.name || "transactions"}.csv`, type: "", size: 0 },
+      format: state.format, delimiter: state.delimiter, worksheetName: state.worksheetName, worksheetIndex: state.worksheetIndex, headerRow: state.headerRow,
+      importWarnings: (state.importWarnings || []).map((warning) => ({ level: warning.level || "info", message: warning.message || String(warning) })),
+      rowCount: reviewState.totalRows || reviewState.activeEntries?.length || 0,
+      review: { headers: [...(reviewState.headers || state.headers)], activeEntries: reviewState.activeEntries || [], deletedEntries: reviewState.deletedEntries || [], originalOrder: reviewState.originalOrder || [], currentOrder: reviewState.currentOrder || [], deletedOrder: (reviewState.deletedEntries || []).map((entry) => entry.id) },
+      mapping: { columns: (mapperState.columns || []).map((column) => ({ id: column.id, index: column.index, header: column.header, role: column.role, origin: column.origin, confirmed: column.confirmed })), mappings: mapperState.mappings || {}, amountMode: mapperState.amountMode || "unresolved" },
+      accountMapping: { destinations: accountState.destinations || [], sourceAccount: accountState.sourceAccount || { destinationId: "", accountType: "BANK" }, defaults: accountState.defaults || {}, records: (accountState.records || []).map((record) => ({ id: record.id, destinationId: record.destinationId || "", origin: record.origin || "none", confirmed: Boolean(record.confirmed), ignored: Boolean(record.ignored), defaultMapping: Boolean(record.defaultMapping) })) },
+      workflow: { cleaned: Boolean(state.cleaned), cleanSummary: state.cleaner?.getSummary?.() || state.cleanSummary || null, currentStep: Number(window.LedgerLiftWorkspace?.state?.current) || 2 },
+      currentStep: Number(window.LedgerLiftWorkspace?.state?.current) || 2
+    };
+  }
+
+  async function saveProject(name) {
+    if (!state.imported || !state.projectStore) return { ok: false, reason: "Import a file before saving a project." };
+    let result;
+    try { result = await state.projectStore.save(name, projectSnapshot(), state.projectId); } catch { return { ok: false, reason: "LedgerLift could not save this project on the device." }; }
+    if (result.ok) { state.projectId = result.project.id; state.projectName = result.project.name; window.dispatchEvent(new CustomEvent("ledgerlift:project-saved", { detail: { project: result.project } })); }
+    return result;
+  }
+
+  async function listProjects() { try { return await state.projectStore?.list?.() || []; } catch { return []; } }
+
+  async function loadProject(id) {
+    const project = await state.projectStore?.load?.(id);
+    if (!project) return { ok: false, reason: "That saved project could not be found on this device." };
+    const headers = project.headers || project.review?.headers || [];
+    state.review = window.LedgerLiftReviewModel?.create({ headers, rows: [], savedState: project.review, tier: tier() }) || null;
+    state.cleaner = state.review && window.LedgerLiftCleaner?.create({ review: state.review, tier: tier(), suggestedRoles: {} });
+    state.mapper = state.review && window.LedgerLiftMapper?.create({ review: state.review, cleaner: state.cleaner, tier: tier(), suggestedRoles: {}, savedState: project.mapping });
+    state.destinationLibrary = window.LedgerLiftDestinationLibrary?.create({ tier: tier() }) || null;
+    state.accountMapper = state.review && window.LedgerLiftAccountMapper?.create({ review: state.review, mapper: state.mapper, tier: tier(), initialDestinations: state.destinationLibrary?.list?.() || [], savedState: project.accountMapping, templates: window.LedgerLiftAccountMappingTemplates?.create({ tier: tier() }) });
+    state.validator = state.review && window.LedgerLiftValidator?.create({ review: state.review, mapper: state.mapper, accountMapper: state.accountMapper, tier: tier() });
+    Object.assign(state, { imported: true, source: false, projectId: project.id, projectName: project.name, name: project.name, fileMeta: project.fileMeta || { name: `${project.name}.csv` }, format: project.format || "", delimiter: project.delimiter || "", worksheetName: project.worksheetName || "", worksheetIndex: Number(project.worksheetIndex) || 0, headerRow: Number(project.headerRow) || 0, importWarnings: project.importWarnings || [], importErrors: [], importPreview: null, suggestions: null, headers, rows: state.review?.getWorkingRows?.() || [], tx: [], validationReport: null, cleaned: Boolean(project.workflow?.cleaned), cleanSummary: project.workflow?.cleanSummary || null });
+    ["date", "desc", "amount", "debit", "credit"].forEach(options);
+    window.SuiteGate.update(false);
+    window.dispatchEvent(new CustomEvent("ledgerlift:project-loaded", { detail: { project: { id: project.id, name: project.name, rowCount: project.rowCount, format: project.format, worksheetName: project.worksheetName, currentStep: project.currentStep }, workflow: project.workflow || {} } }));
+    return { ok: true, project: { id: project.id, name: project.name, rowCount: project.rowCount } };
+  }
+
+  async function deleteProject(id) { let result; try { result = await state.projectStore?.remove?.(id); } catch { result = { ok: false, reason: "LedgerLift could not remove this project." }; } if (result?.ok) window.dispatchEvent(new CustomEvent("ledgerlift:project-deleted", { detail: { id } })); return result || { ok: false, reason: "Saved projects are unavailable." }; }
+
+  window.addEventListener("ledgerlift:account-mapping-changed", () => { const destinations = state.accountMapper?.getState?.().destinations; if (destinations?.length || state.destinationLibrary?.limit) state.destinationLibrary?.replace?.(destinations || []); });
+  const mapperScript = document.createElement("script");
+  mapperScript.src = "mapper.js?v=8f5e2b2";
+  const templateScript = document.createElement("script");
+  templateScript.src = "mapping-templates.js?v=8f5e2b2";
+  const accountTemplateScript = document.createElement("script");
+  accountTemplateScript.src = "account-mapping-templates.js?v=8f5e2b3";
+  const accountMapperScript = document.createElement("script");
+  accountMapperScript.src = "account-mapper.js?v=8f5e2b3";
+  const destinationLibraryScript = document.createElement("script");
+  destinationLibraryScript.src = "destination-library.js?v=8f5e2b5";
+  const validatorScript = document.createElement("script");
+  validatorScript.src = "validator.js?v=8f5e2b4";
+  const projectStoreScript = document.createElement("script");
+  projectStoreScript.src = "project-store.js?v=8f5e2b5";
+  window.LedgerLiftCore = { state, analyze, validate: validateCurrent, cleanRows, renderRows, exportIif: iif, getTier: tier, setMapping, setAccountMapping, saveProject, listProjects, loadProject, deleteProject, markCleanReady: () => { state.cleaned = true; }, markMapColumnsReady: (mapping) => { setMapping(mapping); }, markMapAccountsReady: (mapping) => { setAccountMapping(mapping); }, syncReviewRows: () => { if (state.review) state.rows = state.review.getWorkingRows(); } };
+  const importerScript = document.createElement("script");
+  importerScript.src = "importer.js?v=8f5e2b1";
+  importerScript.onload = () => {
+    const reviewScript = document.createElement("script");
+    reviewScript.src = "review.js?v=8f5e2b1";
+    reviewScript.onload = () => {
+      const cleanerScript = document.createElement("script");
+      cleanerScript.src = "cleaner.js?v=8f5e2b1";
+      cleanerScript.onload = () => { mapperScript.onload = () => { templateScript.onload = () => { accountTemplateScript.onload = () => { destinationLibraryScript.onload = () => { accountMapperScript.onload = () => { validatorScript.onload = () => { projectStoreScript.onload = () => { state.projectStore = window.LedgerLiftProjectStore?.create({ tier: tier() }) || null; const workspaceScript = document.createElement("script"); workspaceScript.src = "workspace.js?v=8f5e2b5"; document.head.append(workspaceScript); }; document.head.append(projectStoreScript); }; document.head.append(validatorScript); }; document.head.append(accountMapperScript); }; document.head.append(destinationLibraryScript); }; document.head.append(accountTemplateScript); }; document.head.append(templateScript); }; document.head.append(mapperScript); };
+      document.head.append(cleanerScript);
+    };
+    document.head.append(reviewScript);
+  };
+  document.head.append(importerScript);
+  window.dispatchEvent(new Event("ledgerlift:ready"));
+})();
