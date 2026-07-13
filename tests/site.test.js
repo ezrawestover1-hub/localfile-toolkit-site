@@ -38,6 +38,31 @@ test("paid users receive access actions without exposing a second bundle purchas
   ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"].forEach((product) => assert.match(read(`${product}/index.html`), /account-access\.js/));
 });
 
+test("paid account handoff is tier-aware and purchase-gated", () => {
+  const access = read("account-access.js");
+  const account = read("account/account.js");
+  assert.match(access, /account-access\.css/);
+  assert.match(access, /account-access-strip/);
+  assert.match(access, /Open Plus/);
+  assert.match(access, /Upgrade to Plus/);
+  assert.match(access, /account-partial/);
+  assert.match(read("account-access.css"), /account-access-strip/);
+  assert.match(account, /Overview/);
+  assert.match(account, /Products/);
+  assert.match(account, /Billing/);
+  assert.match(account, /Security/);
+  assert.match(account, /Open \$\{meta\.name\} Plus/);
+  assert.match(account, /Upgrade to Plus/);
+  assert.doesNotMatch(account, /innerHTML/);
+  assert.match(read("account/register.html"), /Purchase required/);
+  assert.match(read("account/register.html"), /Start with a purchase/);
+  assert.match(read("account/login.html"), /Start with a purchase/);
+  assert.match(read("checkout-portal/index.html"), /create your account/);
+  assert.match(read("checkout-portal/purchase-success.html"), /account\/register\.html/);
+  assert.match(read("worker.js"), /purchase_required/);
+  assert.match(read("worker.js"), /JOIN entitlements/);
+});
+
 test("final pricing source of truth matches every displayed plan", () => {
   const config = read("pricing-config.js");
   ["standard: 1999", "plus: 2499", "standard: 299", "plus: 599", "standard: 999", "plus: 1299", "standard: 699", "plus: 999", "separatePlusTotal: 6695", "savings: 2696", "savingsPercent: 40"].forEach((value) => assert.match(config, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))));

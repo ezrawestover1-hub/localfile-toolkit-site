@@ -136,12 +136,22 @@ async function activateStagedPassword(env, userId, now) {
   await env.LICENSE_DB.prepare("DELETE FROM account_pending_passwords WHERE user_id = ?").bind(userId).run();
 }
 
+async function purchaseEligibility(env, email) {
+  try {
+    return await env.LICENSE_DB.prepare("SELECT c.id FROM customers c JOIN entitlements e ON e.customer_id = c.id WHERE c.normalized_email = ? AND e.status = 'active' LIMIT 1").bind(email).first();
+  } catch {
+    throw new Error("purchase_eligibility_read");
+  }
+}
+
 async function handleAccountRegister(request, env) {
   if (!(await allowSubmission(request, env))) return json({ ok: false, message: "Too many requests. Please try again later." }, 429);
   const body = await readJsonObject(request);
   const email = normalizeEmail(body?.email);
   const password = String(body?.password || "");
   if (!validEmail(email) || password.length < PASSWORD_MIN_LENGTH || password.length > 256) return json({ ok: false, message: `Use a valid email and a password of at least ${PASSWORD_MIN_LENGTH} characters.` }, 400);
+  const purchase = await purchaseEligibility(env, email);
+  if (!purchase?.id) return json({ ok: false, error: "purchase_required", message: "Complete a LocalFile Toolkit purchase before creating an account.", purchase_url: "/pricing.html" }, 402);
   const createdAt = nowIso();
   const userId = id("user");
   try { await env.LICENSE_DB.prepare("INSERT INTO account_users (id,normalized_email,created_at,updated_at) VALUES (?,?,?,?) ON CONFLICT(normalized_email) DO UPDATE SET updated_at = excluded.updated_at").bind(userId, email, createdAt, createdAt).run(); } catch { throw new Error("account_user_write"); }
@@ -705,7 +715,7 @@ async function handleVerify(request, env) {
 export async function handleRequest(request, env) {
   const url = new URL(request.url);
   if (request.method === "GET" && url.pathname === "/api/health") return json({ status: "ok" });
-  if (request.method === "POST" && url.pathname === "/api/account/register") return handleAccountRegister(request, env).catch((error) => { const reason = new Set(["account_user_write", "account_user_read", "account_password_read", "password_hash", "account_password_write", "verification_code_write"]).has(error?.message) ? error.message : "account_register_failed"; console.error("account_register_failed", reason); return json({ ok: false, message: "Account setup is temporarily unavailable. Please try again." }, 503); });
+  if (request.method === "POST" && url.pathname === "/api/account/register") return handleAccountRegister(request, env).catch((error) => { const reason = new Set(["purchase_eligibility_read", "account_user_write", "account_user_read", "account_password_read", "password_hash", "account_password_write", "verification_code_write"]).has(error?.message) ? error.message : "account_register_failed"; console.error("account_register_failed", reason); return json({ ok: false, message: "Account setup is temporarily unavailable. Please try again." }, 503); });
   if (request.method === "POST" && url.pathname === "/api/account/resend-code") return handleResendCode(request, env);
   if (request.method === "POST" && url.pathname === "/api/account/password-reset/request") return handlePasswordResetRequest(request, env);
   if (request.method === "POST" && url.pathname === "/api/account/password-reset/complete") return handlePasswordResetComplete(request, env).catch((error) => { console.error("account_password_reset_route_failed", error?.message || "unknown"); return json({ ok: false, message: "We could not complete the reset. Request a new code and try again." }, 503); });
