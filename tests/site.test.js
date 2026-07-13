@@ -177,6 +177,8 @@ test("PixelPort ownership is product-specific and routes owned users into distin
   assert.match(checkout, /PixelPort Standard only; other products remain separate/);
   assert.match(checkout, /Batch image queue and reusable presets \(PixelPort Plus\)/);
   assert.match(read("plus-mode.js"), /source: capabilities\.bundle/);
+  assert.match(read("_headers"), /\/pixelport\/\*[\s\S]*connect-src 'self'/);
+  assert.match(read("pixelport/_headers"), /connect-src 'self'/);
   assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /Free \/ unpaid/);
   assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /PixelPort Standard/);
   assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /PixelPort Plus/);
