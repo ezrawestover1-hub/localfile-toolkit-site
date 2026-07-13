@@ -78,7 +78,7 @@ function randomVerificationCode() {
 }
 
 async function passwordHash(password, salt, iterations = PASSWORD_ITERATIONS) {
-  const key = await crypto.subtle.importKey("raw", utf8(password), "PBKDF2", false, ["deriveBits"]);
+  const key = await crypto.subtle.importKey("raw", utf8(password), { name: "PBKDF2" }, false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations, hash: "SHA-256" }, key, 256);
   return new Uint8Array(bits);
 }
