@@ -196,8 +196,16 @@ async function handlePasswordResetComplete(request, env) {
   if (!row || row.used_at || new Date(row.expires_at).getTime() <= Date.now()) return json({ ok: false, message: "That code is invalid or expired." }, 400);
   try {
     const now = nowIso();
-    await stagePassword(env, row.user_id, password, now);
-    await activateStagedPassword(env, row.user_id, now);
+    const salt = new Uint8Array(16);
+    crypto.getRandomValues(salt);
+    const hash = bytesToBase64Url(await passwordHash(password, salt));
+    const current = await env.LICENSE_DB.prepare("SELECT password_hash,password_salt,iterations FROM account_passwords WHERE user_id = ?").bind(row.user_id).first();
+    if (current?.password_hash) {
+      try {
+        await env.LICENSE_DB.prepare("INSERT INTO account_password_history (id,user_id,password_hash,password_salt,iterations,created_at) VALUES (?,?,?,?,?,?)").bind(id("pwdhist"), row.user_id, current.password_hash, current.password_salt, current.iterations, now).run();
+      } catch { console.error("password_history_write_failed"); }
+    }
+    await env.LICENSE_DB.prepare("INSERT INTO account_passwords (user_id,password_hash,password_salt,iterations,verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, iterations = excluded.iterations, verified_at = excluded.verified_at, updated_at = excluded.updated_at").bind(row.user_id, hash, bytesToBase64Url(salt), PASSWORD_ITERATIONS, now, now, now).run();
     const consumed = await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?").bind(now, row.id, now).run();
     if (!consumed?.meta?.changes) return createAccountSession(env, row.user_id, request);
     return createAccountSession(env, row.user_id, request);
