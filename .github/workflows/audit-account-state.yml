@@ -1,0 +1,20 @@
+name: Audit Account State
+
+on:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the selected branch
+        uses: actions/checkout@v4
+      - name: Query account state without exposing private values
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4"
+          command: d1 execute localfile-toolkit-licenses --remote --command "SELECT (SELECT COUNT(*) FROM account_users WHERE normalized_email = 'ezra.westover1@gmail.com') AS user_count, (SELECT COUNT(*) FROM account_passwords p JOIN account_users u ON u.id = p.user_id WHERE u.normalized_email = 'ezra.westover1@gmail.com') AS password_count, (SELECT COUNT(*) FROM account_verification_codes v JOIN account_users u ON u.id = v.user_id WHERE u.normalized_email = 'ezra.westover1@gmail.com' AND v.used_at IS NULL AND v.expires_at > datetime('now')) AS active_code_count, (SELECT COUNT(*) FROM customers WHERE normalized_email = 'ezra.westover1@gmail.com') AS customer_count, (SELECT COUNT(*) FROM entitlements e JOIN customers c ON c.id = e.customer_id WHERE c.normalized_email = 'ezra.westover1@gmail.com' AND e.status = 'active') AS entitlement_count, (SELECT COUNT(*) FROM account_sessions s JOIN account_users u ON u.id = s.user_id WHERE u.normalized_email = 'ezra.westover1@gmail.com' AND s.expires_at > datetime('now')) AS active_session_count;"
