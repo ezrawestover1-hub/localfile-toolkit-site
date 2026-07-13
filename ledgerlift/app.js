@@ -1,7 +1,7 @@
 (() => {
   "use strict";
   const $ = (id) => document.getElementById(id);
-  const state = { headers: [], rows: [], tx: [], review: null, cleaner: null, source: false, name: "transactions", amountMode: "signed", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] };
+  const state = { headers: [], rows: [], tx: [], review: null, cleaner: null, mapper: null, source: false, name: "transactions", amountMode: "signed", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] };
   const input = $("fileInput");
   const drop = $("dropZone");
   const status = $("fileStatus");
@@ -39,7 +39,7 @@
     if (!canReplaceFile()) { input.value = ""; return; }
     try {
       const preview = await window.LedgerLiftImporter.importFile(file, { tier: tier() });
-      Object.assign(state, { source: sample, name: displayName(file), importPreview: preview, fileMeta: preview.fileMeta, format: preview.format, delimiter: preview.delimiter, worksheetName: preview.worksheetName || "", worksheetIndex: preview.worksheetIndex || 0, headerRow: preview.headerRow, suggestions: preview.suggestions, importWarnings: preview.warnings, importErrors: preview.blocking, imported: false, review: null, cleaner: null, headers: preview.headers, rows: preview.rows, tx: [], cleaned: false, cleanSummary: null });
+      Object.assign(state, { source: sample, name: displayName(file), importPreview: preview, fileMeta: preview.fileMeta, format: preview.format, delimiter: preview.delimiter, worksheetName: preview.worksheetName || "", worksheetIndex: preview.worksheetIndex || 0, headerRow: preview.headerRow, suggestions: preview.suggestions, importWarnings: preview.warnings, importErrors: preview.blocking, imported: false, review: null, cleaner: null, mapper: null, headers: preview.headers, rows: preview.rows, tx: [], cleaned: false, cleanSummary: null });
       ["date", "desc", "amount", "debit", "credit"].forEach(options);
       status.textContent = `${file.name} · ${preview.format} · ${Math.max(1, Math.round(file.size / 1024))} KB`;
       work.classList.add("hidden"); $("results").classList.add("hidden");
@@ -76,6 +76,7 @@
     if (preview.blocking.length) { window.SuiteGate.message(preview.blocking[0]); return false; }
     state.review = window.LedgerLiftReviewModel?.create({ headers: preview.headers, rows: preview.rows, rowWarnings: preview.rowWarnings, tier: tier() }) || null;
     state.cleaner = state.review && window.LedgerLiftCleaner?.create({ review: state.review, tier: tier(), suggestedRoles: preview.suggestions?.roles || {} });
+    state.mapper = state.review && window.LedgerLiftMapper?.create({ review: state.review, cleaner: state.cleaner, tier: tier(), suggestedRoles: preview.suggestions?.roles || {}, templates: window.LedgerLiftMappingTemplates?.create({ tier: tier() }) });
     Object.assign(state, { imported: true, headers: preview.headers, rows: state.review?.getWorkingRows() || preview.rows, tx: [], cleaned: false, cleanSummary: null });
     ["date", "desc", "amount", "debit", "credit"].forEach(options);
     applySuggestions(preview);
@@ -129,6 +130,8 @@
 
   function analyze() {
     if (!state.cleaned) { window.SuiteGate.message("Clean your rows before validating the mapping."); return; }
+    if (state.mapper && !window.LedgerLiftWorkspace?.state?.mapColumnsVisited) { window.SuiteGate.message("Complete Map Columns before validating the mapping."); return; }
+    if (state.mapper && !state.mapper.getValidation().canContinue) { window.SuiteGate.message("Resolve the required Map Columns issues before validating the mapping."); return; }
     const mode = $("amountMode")?.value || "signed";
     state.amountMode = mode;
     state.tx = state.rows.map((row, index) => {
@@ -166,7 +169,7 @@
 
   function resetImport() {
     input.value = "";
-    Object.assign(state, { headers: [], rows: [], tx: [], review: null, cleaner: null, source: false, name: "transactions", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] });
+    Object.assign(state, { headers: [], rows: [], tx: [], review: null, cleaner: null, mapper: null, source: false, name: "transactions", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] });
     work.classList.add("hidden"); $("results").classList.add("hidden"); status.textContent = "No file selected";
     window.SuiteGate.setActive(false);
     window.dispatchEvent(new CustomEvent("ledgerlift:cleared"));
@@ -184,6 +187,7 @@
   window.addEventListener("ledgerlift:review-changed", (event) => {
     if (!state.review) return;
     state.cleaner?.syncReviewData();
+    state.mapper?.refresh();
     state.rows = state.review.getWorkingRows();
     if (["edit", "restore", "add", "delete", "restore-deleted", "undo", "redo"].includes(event.detail?.type)) {
       state.cleaned = false;
@@ -196,6 +200,7 @@
     if (!state.cleaner) return;
     state.rows = state.review.getWorkingRows();
     state.cleanSummary = state.cleaner.getSummary();
+    state.mapper?.refresh();
     if (event.detail?.type !== "review-change") state.cleaned = true;
     state.tx = [];
     $("results").classList.add("hidden");
@@ -203,7 +208,22 @@
   window.addEventListener("ledgerlift:review-edited", () => { state.cleaned = false; state.cleanSummary = null; state.tx = []; $("results").classList.add("hidden"); });
   $("analyze").addEventListener("click", analyze);
   $("download").addEventListener("click", () => { try { if (window.LedgerLiftWorkspace && !window.LedgerLiftWorkspace.canExport()) { window.SuiteGate.message("Review the preview and resolve every row marked Review before exporting."); return; } if (state.tx.some((transaction) => !transaction.ok)) { window.SuiteGate.message("Resolve every row marked Review before exporting."); return; } if (!state.source && window.SuiteGate.used()) { window.SuiteGate.showUpgrade(); return; } const blob = new Blob([iif()], { type: "text/plain" }), anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob); anchor.download = `${state.name}.iif`; anchor.click(); setTimeout(() => URL.revokeObjectURL(anchor.href), 1000); if (!state.source) window.SuiteGate.markUsed(); window.dispatchEvent(new Event("ledgerlift:exported")); } catch (error) { window.SuiteGate.message(error.message); } });
-  window.LedgerLiftCore = { state, analyze, cleanRows, renderRows, exportIif: iif, getTier: tier, markCleanReady: () => { state.cleaned = true; }, syncReviewRows: () => { if (state.review) state.rows = state.review.getWorkingRows(); } };
+  function setMapping(mapping) {
+    const byRole = mapping?.byRole || {};
+    [["date", byRole.transactionDate || byRole.postedDate], ["desc", byRole.description || byRole.memo || byRole.vendor || byRole.name], ["amount", byRole.amount], ["debit", byRole.debit], ["credit", byRole.credit]].forEach(([id, value]) => {
+      const select = $(id);
+      if (select && value && Array.from(select.options).some((option) => option.value === value)) select.value = value;
+    });
+    state.amountMode = mapping?.amountMode === "debit-credit" ? "debit-credit" : "signed";
+    const amountMode = $("amountMode");
+    if (amountMode) amountMode.value = state.amountMode;
+    state.mapping = mapping;
+  }
+  const mapperScript = document.createElement("script");
+  mapperScript.src = "mapper.js?v=8f5e2b2";
+  const templateScript = document.createElement("script");
+  templateScript.src = "mapping-templates.js?v=8f5e2b2";
+  window.LedgerLiftCore = { state, analyze, cleanRows, renderRows, exportIif: iif, getTier: tier, setMapping, markCleanReady: () => { state.cleaned = true; }, markMapColumnsReady: (mapping) => { setMapping(mapping); }, syncReviewRows: () => { if (state.review) state.rows = state.review.getWorkingRows(); } };
   const importerScript = document.createElement("script");
   importerScript.src = "importer.js?v=8f5e2b1";
   importerScript.onload = () => {
@@ -212,7 +232,7 @@
     reviewScript.onload = () => {
       const cleanerScript = document.createElement("script");
       cleanerScript.src = "cleaner.js?v=8f5e2b1";
-      cleanerScript.onload = () => { const workspaceScript = document.createElement("script"); workspaceScript.src = "workspace.js?v=8f5e2b1"; document.head.append(workspaceScript); };
+      cleanerScript.onload = () => { mapperScript.onload = () => { templateScript.onload = () => { const workspaceScript = document.createElement("script"); workspaceScript.src = "workspace.js?v=8f5e2b2"; document.head.append(workspaceScript); }; document.head.append(templateScript); }; document.head.append(mapperScript); };
       document.head.append(cleanerScript);
     };
     document.head.append(reviewScript);

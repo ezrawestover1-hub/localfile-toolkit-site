@@ -262,7 +262,51 @@
     cleanActions.append(continueToMapColumns);
     cleanPanel.append(cleanHeader, cleanMeta, cleanNotice, cleanSummary, cleanTools, cleanPreview, cleanHistory, cleanActions);
 
-    shell.append(heading, list, message, entry, importPreview, review, cleanPanel);
+    const mapPanel = make("section", "workspace-map hidden");
+    mapPanel.id = "workspaceMapColumns";
+    mapPanel.setAttribute("aria-labelledby", "workspaceMapColumnsTitle");
+    const mapHeader = make("div", "workspace-review-header");
+    const mapCopy = make("div");
+    mapCopy.append(make("h3", "", "Map your columns"), make("p", "", "Confirm what each source column means before LedgerLift prepares your transactions."));
+    mapCopy.querySelector("h3").id = "workspaceMapColumnsTitle";
+    const mapStatus = make("strong", "workspace-review-summary", "Mapping not confirmed"); mapStatus.id = "mappingStatus";
+    mapHeader.append(mapCopy, mapStatus);
+    const mapMeta = make("div", "mapping-meta");
+    ["mappingFileMeta", "mappingRowsMeta", "mappingMappedMeta", "mappingIssuesMeta"].forEach((id) => { const item = make("div", "mapping-meta-item", ""); item.id = id; mapMeta.append(item); });
+    const mapNotice = make("div", "mapping-notice", "Suggestions are only a starting point. Review each required field before continuing."); mapNotice.id = "mappingNotice"; mapNotice.setAttribute("role", "status"); mapNotice.setAttribute("aria-live", "polite");
+    const mapToolbar = make("div", "mapping-toolbar");
+    const applySuggestions = make("button", "button secondary", "Apply high-confidence suggestions"); applySuggestions.type = "button"; applySuggestions.id = "mappingApplySuggestions";
+    const resetMappings = make("button", "button quiet", "Reset to suggestions"); resetMappings.type = "button"; resetMappings.id = "mappingResetAll";
+    const clearMappings = make("button", "button quiet", "Clear all mappings"); clearMappings.type = "button"; clearMappings.id = "mappingClearAll";
+    const mappingUndo = make("button", "button secondary", "Undo"); mappingUndo.type = "button"; mappingUndo.id = "mappingUndo";
+    const mappingRedo = make("button", "button secondary", "Redo"); mappingRedo.type = "button"; mappingRedo.id = "mappingRedo";
+    mapToolbar.append(applySuggestions, resetMappings, clearMappings, mappingUndo, mappingRedo);
+    const amountStructure = make("div", "mapping-amount-structure");
+    const amountLabel = make("label", "", "Amount structure"); const amountSelect = make("select"); amountSelect.id = "mappingAmountMode";
+    [["unresolved", "Choose signed amount or debit / credit"], ["amount", "One signed amount column"], ["debit-credit", "Separate debit and credit columns"], ["debit-only", "Debit / withdrawal only"], ["credit-only", "Credit / deposit only"]].forEach(([value, label]) => { const option = make("option", "", label); option.value = value; amountSelect.append(option); });
+    amountLabel.append(amountSelect); amountStructure.append(amountLabel, make("span", "mapping-amount-help", "If both structures are present, choose deliberately before continuing."));
+    const mappingIssues = make("div", "mapping-issues"); mappingIssues.id = "mappingIssues"; mappingIssues.setAttribute("role", "alert");
+    const mappingColumns = make("div", "mapping-columns"); mappingColumns.id = "mappingColumns";
+    const templatePanel = make("section", "mapping-templates"); templatePanel.id = "mappingTemplates"; templatePanel.setAttribute("aria-labelledby", "mappingTemplatesTitle");
+    templatePanel.append(make("h4", "", "Saved mapping templates"), make("p", "mapping-template-note", "Templates save only column names, positions, and roles—not transaction values.")); templatePanel.querySelector("h4").id = "mappingTemplatesTitle";
+    const templateUnavailable = make("p", "mapping-template-unavailable", "Saved mapping templates are available in Standard and Plus workspaces."); templateUnavailable.id = "mappingTemplateUnavailable";
+    const templateControls = make("div", "mapping-template-controls"); templateControls.id = "mappingTemplateControls";
+    const templateName = make("input"); templateName.id = "mappingTemplateName"; templateName.placeholder = "Template name"; templateName.setAttribute("aria-label", "New mapping template name");
+    const saveTemplate = make("button", "button secondary", "Save template"); saveTemplate.type = "button"; saveTemplate.id = "mappingSaveTemplate";
+    const templateSelect = make("select"); templateSelect.id = "mappingTemplateSelect"; templateSelect.setAttribute("aria-label", "Saved mapping template");
+    const applyTemplate = make("button", "button quiet", "Apply selected template"); applyTemplate.type = "button"; applyTemplate.id = "mappingApplyTemplate";
+    const deleteTemplate = make("button", "button quiet", "Delete selected template"); deleteTemplate.type = "button"; deleteTemplate.id = "mappingDeleteTemplate";
+    templateControls.append(templateName, saveTemplate, templateSelect, applyTemplate, deleteTemplate); templatePanel.append(templateUnavailable, templateControls);
+    const mapPreview = make("section", "mapping-preview"); mapPreview.id = "mappingPreview"; mapPreview.setAttribute("aria-labelledby", "mappingPreviewTitle");
+    mapPreview.append(make("h4", "", "Mapping preview"), make("p", "", "A small sample of the fields LedgerLift will carry forward. This does not change your data.")); mapPreview.querySelector("h4").id = "mappingPreviewTitle";
+    const mapPreviewMeta = make("div", "mapping-preview-meta", ""); mapPreviewMeta.id = "mappingPreviewMeta";
+    const mapPreviewWrap = make("div", "table-wrap mapping-preview-table"); const mapPreviewTable = make("table"); mapPreviewTable.append(make("caption", "sr-only", "Preview of mapped transaction fields"), make("thead"), make("tbody")); mapPreviewTable.querySelector("thead").id = "mappingPreviewHead"; mapPreviewTable.querySelector("tbody").id = "mappingPreviewRows"; mapPreviewWrap.append(mapPreviewTable); mapPreview.append(mapPreviewMeta, mapPreviewWrap);
+    const mapActions = make("div", "workspace-map-actions");
+    const continueToAccounts = make("button", "button", "Continue to Map Accounts"); continueToAccounts.type = "button"; continueToAccounts.id = "continueToMapAccounts"; continueToAccounts.addEventListener("click", () => { const mapper = mapperModel(); if (!mapper?.getValidation().canContinue) return; window.LedgerLiftCore?.markMapColumnsReady?.(mapper.getMapping()); state.mapColumnsVisited = true; setStep(5); });
+    mapActions.append(continueToAccounts);
+    mapPanel.append(mapHeader, mapMeta, mapNotice, mapToolbar, amountStructure, mappingIssues, mappingColumns, templatePanel, mapPreview, mapActions);
+
+    shell.append(heading, list, message, entry, importPreview, review, cleanPanel, mapPanel);
     converter.prepend(shell);
 
     const sectionTitle = converter.querySelector(".section-title");
@@ -339,6 +383,37 @@
       const row = event.target.closest("[data-clean-restore-row]");
       if (row) cleanerModel()?.restoreRow(row.dataset.cleanRestoreRow);
     });
+    $("mappingColumns").addEventListener("change", (event) => {
+      const role = event.target.closest("[data-map-role]");
+      if (role) mapperModel()?.setRole(role.dataset.columnId, role.value);
+    });
+    $("mappingColumns").addEventListener("click", (event) => {
+      const clear = event.target.closest("[data-map-clear]");
+      const reset = event.target.closest("[data-map-reset]");
+      if (clear) mapperModel()?.clearColumn(clear.dataset.mapClear);
+      if (reset) mapperModel()?.resetColumn(reset.dataset.mapReset);
+    });
+    $("mappingIssues").addEventListener("click", (event) => {
+      const action = event.target.closest("[data-map-conflict]");
+      if (action) mapperModel()?.resolveConflict(action.dataset.mapConflict);
+      const amount = event.target.closest("[data-map-amount-resolve]");
+      if (amount) mapperModel()?.setAmountMode(amount.dataset.mapAmountResolve, { resolve: true });
+    });
+    $("mappingApplySuggestions").addEventListener("click", () => mapperModel()?.applyHighConfidence());
+    $("mappingResetAll").addEventListener("click", () => mapperModel()?.resetAll());
+    $("mappingClearAll").addEventListener("click", () => mapperModel()?.clearAll());
+    $("mappingUndo").addEventListener("click", () => mapperModel()?.undo());
+    $("mappingRedo").addEventListener("click", () => mapperModel()?.redo());
+    $("mappingAmountMode").addEventListener("change", (event) => { const result = mapperModel()?.setAmountMode(event.target.value); if (result?.conflict) renderMapping(); });
+    $("mappingSaveTemplate").addEventListener("click", () => {
+      const mapper = mapperModel(), store = mapper?.getTemplateStore?.();
+      if (!store) return;
+      const result = store.save($("mappingTemplateName").value, mapper.mappingTemplateBlueprint());
+      $("mappingNotice").textContent = result.ok ? `Saved “${result.template.name}” on this device. No transaction data was included.` : result.reason;
+      if (result.ok) { $("mappingTemplateName").value = ""; renderMapping(); }
+    });
+    $("mappingApplyTemplate").addEventListener("click", () => { const mapper = mapperModel(), store = mapper?.getTemplateStore?.(), selected = store?.list?.().find((template) => template.id === $("mappingTemplateSelect").value); if (mapper && selected) mapper.applyTemplate(selected); });
+    $("mappingDeleteTemplate").addEventListener("click", () => { const store = mapperModel()?.getTemplateStore?.(); if (store?.remove($("mappingTemplateSelect").value)) renderMapping(); });
     document.addEventListener("keydown", (event) => {
       const reviewPanel = $("workspaceReview");
       const activeElement = document.activeElement;
@@ -406,6 +481,85 @@
   function reviewModel() { return window.LedgerLiftCore?.state?.review || null; }
 
   function cleanerModel() { return window.LedgerLiftCore?.state?.cleaner || null; }
+
+  function mapperModel() { return window.LedgerLiftCore?.state?.mapper || null; }
+
+  function mappingRoleOptions(selected) {
+    const roles = window.LedgerLiftMapper?.ROLE_DEFINITIONS || [];
+    return roles.map((role) => { const option = make("option", "", role.label); option.value = role.id; option.selected = role.id === selected; return option; });
+  }
+
+  function renderMapping() {
+    const mapper = mapperModel();
+    if (!mapper) return;
+    const modelState = mapper.getState();
+    const validation = modelState.validation;
+    const core = window.LedgerLiftCore?.state;
+    const fileName = core?.fileMeta?.name || `${core?.name || "transactions"}.csv`;
+    const setMeta = (id, label, value) => $(id)?.replaceChildren(make("span", "mapping-meta-label", label), make("strong", "", String(value)));
+    setMeta("mappingFileMeta", "File", fileName);
+    setMeta("mappingRowsMeta", "Active rows", core?.review?.getState?.().totalRows || 0);
+    setMeta("mappingMappedMeta", "Mapped / ignored", `${validation.mappedCount} / ${validation.ignoredCount}`);
+    setMeta("mappingIssuesMeta", "Required issues", validation.blocking.length);
+    $("mappingStatus").textContent = validation.canContinue ? "Ready to continue" : `${validation.blocking.length} required issue${validation.blocking.length === 1 ? "" : "s"}`;
+    $("mappingNotice").textContent = validation.canContinue ? "Your required fields are mapped. You can still return and adjust them before Map Accounts." : "Review the required fields below. Suggestions are not confirmed until you choose them.";
+    const issues = $("mappingIssues"); issues.replaceChildren();
+    if (!validation.issues.length) issues.append(make("p", "mapping-success", "All required fields are mapped. No conflicts are waiting for resolution."));
+    validation.issues.forEach((issue) => {
+      const item = make("div", `mapping-issue mapping-issue-${issue.severity}`);
+      item.append(make("strong", "", issue.severity === "blocking" ? "Required" : "Review recommended"), make("span", "", issue.message));
+      if (issue.code === "amount-structure-conflict") {
+        const amountButton = make("button", "button quiet", "Use signed amount"); amountButton.type = "button"; amountButton.dataset.mapAmountResolve = "amount";
+        const splitButton = make("button", "button quiet", "Use debit and credit"); splitButton.type = "button"; splitButton.dataset.mapAmountResolve = "debit-credit";
+        item.append(amountButton, splitButton);
+      }
+      if (issue.code === "pending-conflict") {
+        const replace = make("button", "button quiet", "Replace existing assignment"); replace.type = "button"; replace.dataset.mapConflict = "replace";
+        const swap = make("button", "button quiet", "Swap assignments"); swap.type = "button"; swap.dataset.mapConflict = "swap";
+        item.append(replace, swap);
+      }
+      issues.append(item);
+    });
+    const amountSelect = $("mappingAmountMode"); amountSelect.value = validation.mode;
+    const columns = $("mappingColumns"); columns.replaceChildren();
+    modelState.columns.forEach((column) => {
+      const card = make("article", "mapping-column-card"); card.dataset.columnId = column.id;
+      const head = make("div", "mapping-column-head");
+      const title = make("div", "mapping-column-title"); title.append(make("strong", "", column.header), make("span", "", `Source column ${column.index + 1}`));
+      const profile = column.profile || {}; const stat = profile.nonBlank ? `${profile.nonBlank} values · ${profile.blankPercent}% blank` : "No values detected";
+      head.append(title, make("span", "mapping-column-stat", stat)); card.append(head);
+      const controls = make("div", "mapping-column-controls");
+      const label = make("label", "", "Map as"); const select = make("select"); select.dataset.mapRole = "true"; select.dataset.columnId = column.id; select.setAttribute("aria-label", `Map ${column.header}`); select.append(...mappingRoleOptions(column.role)); label.append(select);
+      const suggestion = column.suggestions?.[0];
+      const suggestionText = suggestion ? `${suggestion.label}: ${suggestion.confidence} suggestion` : "Not identified by the import scan";
+      const suggestionNode = make("span", "mapping-column-suggestion", suggestionText);
+      const clear = make("button", "button quiet", "Clear"); clear.type = "button"; clear.dataset.mapClear = column.id; clear.setAttribute("aria-label", `Clear mapping for ${column.header}`);
+      const reset = make("button", "button quiet", "Reset"); reset.type = "button"; reset.dataset.mapReset = column.id; reset.setAttribute("aria-label", `Reset ${column.header} to its suggestion`);
+      controls.append(label, suggestionNode, clear, reset); card.append(controls);
+      if (profile.samples?.length) card.append(make("p", "mapping-column-samples", `Examples: ${profile.samples.map((value) => textForDisplay(value)).join(" · ")}`));
+      if (column.origin === "manual") card.append(make("span", "mapping-origin", "Chosen by you"));
+      else if (column.origin === "suggestion") card.append(make("span", "mapping-origin mapping-origin-suggested", "Suggested; please confirm"));
+      columns.append(card);
+    });
+    const store = mapper.getTemplateStore?.();
+    const templateControls = $("mappingTemplateControls"), unavailable = $("mappingTemplateUnavailable");
+    const eligible = Boolean(store && store.limit > 0);
+    templateControls.hidden = !eligible; unavailable.hidden = eligible;
+    if (eligible) {
+      const select = $("mappingTemplateSelect"); select.replaceChildren(); (store.list?.() || []).forEach((template) => { const option = make("option", "", template.name); option.value = template.id; select.append(option); });
+      const hasTemplates = select.options.length > 0; $("mappingApplyTemplate").disabled = !hasTemplates; $("mappingDeleteTemplate").disabled = !hasTemplates;
+    }
+    const preview = mapper.getPreview(6); $("mappingPreviewMeta").textContent = `${preview.length} sample rows shown · source values remain local and unchanged.`;
+    const previewHead = $("mappingPreviewHead"); previewHead.replaceChildren(); ["Date", "Description", "Memo", validation.mode === "debit-credit" ? "Debit / Credit" : "Amount", "Reference", "Account", "Category"].forEach((label) => { const th = make("th", "", label); th.scope = "col"; previewHead.append(th); });
+    const previewBody = $("mappingPreviewRows"); previewBody.replaceChildren(); preview.forEach((row) => { const tr = make("tr"); [row.fields.date, row.fields.description, row.fields.memo, validation.mode === "debit-credit" ? `${row.fields.debit || "—"} / ${row.fields.credit || "—"}` : row.fields.amount, row.fields.reference, row.fields.account, row.fields.category].forEach((value) => tr.append(make("td", "", textForDisplay(value) || "—"))); previewBody.append(tr); });
+    $("mappingApplySuggestions").disabled = !modelState.columns.some((column) => column.suggestions?.some((suggestion) => suggestion.confidence === "High") && column.origin !== "manual");
+    $("mappingResetAll").disabled = !modelState.columns.some((column) => column.role !== "unmapped");
+    $("mappingClearAll").disabled = validation.mappedCount === 0 && validation.ignoredCount === 0;
+    $("mappingUndo").disabled = !modelState.canUndo; $("mappingRedo").disabled = !modelState.canRedo;
+    $("continueToMapAccounts").disabled = !validation.canContinue;
+  }
+
+  function textForDisplay(value) { return String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim(); }
 
   function syncReviewRows() { window.LedgerLiftCore?.syncReviewRows?.(); }
 
@@ -745,7 +899,7 @@
     if (step === 2) return state.imported;
     if (step === 3) return state.imported && (reviewModel()?.getState().totalRows || 0) > 0;
     if (step === 4) return state.imported && state.cleanVisited && state.cleaned && (reviewModel()?.getState().totalRows || 0) > 0;
-    if (step === 5) return state.cleaned && state.mapColumnsVisited;
+    if (step === 5) return state.cleaned && state.mapColumnsVisited && Boolean(mapperModel()?.getValidation().canContinue);
     if (step === 6 || step === 7) return state.analyzed;
     if (step === 8) return state.previewed && allRowsValid();
     return false;
@@ -755,7 +909,8 @@
     if (step === 1) return state.imported;
     if (step === 2) return state.cleanVisited;
     if (step === 3) return state.cleanVisited && state.cleaned;
-    if (step === 4 || step === 5) return state.analyzed;
+    if (step === 4) return state.mapColumnsVisited && Boolean(mapperModel()?.getValidation().canContinue);
+    if (step === 5) return state.analyzed;
     if (step === 6) return state.previewed;
     if (step === 7 || step === 8) return state.exported;
     return false;
@@ -791,7 +946,9 @@
     $("workflowMessage").textContent = messageForCurrentStep();
     delete $("workflowMessage").dataset.error;
     document.body.classList.toggle("ledgerlift-has-data", state.imported);
+    document.body.classList.toggle("ledgerlift-pre-map-active", state.current < 4 && state.imported);
     document.body.classList.toggle("ledgerlift-map-active", state.current >= 4 && state.imported);
+    document.body.classList.toggle("ledgerlift-map-columns-active", state.current === 4 && state.imported);
     steps.forEach((step) => {
       const item = shell.querySelector(`[data-step="${step.id}"]`);
       const button = shell.querySelector(`[data-step-button="${step.id}"]`);
@@ -815,7 +972,10 @@
     if (corePreview) renderImportPreview(corePreview);
     const cleanPanel = $("workspaceClean");
     cleanPanel.classList.toggle("hidden", !state.imported || state.current !== 3);
+    const mapPanel = $("workspaceMapColumns");
+    mapPanel.classList.toggle("hidden", !state.imported || state.current !== 4);
     renderCleanSummary();
+    if (state.imported && state.current === 4) renderMapping();
     $("continueToPreview").hidden = !state.analyzed;
     $("continueToExport").disabled = !state.previewed || !allRowsValid();
     $("download").hidden = !state.previewed || !allRowsValid();
@@ -825,7 +985,7 @@
     if (step === 1) return $("converter");
     if (step === 2) return $("workspaceReview");
     if (step === 3) return $("workspaceClean");
-    if (step === 4) return $("date");
+    if (step === 4) return $("workspaceMapColumns");
     if (step === 5) return $("bank");
     if (step === 6 || step === 7) return $("validation");
     if (step === 8) return $("download");
@@ -835,7 +995,6 @@
   function setStep(step) {
     if (!available(step) && step !== state.current) return;
     if (step === 3) { state.cleanVisited = true; window.LedgerLiftCore?.markCleanReady?.(); state.cleaned = true; }
-    if (step === 4) state.mapColumnsVisited = true;
     if (step === 5) state.mapAccountsVisited = true;
     state.current = step;
     render();
@@ -887,6 +1046,7 @@
   window.addEventListener("ledgerlift:import-error", (event) => { $("workflowMessage").textContent = event.detail?.message || "LedgerLift could not read that file. Choose another file and try again."; $("workflowMessage").dataset.error = "true"; $("workflowMessage")?.focus(); });
   window.addEventListener("ledgerlift:data-loaded", () => { state.imported = true; state.cleaned = false; state.cleanVisited = false; state.cleanSummary = null; state.mapColumnsVisited = false; state.mapAccountsVisited = false; state.analyzed = false; state.previewed = false; state.exported = false; state.current = 2; renderReviewTable(); render(); $("workspaceReviewTitle")?.focus(); });
   window.addEventListener("ledgerlift:clean-state-changed", (event) => { state.cleanSummary = cleanerModel()?.getSummary?.() || state.cleanSummary; if (event.detail?.type !== "review-change") state.cleaned = true; if (state.current === 3) { if (event.detail?.type === "preview") renderCleanPreview(); else render(); } });
+  window.addEventListener("ledgerlift:mapping-changed", () => { if (state.current === 4) renderMapping(); });
   window.addEventListener("ledgerlift:cleaned", (event) => { state.imported = true; state.cleaned = true; state.cleanSummary = event.detail?.summary || null; state.analyzed = false; state.mapColumnsVisited = false; state.mapAccountsVisited = false; state.previewed = false; state.exported = false; state.current = 3; render(); });
   window.addEventListener("ledgerlift:review-edited", () => { state.cleaned = false; state.cleanSummary = cleanerModel()?.getSummary?.() || null; state.analyzed = false; state.mapColumnsVisited = false; state.mapAccountsVisited = false; state.previewed = false; state.exported = false; state.current = 2; render(); });
   window.addEventListener("ledgerlift:analyzed", () => { state.imported = true; state.mapColumnsVisited = true; state.mapAccountsVisited = true; state.analyzed = true; state.previewed = false; state.exported = false; state.current = 6; render(); });

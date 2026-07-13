@@ -36,6 +36,11 @@ test("LedgerLift guided workspace defines the eight honest workflow steps", () =
   assert.match(workspace, /cleanTools/);
   assert.match(workspace, /cleanUndo/);
   assert.match(workspace, /cleanRedo/);
+  assert.match(workspace, /workspaceMapColumns/);
+  assert.match(workspace, /mappingColumns/);
+  assert.match(workspace, /mappingPreview/);
+  assert.match(workspace, /mappingAmountMode/);
+  assert.match(workspace, /continueToMapAccounts/);
   assert.match(read("ledgerlift/cleaner.js"), /HISTORY_LIMITS/);
   assert.match(read("ledgerlift/cleaner.js"), /createCleaner/);
   assert.match(read("ledgerlift/cleaner.js"), /restoreCell/);
@@ -44,6 +49,8 @@ test("LedgerLift guided workspace defines the eight honest workflow steps", () =
   assert.match(app, /function cleanRows/);
   assert.match(app, /ledgerlift:cleaned/);
   assert.match(app, /state\.cleanSummary/);
+  assert.match(app, /LedgerLiftMapper/);
+  assert.match(app, /markMapColumnsReady/);
   assert.match(app, /Clean your rows before validating/);
   assert.match(workspace, /Supported here: CSV, TSV, and XLSX/);
   assert.match(workspace, /importPreview/);
@@ -82,4 +89,6 @@ test("LedgerLift tier state stays local to the LedgerLift workspace", () => {
   assert.match(workspace, /Plus workspace/);
   assert.match(cleaner, /tier === "plus"/);
   assert.match(cleaner, /tool\.tier !== "plus"/);
+  assert.match(read("ledgerlift/mapper.js"), /amount-structure-conflict/);
+  assert.match(read("ledgerlift/mapping-templates.js"), /transaction values/);
 });
