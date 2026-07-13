@@ -223,3 +223,11 @@ test("cross-device account surface is wired to durable entitlements", () => {
   assert.match(read("_headers"), /\/account\/\*/);
   assert.doesNotMatch(read("account/account.js"), /innerHTML/);
 });
+
+test("account setup stages passwords until email verification", () => {
+  assert.match(read("worker.js"), /account_pending_passwords/);
+  assert.match(read("worker.js"), /activateStagedPassword/);
+  assert.match(read("worker.js"), /account_password_history/);
+  assert.doesNotMatch(read("worker.js"), /That account already exists\. Sign in instead/);
+  assert.match(read("migrations/0006_password_setup_history.sql"), /account_password_history/);
+});

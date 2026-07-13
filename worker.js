@@ -184,9 +184,9 @@ async function handlePasswordResetComplete(request, env) {
   const row = user?.id ? await env.LICENSE_DB.prepare("SELECT id,user_id,expires_at,used_at FROM account_verification_codes WHERE user_id = ? AND purpose = 'reset' AND code_hash = ? ORDER BY created_at DESC LIMIT 1").bind(user.id, await sha256(code)).first() : null;
   if (!row || row.used_at || new Date(row.expires_at).getTime() <= Date.now()) return json({ ok: false, message: "That code is invalid or expired." }, 400);
   const now = nowIso();
+  await stagePassword(env, row.user_id, password, now);
   const consumed = await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?").bind(now, row.id, now).run();
   if (!consumed?.meta?.changes) return json({ ok: false, message: "That code is no longer valid." }, 400);
-  await stagePassword(env, row.user_id, password, now);
   await activateStagedPassword(env, row.user_id, now);
   return createAccountSession(env, row.user_id, request);
 }
