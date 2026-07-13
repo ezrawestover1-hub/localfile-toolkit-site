@@ -25,6 +25,18 @@
     else { element.type = "button"; element.addEventListener("click", () => location.assign(target), { once: true }); }
   }
 
+  function addAccountLink() {
+    if (document.querySelector("a.account-access-link")) return;
+    const nav = document.querySelector(".suite-nav, .nav");
+    if (nav) {
+      const link = document.createElement("a");
+      link.href = "/account/";
+      link.textContent = "My Account";
+      link.className = "account-access-link";
+      nav.append(link);
+    }
+  }
+
   function apply(map) {
     const paid = map.size > 0;
     const fullPlus = isBundleOwner(map);
@@ -42,10 +54,7 @@
       if (!map.has(product) || !planRank[plan] || planRank[map.get(product).plan_key] < planRank[plan]) return;
       makeAccessButton(element, accessLabel(product, plan), productHome(product));
     });
-    if (paid && !document.querySelector("a.account-access-link")) {
-      const nav = document.querySelector(".suite-nav, .nav");
-      if (nav) { const link = document.createElement("a"); link.href = "/account/"; link.textContent = "My Account"; link.className = "account-access-link"; nav.append(link); }
-    }
+    if (paid) addAccountLink();
     if (fullPlus && !currentProduct) {
       document.body.classList.add("account-active");
       const badge = document.querySelector(".hero .badge");
@@ -77,6 +86,7 @@
     }
   }
 
+  addAccountLink();
   fetch("/api/account/me", { credentials: "same-origin", cache: "no-store" })
     .then((response) => response.ok ? response.json() : null)
     .then((account) => { if (account?.authenticated) apply(entitlementMap(account.entitlements)); })
