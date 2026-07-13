@@ -531,13 +531,29 @@ test("CalendarFlow Plus promises are implemented and license-gated", () => {
   assert.match(read("checkout-portal/checkout.js"), /Saved filters and recurrence normalization/);
 });
 
+test("CaptionShift has product-specific tier routing, free messaging, and promotion suppression", () => {
+  const access = read("account-access.js");
+  const common = read("captionshift/common.js");
+  assert.match(access, /routeOwnedCaptionShift\(map, account\)/);
+  assert.match(access, /account\.products\.captionshift/);
+  assert.match(access, /suppressUnpurchasedCaptionShiftPromotion/);
+  assert.match(access, /setTier\?\.\(entitlement\?\.plan_key \|\| "free", entitlement\?\.source\)/);
+  assert.match(common, /setTier/);
+  assert.match(common, /INCLUDED WITH BUNDLE · CaptionShift Plus workspace/);
+  assert.match(common, /FREE · 1 complete subtitle file per browser installation · 5 MB maximum/);
+  assert.match(read("captionshift/plus.js"), /canUsePlus\("captionshift"\)/, "CaptionShift Plus remains license-gated");
+  assert.match(read("CAPTIONSHIFT_PRODUCT_MATRIX.md"), /highest active CaptionShift entitlement wins/);
+  assert.match(read("captionshift/_headers"), /connect-src 'self'/);
+});
+
 test("CaptionShift Plus promises are implemented and license-gated", () => {
   const plus = read("captionshift/plus.js");
   ["Batch subtitle files", "Save preset", "Apply timing offset", "Clean captions", "Download validation report", "getCapabilities"].forEach((value) => assert.match(plus, new RegExp(value.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&"))));
   assert.match(plus, /canUsePlus\("captionshift"\)/);
   assert.match(read("captionshift/app.js"), /window\.CaptionShiftCore/);
   assert.match(read("captionshift/common.js"), /batch conversion, saved timing presets, cleanup, and validation reports/i);
-  assert.match(read("checkout-portal/checkout.js"), /Batch conversion and saved timing presets/);
+  assert.match(read("checkout-portal/checkout.js"), /Batch subtitle conversion with timing offsets/);
+  assert.match(read("checkout-portal/checkout.js"), /Saved timing presets and find-and-replace cleanup/);
 });
 
 test("LedgerLift trial survives refresh and only counts a real export", () => {

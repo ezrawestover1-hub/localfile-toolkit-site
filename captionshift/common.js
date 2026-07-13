@@ -67,6 +67,8 @@
 
   let activeRealDocument = false;
   let paidAccess = false;
+  let tier = "free";
+  let tierSource = "";
   let toastTimer;
   const $ = (id) => document.getElementById(id);
   const toast = $("toast");
@@ -76,6 +78,28 @@
   function used() { try { return localStorage.getItem(key) === "used"; } catch { return false; } }
   function markUsed() { try { localStorage.setItem(key, "used"); } catch {} activeRealDocument = true; update(); }
   function mayOpenRealDocument() { return paidAccess || !used() || activeRealDocument; }
+  function ensureTierStatus() {
+    if (!trial) return null;
+    let status = $("captionshiftTier");
+    if (!status) {
+      status = document.createElement("div");
+      status.id = "captionshiftTier";
+      status.className = "product-tier-status";
+      status.setAttribute("aria-live", "polite");
+      trial.parentNode?.insertBefore(status, trial);
+    }
+    return status;
+  }
+  function setTier(next = "free", source = "") {
+    tier = ["free", "standard", "plus"].includes(next) ? next : "free";
+    tierSource = source === "bundle" ? "bundle" : "";
+    paidAccess = tier !== "free";
+    body.dataset.productTier = tier;
+    if (tierSource) body.dataset.productTierSource = tierSource;
+    const status = ensureTierStatus();
+    if (status) status.textContent = tierSource === "bundle" ? "INCLUDED WITH BUNDLE · CaptionShift Plus workspace" : tier === "plus" ? "PLUS · CaptionShift Plus workspace" : tier === "standard" ? "STANDARD · CaptionShift Standard workspace" : "FREE · 1 complete subtitle file per browser installation · 5 MB maximum";
+    update();
+  }
   function showUpgrade() { dialog?.classList.remove("hidden"); body.classList.add("dialog-open"); $("closeUpgradeBtn")?.focus(); }
   function closeUpgrade() { dialog?.classList.add("hidden"); body.classList.remove("dialog-open"); }
   function message(text) { if (!toast) return; toast.textContent = text; toast.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>toast.classList.remove("show"),3200); }
@@ -86,11 +110,12 @@
   }
   function update(sample=false) {
     if (!trial) return;
-    if (paidAccess) trial.textContent = mode === "plus" ? "Plus access is active. Real files are available without the free-document limit." : "Standard access is active. Core conversions are available without the free-document limit.";
-    else if (sample) trial.textContent = "Sample mode does not consume your free document.";
-    else if (used() && activeRealDocument) trial.textContent = "Free document active: you may export this open document again. A new document requires a paid license.";
-    else if (used()) trial.textContent = "Free document used: choose Standard, Plus, or the five-product bundle to continue.";
-    else trial.textContent = "Free demo: convert and export one complete document.";
+    if (tier === "plus") trial.textContent = "Plus access is active. Real subtitle files are available without the free-file limit.";
+    else if (tier === "standard") trial.textContent = "Standard access is active. Core subtitle conversions are available without the free-file limit.";
+    else if (sample) trial.textContent = "Sample mode does not consume your free subtitle file.";
+    else if (used() && activeRealDocument) trial.textContent = "Free subtitle file active: you may export this open file again. A new file requires a paid license.";
+    else if (used()) trial.textContent = "Free subtitle file used: choose CaptionShift Standard, Plus, or the complete bundle to continue.";
+    else trial.textContent = "Free demo: convert and export one complete subtitle file.";
   }
   function addSiteLinks() {
     const footer = document.querySelector(".footer");
@@ -157,6 +182,23 @@
       }
     });
   }
+  function sanitizeCaptionCopy() {
+    if (product !== "captionshift") return;
+    const freeDemo = document.querySelector(".free-demo-callout");
+    if (freeDemo) freeDemo.textContent = "One complete subtitle file is free. Sample data does not use that allowance.";
+    const freeDocumentFaq = [...document.querySelectorAll(".faq details")].find(detail => detail.querySelector("summary")?.textContent.includes("free document"));
+    if (freeDocumentFaq) {
+      const summary = freeDocumentFaq.querySelector("summary");
+      const answer = freeDocumentFaq.querySelector("p");
+      if (summary) summary.textContent = "What does one free subtitle file mean?";
+      if (answer) answer.textContent = "You may load, convert, preview, and export one complete subtitle file. Sample data does not use the free allowance. Paid access is required for a new real file after that.";
+    }
+    const upgradeTitle = $("upgradeTitle");
+    const upgradeCopy = dialog?.querySelector("p");
+    if (upgradeTitle) upgradeTitle.textContent = "Your free subtitle file has been used";
+    if (upgradeCopy) upgradeCopy.textContent = "Keep converting with CaptionShift Standard, or review Plus and the complete bundle before checkout.";
+    if (mode === "standard" || mode === "plus") document.querySelector("#pricing")?.classList.add("hidden");
+  }
   function applyPricing() {
     const prices = window.LOCALFILE_PRICING?.[product]; const bundle = window.LOCALFILE_PRICING?.bundle;
     if (!prices || !window.formatLocalFilePrice) return;
@@ -169,14 +211,18 @@
   }
   addSiteLinks();
   sanitizePlusMessaging();
+  sanitizeCaptionCopy();
   applyPricing();
   applyCanonicalProductIcons();
   document.querySelectorAll("[data-checkout]").forEach(b=>b.addEventListener("click",()=>checkoutPlan(b.dataset.checkout)));
   $("closeUpgradeBtn")?.addEventListener("click", closeUpgrade);
   dialog?.addEventListener("click", e=>{ if (e.target===dialog) closeUpgrade(); });
   document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeUpgrade(); });
-  window.SuiteGate = { used, markUsed, mayOpenRealDocument, showUpgrade, closeUpgrade, message, update, setActive: v=>{activeRealDocument=!!v;update();}, setPaidAccess: v=>{paidAccess=!!v;update();}, paid:()=>paidAccess, product };
-  if (mode === "plus" || mode === "standard") { const script = document.createElement("script"); script.src = mode === "plus" ? "../plus-mode.js?v=8f5e2b1" : "../standard-mode.js?v=8f5e2b1"; document.head.append(script); }
+  window.SuiteGate = { used, markUsed, mayOpenRealDocument, showUpgrade, closeUpgrade, message, update, setActive: v=>{activeRealDocument=!!v;update();}, setPaidAccess: v=>{paidAccess=!!v;update();}, setTier, paid:()=>paidAccess, product };
+  setTier("free");
+  window.addEventListener("standard-mode:ready", (event) => { if (event.detail?.product === "captionshift") setTier("standard", event.detail.source); });
+  window.addEventListener("plus-mode:ready", (event) => { if (event.detail?.product === "captionshift") setTier("plus", event.detail.source); });
+  if (mode === "plus" || mode === "standard") { const script = document.createElement("script"); const version = product === "captionshift" ? "captionshift-tier-v1" : "8f5e2b1"; script.src = mode === "plus" ? `../plus-mode.js?v=${version}` : `../standard-mode.js?v=${version}`; document.head.append(script); }
   if (product === "captionshift" && mode !== "standard") import("./plus.js").catch(() => {});
   update();
 })();

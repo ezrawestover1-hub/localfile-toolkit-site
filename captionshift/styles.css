@@ -38,6 +38,7 @@
 .button.secondary{color:var(--ink)}
 .product-menu-item:hover{color:var(--ink)}
 .footer a{color:var(--muted)}
+.product-tier-status{padding:9px 12px;border:1px solid var(--line);border-radius:11px;background:#f7faf9;color:var(--ink);font-size:.78rem;font-weight:900;letter-spacing:.035em}
 .seo-lead a,.faq a,.card p a:not(.button){color:var(--ink);text-decoration-color:var(--muted)}
 
 /* Canonical product icons */

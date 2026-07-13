@@ -139,6 +139,17 @@
     }
   }
 
+  function suppressUnpurchasedCaptionShiftPromotion(map) {
+    if (document.body.dataset.product !== "captionshift" || map.hasPurchase !== true || productEntitlement(map, "captionshift")) return;
+    document.body.classList.add("account-product-free");
+    document.querySelector("#pricing")?.classList.add("hidden");
+    const pricingLink = document.querySelector("a[href='#pricing']");
+    if (pricingLink) {
+      pricingLink.href = "../pricing.html";
+      pricingLink.textContent = "Plans";
+    }
+  }
+
   function applySuiteHome(map, fullPlus) {
     if (fullPlus) {
       document.body.classList.add("account-active");
@@ -250,6 +261,10 @@
           window.SuiteGate?.setTier?.(entitlement?.plan_key || "free", entitlement?.source);
           suppressUnpurchasedCalendarFlowPromotion(map);
         }
+        if (currentProduct === "captionshift") {
+          window.SuiteGate?.setTier?.(entitlement?.plan_key || "free", entitlement?.source);
+          suppressUnpurchasedCaptionShiftPromotion(map);
+        }
         if (!plusMode) {
           addAccessStrip(map, currentProduct);
           applyProductPricing(map, currentProduct);
@@ -304,8 +319,18 @@
     location.replace(`${productHome("calendarflow")}?mode=${serverTier}`);
   }
 
+  function routeOwnedCaptionShift(map, account) {
+    const path = location.pathname.replace(/\/+$/, "");
+    const isCaptionShiftHome = /\/captionshift(?:\/index\.html)?$/.test(path);
+    const mode = new URLSearchParams(location.search).get("mode");
+    if (!isCaptionShiftHome || mode === "standard" || mode === "plus") return;
+    const serverTier = ["free", "standard", "plus"].includes(account?.products?.captionshift) ? account.products.captionshift : productEntitlement(map, "captionshift")?.plan_key || "free";
+    if (serverTier === "free") return;
+    location.replace(`${productHome("captionshift")}?mode=${serverTier}`);
+  }
+
   fetch("/api/account/me", { credentials: "same-origin", cache: "no-store" })
     .then((response) => response.ok ? response.json() : null)
-    .then((account) => { if (account?.authenticated) { const map = entitlementMap(account.entitlements); routeOwnedLedgerLift(map, account); routeOwnedPixelPort(map, account); routeOwnedContactCraft(map, account); routeOwnedCalendarFlow(map, account); apply(map); } })
+    .then((account) => { if (account?.authenticated) { const map = entitlementMap(account.entitlements); routeOwnedLedgerLift(map, account); routeOwnedPixelPort(map, account); routeOwnedContactCraft(map, account); routeOwnedCalendarFlow(map, account); routeOwnedCaptionShift(map, account); apply(map); } })
     .catch(() => {});
 })();
