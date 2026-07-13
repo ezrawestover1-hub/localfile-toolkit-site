@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Export Calendar Events to CSV – Private ICS Converter | CalendarFlow</title>
+<meta name="description" content="Export calendar events from ICS to CSV privately in your browser. Preview event rows, review dates and locations, and understand recurrence and field limits.">
+<link rel="canonical" href="https://localfiletoolkit.com/calendarflow/export-calendar-events-to-csv.html">
+<meta property="og:title" content="Export Calendar Events to CSV – Private ICS Converter | CalendarFlow">
+<meta property="og:description" content="Export calendar events from ICS to CSV privately in your browser. Preview event rows, review dates and locations, and understand recurrence and field limits.">
+<meta property="og:url" content="https://localfiletoolkit.com/calendarflow/export-calendar-events-to-csv.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Export Calendar Events to CSV – Private ICS Converter | CalendarFlow">
+<meta name="twitter:description" content="Export calendar events from ICS to CSV privately in your browser. Preview event rows, review dates and locations, and understand recurrence and field limits.">
+<meta name="robots" content="index,follow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; media-src 'none'; worker-src 'none'; manifest-src 'self'">
+<link rel="icon" type="image/png" sizes="16x16" href="../assets/product-icons/calendarflow/favicon-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/product-icons/calendarflow/favicon-32.png">
+<link href="styles.css" rel="stylesheet">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"SoftwareApplication","name":"CalendarFlow","url":"https://localfiletoolkit.com/calendarflow/export-calendar-events-to-csv.html","applicationCategory":"UtilitiesApplication","operatingSystem":"Web","description":"Private browser-based export of common ICS calendar event fields to CSV.","featureList":["Calendar event export","ICS to CSV conversion","Local browser processing"]},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"LocalFile Toolkit","item":"https://localfiletoolkit.com/"},{"@type":"ListItem","position":2,"name":"CalendarFlow","item":"https://localfiletoolkit.com/calendarflow/"},{"@type":"ListItem","position":3,"name":"Export calendar events to CSV","item":"https://localfiletoolkit.com/calendarflow/export-calendar-events-to-csv.html"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How many calendar events can I export?","acceptedAnswer":{"@type":"Answer","text":"The browser converter accepts files up to 10 MB and previews up to the first 200 rows; the export is generated from the parsed event list."}},{"@type":"Question","name":"Can I export only a date range?","acceptedAnswer":{"@type":"Answer","text":"The basic converter exports the parsed event list as a whole. CalendarFlow Plus adds local filtering tools, but the basic workflow does not apply a date-range filter."}},{"@type":"Question","name":"Does the export include reminders?","acceptedAnswer":{"@type":"Answer","text":"No. The CSV schema focuses on common event fields and does not include alarms, reminders, attendees, or every provider-specific property."}}]}]}</script>
+</head>
+<body>
+<header class="topbar">
+<div class="container nav">
+<a class="brand" href="index.html">
+<span class="mark">
+<img src="../assets/product-icons/calendarflow/icon-64.png" width="38" height="38" alt="" aria-hidden="true">
+</span>CalendarFlow</a>
+<nav class="navlinks" aria-label="Primary">
+<a href="index.html#converter">Converter</a>
+<a href="../pricing.html">Pricing</a>
+<a href="security.html">Security</a>
+</nav>
+<a class="nav-cta" href="index.html#converter">Open converter</a>
+</div>
+</header>
+<main class="seo-page">
+<div class="container">
+<section class="seo-hero">
+<span class="kicker light">Calendar export workflow</span>
+<h1>Export Calendar Events to a CSV Spreadsheet</h1>
+<p>Make a local spreadsheet copy of common event data from an ICS file. CalendarFlow gives you a preview before export so you can check titles, locations, date values, and recurrence notices.</p>
+<div class="seo-cta">
+<a class="button" href="index.html#converter">Export ICS events to CSV</a>
+<a class="button secondary" href="open-ics-in-excel.html">Open the CSV in Excel</a>
+</div>
+</section>
+<section class="card">
+<h2>What the export includes</h2>
+<p>Each parsed VEVENT becomes a row with the headers <strong>Title, Start, End, Location, Description, Categories, Recurrence,</strong> and <strong>UID</strong>. Blank values remain blank rather than being invented, except that a missing title is only filled when CalendarFlow later creates an ICS output.</p>
+<div class="seo-example">Title,Start,End,Location,Description,Categories,Recurrence,UID</div>
+<p>The file is useful for audits, sorting, handoff, or preparing data for another workflow. It is not a complete replacement for a calendar database.</p>
+</section>
+<section class="card">
+<h2>Export steps</h2>
+<ol class="seo-steps">
+<li>Choose an ICS or iCalendar export in the working converter.</li>
+<li>Confirm the file name, event count, and preview rows.</li>
+<li>Read the validation message for recurrence rules and inspect the date columns.</li>
+<li>Choose CSV, download the file, and review it in a spreadsheet program.</li>
+</ol>
+<h2>Check dates before editing</h2>
+<p>Look for UTC values, date-only all-day events, missing end times, daylight-saving transitions, and named time zones. Spreadsheet applications may display these differently from a calendar application.</p>
+</section>
+<section class="card">
+<h2>Export limitations</h2>
+<ul class="seo-list">
+<li>The basic converter exports the whole parsed event list; it does not apply a date-range filter or remove duplicates.</li>
+<li>Only common fields are mapped. Attendees, organizers, alarms, reminders, exceptions, attachments, conferencing links, and custom properties may be omitted.</li>
+<li>Recurring rules remain text; occurrences are not expanded into separate spreadsheet rows.</li>
+<li>Files larger than 10 MB are rejected by the current browser workflow.</li>
+</ul>
+<p class="internal-links">
+<a href="index.html">CalendarFlow overview</a> · <a href="ics-to-csv-converter.html">ICS to CSV guide</a> · <a href="private-calendar-converter.html">Private calendar converter</a>
+</p>
+</section>
+<section class="card faq">
+<h2>Calendar export questions</h2>
+<details>
+<summary>Can I filter events before exporting?</summary>
+<p>The basic converter exports all parsed events. CalendarFlow Plus includes local filtering and merging tools for users who need that workflow.</p>
+</details>
+<details>
+<summary>Why does the preview show fewer rows than the file?</summary>
+<p>The preview is intentionally limited to the first 200 events for readability, while the export is generated from the parsed event list.</p>
+</details>
+<details>
+<summary>Does CalendarFlow send my calendar anywhere?</summary>
+<p>No. It processes the file locally in the browser.</p>
+</details>
+</section>
+<p class="internal-links">
+<a href="../index.html">Suite homepage</a> · <a href="../pricing.html">Pricing</a> · <a href="../account/">Account access</a> · <a href="../privacy.html">Privacy</a> · <a href="security.html">Security</a>
+</p>
+</div>
+</main>
+<footer class="footer">
+<div class="container footer-grid">
+<span>© 2026 CalendarFlow · LocalFile Toolkit</span>
+<span>
+<a href="privacy.html">Privacy</a> · <a href="security.html">Security</a> · <a href="terms.html">Terms</a>
+</span>
+</div>
+</footer>
+<script src="checkout-config.js">
+</script>
+<script src="../pricing-config.js">
+</script>
+<script src="../assets/product-icons/config.js">
+</script>
+<script src="common.js?v=8f5e2b1">
+</script>
+<script src="../account-access.js">
+</script>
+</body>
+</html>

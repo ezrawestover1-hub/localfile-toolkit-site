@@ -303,6 +303,39 @@ test("ContactCraft SEO pages have unique metadata, field guidance, structured da
   assert.match(index, /What CSV structure should I prepare\?/);
 });
 
+test("CalendarFlow SEO pages have unique metadata, calendar guidance, structured data, and sitemap coverage", () => {
+  const pages = ["calendarflow/index.html", "calendarflow/ics-to-csv-converter.html", "calendarflow/csv-to-ics-converter.html", "calendarflow/open-ics-in-excel.html", "calendarflow/create-ics-from-csv.html", "calendarflow/export-calendar-events-to-csv.html", "calendarflow/private-calendar-converter.html"];
+  const titles = new Set(); const descriptions = new Set();
+  pages.forEach((file) => {
+    const content = read(file);
+    const title = content.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
+    const description = content.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i)?.[1] || content.match(/<meta[^>]+content="([^"]+)"[^>]+name="description"/i)?.[1];
+    assert.ok(title && description, `${file} metadata`);
+    assert.equal((content.match(/<h1\b/gi) || []).length, 1, `${file} one H1`);
+    assert.doesNotMatch(content, /name="robots"[^>]+content="[^"]*noindex/i, `${file} indexable`);
+    assert.match(content, /<link[^>]+rel="canonical"[^>]+https:\/\/localfiletoolkit\.com\/calendarflow\//i, `${file} canonical`);
+    assert.match(content, /property="og:title"/i, `${file} Open Graph title`);
+    assert.match(content, /name="twitter:title"/i, `${file} Twitter title`);
+    assert.match(content, /class="[^"]*\bfaq\b/i, `${file} visible FAQ`);
+    titles.add(title); descriptions.add(description);
+    const jsonScripts = [...content.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
+    assert.ok(jsonScripts.length, `${file} JSON-LD`);
+    jsonScripts.forEach((match) => { const data = JSON.parse(match[1]); const graph = data["@graph"] || [data]; assert.ok(graph.some((item) => item["@type"] === "SoftwareApplication"), `${file} SoftwareApplication`); assert.ok(graph.some((item) => item["@type"] === "BreadcrumbList"), `${file} BreadcrumbList`); assert.ok(graph.some((item) => item["@type"] === "FAQPage"), `${file} FAQPage`); });
+  });
+  assert.equal(titles.size, pages.length);
+  assert.equal(descriptions.size, pages.length);
+  assert.match(read("calendarflow/index.html"), /<title>ICS and CSV Calendar Converter \| CalendarFlow<\/title>/);
+  assert.match(read("calendarflow/index.html"), /<h1>Convert Calendar Events Between ICS and CSV<\/h1>/);
+  assert.match(read("calendarflow/index.html"), /<caption>CalendarFlow CSV column mapping<\/caption>/);
+  assert.match(read("calendarflow/index.html"), /Does CalendarFlow expand recurring events\?/);
+  const routes = pages.slice(1).map((file) => file.replace("calendarflow/", ""));
+  routes.forEach((route) => assert.ok(fs.existsSync(path.join(root, "calendarflow", route)), route));
+  const sitemap = read("sitemap.xml");
+  pages.forEach((file) => { const url = file === "calendarflow/index.html" ? "https://localfiletoolkit.com/calendarflow/" : `https://localfiletoolkit.com/${file}`; assert.match(sitemap, new RegExp(url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${file} sitemap`); });
+  const index = read("calendarflow/index.html");
+  ["ics-to-csv-converter.html", "csv-to-ics-converter.html", "open-ics-in-excel.html", "create-ics-from-csv.html", "export-calendar-events-to-csv.html", "private-calendar-converter.html", "../index.html", "../pricing.html", "../account/", "privacy.html", "security.html"].forEach((href) => assert.match(index, new RegExp(`href="${href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), `CalendarFlow link ${href}`));
+});
+
 test("root favicon is linked by suite pages", () => {
   ["index.html", "pricing.html", "terms.html", "privacy.html", "refunds.html", "support.html", "contact.html", "refund-request.html"].forEach((file) => assert.match(read(file), /href="favicon\.ico"/));
   assert.ok(fs.statSync(path.join(root, "favicon.ico")).size > 0);
