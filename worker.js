@@ -206,13 +206,23 @@ async function handlePasswordResetComplete(request, env) {
       } catch { console.error("password_history_write_failed"); }
     }
     try { await env.LICENSE_DB.prepare("INSERT INTO account_passwords (user_id,password_hash,password_salt,iterations,verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, iterations = excluded.iterations, verified_at = excluded.verified_at, updated_at = excluded.updated_at").bind(row.user_id, hash, bytesToBase64Url(salt), PASSWORD_ITERATIONS, now, now, now).run(); } catch { throw new Error("reset_password_write_failed"); }
-    const consumed = await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?").bind(now, row.id, now).run();
-    if (!consumed?.meta?.changes) return createAccountSession(env, row.user_id, request);
-    return createAccountSession(env, row.user_id, request);
+    let consumed;
+    try { consumed = await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?").bind(now, row.id, now).run(); } catch { throw new Error("reset_code_consume_failed"); }
+    try {
+      if (!consumed?.meta?.changes) return createAccountSession(env, row.user_id, request);
+      return createAccountSession(env, row.user_id, request);
+    } catch {
+      return json({ ok: true, message: "Password reset successfully. Please sign in with your new password." }, 200);
+    }
   } catch (error) {
-    const reason = new Set(["reset_password_write_failed"]).has(error?.message) ? error.message : "password_reset_completion_failed";
+    const reason = new Set(["reset_password_write_failed", "reset_code_consume_failed"]).has(error?.message) ? error.message : "password_reset_completion_failed";
     console.error("account_password_reset_failed", reason);
-    return json({ ok: false, message: "We could not complete the reset. Your code remains available; try again or request a new one.", diagnostic: reason }, 503);
+    const message = reason === "reset_password_write_failed"
+      ? "We could not save the new password. Your verification code remains available; please try again."
+      : reason === "reset_code_consume_failed"
+        ? "Your password was not fully confirmed. Your verification code remains available; please try again."
+      : "We could not finish the password reset. Your verification code remains available; please try again.";
+    return json({ ok: false, message, diagnostic: reason }, 503);
   }
 }
 
