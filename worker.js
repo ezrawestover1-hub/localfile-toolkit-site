@@ -165,7 +165,15 @@ async function handlePasswordResetRequest(request, env) {
   const body = await readJsonObject(request);
   const email = normalizeEmail(body?.email);
   if (!validEmail(email)) return json({ ok: false, message: "Enter a valid email address." }, 400);
-  const user = await env.LICENSE_DB.prepare("SELECT id FROM account_users WHERE normalized_email = ?").bind(email).first();
+  let user = await env.LICENSE_DB.prepare("SELECT id FROM account_users WHERE normalized_email = ?").bind(email).first();
+  if (!user?.id) {
+    const customer = await env.LICENSE_DB.prepare("SELECT id FROM customers WHERE normalized_email = ?").bind(email).first();
+    if (customer?.id) {
+      const createdAt = nowIso();
+      await env.LICENSE_DB.prepare("INSERT INTO account_users (id,normalized_email,created_at,updated_at) VALUES (?,?,?,?) ON CONFLICT(normalized_email) DO NOTHING").bind(id("user"), email, createdAt, createdAt).run();
+      user = await env.LICENSE_DB.prepare("SELECT id FROM account_users WHERE normalized_email = ?").bind(email).first();
+    }
+  }
   if (user?.id) {
     const delivery = await issueVerificationCode(env, user.id, email, "reset");
     if (!delivery.ok) return json({ ok: false, message: delivery.setup ? "Email delivery is not configured yet." : "We could not send a reset code right now." }, delivery.setup ? 503 : 502);

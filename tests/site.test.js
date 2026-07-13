@@ -232,4 +232,6 @@ test("account setup stages passwords until email verification", () => {
   assert.match(read("migrations/0006_password_setup_history.sql"), /account_password_history/);
   assert.match(read("worker.js"), /pending_user_id/);
   assert.match(read("worker.js"), /Request a new code and try again/);
+  assert.match(read("account/reset.js"), /replace\(\/\\D\/g/);
+  assert.match(read("worker.js"), /SELECT id FROM customers WHERE normalized_email/);
 });
