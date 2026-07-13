@@ -116,6 +116,7 @@
   function markLocked() {
     document.body.classList.add("plus-locked");
     document.body.classList.remove("plus-authorized");
+    document.title = `${meta.name} Plus — LocalFile Tools`;
     addGate();
   }
 
