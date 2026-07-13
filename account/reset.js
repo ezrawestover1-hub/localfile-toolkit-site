@@ -1,14 +1,22 @@
 const form = document.querySelector("#reset-form");
 const requestButton = document.querySelector("#request-code");
+const resendButton = document.querySelector("#resend-code");
+const resetFields = document.querySelector("#reset-fields");
 const message = document.querySelector("#reset-message");
 const email = document.querySelector("#email");
-requestButton.addEventListener("click", async () => {
+
+async function requestCode(button) {
   if (!email.reportValidity()) return;
-  requestButton.disabled = true; message.textContent = "Sending reset code…";
+  button.disabled = true; message.textContent = "Sending reset code…";
   const response = await fetch("/api/account/password-reset/request", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: email.value }) }).catch(() => null);
-  message.textContent = (await response?.json().catch(() => ({})))?.message || "Unable to send the reset code.";
-  setTimeout(() => { requestButton.disabled = false; }, 30000);
-});
+  const result = await response?.json().catch(() => ({}));
+  message.textContent = result?.message || "Unable to send the reset code.";
+  if (response?.ok) resetFields.hidden = false;
+  setTimeout(() => { button.disabled = false; }, 30000);
+}
+
+requestButton.addEventListener("click", () => requestCode(requestButton));
+resendButton.addEventListener("click", () => requestCode(resendButton));
 form.addEventListener("submit", async (event) => {
   event.preventDefault(); const data = new FormData(form);
   if (data.get("password") !== data.get("confirm_password")) { message.textContent = "Passwords do not match."; return; }
