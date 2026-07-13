@@ -29,6 +29,9 @@ test("paid users receive access actions without exposing a second bundle purchas
   const access = read("account-access.js");
   assert.match(access, /api\/account\/me/);
   assert.match(access, /Access other products/);
+  assert.match(access, /Full Plus access active/);
+  assert.match(access, /Your complete private toolkit is ready/);
+  assert.match(access, /My Account/);
   assert.match(access, /account\.entitlements/);
   assert.match(access, /planRank/);
   assert.match(read("checkout-portal/checkout.js"), /This purchase is already linked to your account/);

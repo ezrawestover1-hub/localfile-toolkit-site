@@ -27,6 +27,7 @@
 
   function apply(map) {
     const paid = map.size > 0;
+    const fullPlus = isBundleOwner(map);
     document.querySelectorAll("a[href*='product=suite'], .bundle-menu-button, [data-checkout='bundle'], .product-bundle-card").forEach((element) => {
       if (!paid || element.dataset.accountAccessApplied === "true") return;
       makeAccessButton(element, "Access other products", "/account/");
@@ -43,7 +44,36 @@
     });
     if (paid && !document.querySelector("a.account-access-link")) {
       const nav = document.querySelector(".suite-nav, .nav");
-      if (nav) { const link = document.createElement("a"); link.href = "/account/"; link.textContent = "My products"; link.className = "account-access-link"; nav.append(link); }
+      if (nav) { const link = document.createElement("a"); link.href = "/account/"; link.textContent = "My Account"; link.className = "account-access-link"; nav.append(link); }
+    }
+    if (fullPlus && !currentProduct) {
+      document.body.classList.add("account-active");
+      const badge = document.querySelector(".hero .badge");
+      const heading = document.querySelector(".hero h1");
+      const lead = document.querySelector(".hero h1 + p");
+      const heroLink = document.querySelector(".hero .button");
+      const portalHeading = document.querySelector(".portal-intro h2");
+      const portalCopy = document.querySelector(".portal-intro p");
+      if (badge) badge.textContent = "Full Plus access active";
+      if (heading) heading.textContent = "Your complete private toolkit is ready.";
+      if (lead) lead.textContent = "All five Plus products are linked to your account. Open any tool and keep working across devices with permanent one-time access.";
+      if (heroLink) { heroLink.textContent = "Open My Account"; heroLink.href = "/account/"; }
+      if (portalHeading) portalHeading.textContent = "Open your Plus tools";
+      if (portalCopy) portalCopy.textContent = "Every product below is ready with its Plus features. Choose a tool and start working.";
+      document.querySelectorAll(".suite-card b").forEach((label) => { label.textContent = label.textContent.replace(/^Open /, "Open Plus "); });
+      const bundle = document.querySelector(".bundle");
+      if (bundle) {
+        const bundleKicker = bundle.querySelector(".bundle-kicker");
+        const bundleHeading = bundle.querySelector("h2");
+        const bundleStrong = bundle.querySelector("strong");
+        const bundleCopy = bundle.querySelector("p");
+        const bundleLink = bundle.querySelector("a");
+        if (bundleKicker) bundleKicker.textContent = "Your complete suite";
+        if (bundleHeading) bundleHeading.textContent = "Full Plus access is active.";
+        if (bundleStrong) bundleStrong.textContent = "5 products ready";
+        if (bundleCopy) bundleCopy.textContent = "LedgerLift, PixelPort, ContactCraft, CalendarFlow, and CaptionShift are all connected to your account. No second purchase is needed.";
+        if (bundleLink) { bundleLink.textContent = "Access other products"; bundleLink.href = "/account/"; }
+      }
     }
   }
 
