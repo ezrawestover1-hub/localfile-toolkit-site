@@ -585,7 +585,7 @@ async function handleVerify(request, env) {
 export async function handleRequest(request, env) {
   const url = new URL(request.url);
   if (request.method === "GET" && url.pathname === "/api/health") return json({ status: "ok" });
-  if (request.method === "POST" && url.pathname === "/api/account/register") return handleAccountRegister(request, env).catch((error) => { const reason = new Set(["account_user_write", "account_user_read", "account_password_read", "password_hash", "account_password_write", "verification_code_write"]).has(error?.message) ? error.message : "account_register_failed"; console.error("account_register_failed", reason); return json({ ok: false, message: "Account setup is temporarily unavailable. Please try again.", error: reason }, 503); });
+  if (request.method === "POST" && url.pathname === "/api/account/register") return handleAccountRegister(request, env).catch((error) => { const reason = new Set(["account_user_write", "account_user_read", "account_password_read", "password_hash", "account_password_write", "verification_code_write"]).has(error?.message) ? error.message : "account_register_failed"; console.error("account_register_failed", reason); return json({ ok: false, message: "Account setup is temporarily unavailable. Please try again." }, 503); });
   if (request.method === "POST" && url.pathname === "/api/account/login") return handleAccountLogin(request, env);
   if (request.method === "POST" && url.pathname === "/api/account/verify-code") return handleAccountVerifyCode(request, env);
   if (request.method === "GET" && url.pathname === "/api/account/me") return handleAccountMe(request, env);
