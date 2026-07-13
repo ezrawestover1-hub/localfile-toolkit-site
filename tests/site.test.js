@@ -181,6 +181,31 @@ test("product pages and legal subpages have SEO descriptions", () => {
   });
 });
 
+test("LedgerLift SEO pages have unique metadata, structured data, headings, and working internal routes", () => {
+  const pages = ["ledgerlift/index.html", "ledgerlift/csv-to-iif-converter.html", "ledgerlift/bank-csv-to-iif.html", "ledgerlift/debit-credit-csv-to-iif.html", "ledgerlift/create-iif-from-spreadsheet.html"];
+  const titles = new Set(); const descriptions = new Set();
+  pages.forEach((file) => {
+    const content = read(file);
+    const title = content.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
+    const description = content.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i)?.[1];
+    assert.ok(title && description, `${file} metadata`);
+    assert.equal((content.match(/<h1\b/gi) || []).length, 1, `${file} one H1`);
+    assert.doesNotMatch(content, /name="robots"[^>]+content="[^"]*noindex/i, `${file} indexable`);
+    assert.match(content, /<link[^>]+rel="canonical"[^>]+https:\/\/localfiletoolkit\.com\/ledgerlift\//i, `${file} canonical`);
+    titles.add(title); descriptions.add(description);
+    const jsonScripts = [...content.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
+    assert.ok(jsonScripts.length, `${file} JSON-LD`);
+    jsonScripts.forEach((match) => { const data = JSON.parse(match[1]); const graph = data["@graph"] || [data]; assert.ok(graph.some((item) => item["@type"] === "SoftwareApplication"), `${file} SoftwareApplication`); assert.ok(graph.some((item) => item["@type"] === "BreadcrumbList"), `${file} BreadcrumbList`); assert.ok(graph.some((item) => item["@type"] === "FAQPage"), `${file} FAQPage`); });
+  });
+  assert.equal(titles.size, pages.length);
+  assert.equal(descriptions.size, pages.length);
+  const routes = ["csv-to-iif-converter.html", "bank-csv-to-iif.html", "debit-credit-csv-to-iif.html", "create-iif-from-spreadsheet.html"];
+  routes.forEach((route) => assert.ok(fs.existsSync(path.join(root, "ledgerlift", route)), route));
+  const index = read("ledgerlift/index.html");
+  ["../index.html", "../pricing.html", "../account/", "privacy.html", "security.html", ...routes].forEach((href) => assert.match(index, new RegExp(`href="${href.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}`), `LedgerLift link ${href}`));
+  assert.match(read("sitemap.xml"), /ledgerlift\/(bank-csv-to-iif|debit-credit-csv-to-iif|create-iif-from-spreadsheet)\.html/);
+});
+
 test("root favicon is linked by suite pages", () => {
   ["index.html", "pricing.html", "terms.html", "privacy.html", "refunds.html", "support.html", "contact.html", "refund-request.html"].forEach((file) => assert.match(read(file), /href="favicon\.ico"/));
   assert.ok(fs.statSync(path.join(root, "favicon.ico")).size > 0);
