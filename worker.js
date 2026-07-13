@@ -282,6 +282,7 @@ async function handleAccountMe(request, env) {
 async function handleAccountRestore(request, env) {
   const user = await accountUser(request, env);
   if (!user) return json({ error: "not_authenticated" }, 401);
+  if (!env.LICENSE_SIGNING_SECRET) return json({ error: "license_setup_incomplete", message: "License restoration is not configured yet. Add the Worker secret LICENSE_SIGNING_SECRET." }, 503);
   const body = await readJsonObject(request);
   const installationId = String(body?.installation_id || "").trim();
   if (installationId.length < 16 || installationId.length > 256) return json({ error: "invalid_installation" }, 400);
@@ -290,7 +291,8 @@ async function handleAccountRestore(request, env) {
   const rows = await env.LICENSE_DB.prepare("SELECT e.id,e.product_key,e.plan_key,a.token_id FROM entitlements e LEFT JOIN activations a ON a.entitlement_id = e.id AND a.installation_id_hash = ? AND a.revoked_at IS NULL WHERE e.customer_id = ? AND e.status = 'active'").bind(await sha256(installationId), customer.id).all();
   const tokens = [];
   const createdAt = nowIso();
-  for (const row of rows.results || []) {
+  try {
+    for (const row of rows.results || []) {
     let tokenId = row.token_id;
     if (!tokenId) {
       const candidate = id("tok");
@@ -298,7 +300,11 @@ async function handleAccountRestore(request, env) {
       const activation = await env.LICENSE_DB.prepare("SELECT token_id FROM activations WHERE entitlement_id = ? AND installation_id_hash = ? AND revoked_at IS NULL").bind(row.id, await sha256(installationId)).first();
       tokenId = activation?.token_id;
     }
-    if (tokenId) tokens.push(await signEntitlement(env.LICENSE_SIGNING_SECRET, { v: 1, token_id: tokenId, product: row.product_key, plan: row.plan_key, iat: Math.floor(Date.now() / 1000), exp: null }));
+      if (tokenId) tokens.push(await signEntitlement(env.LICENSE_SIGNING_SECRET, { v: 1, token_id: tokenId, product: row.product_key, plan: row.plan_key, iat: Math.floor(Date.now() / 1000), exp: null }));
+    }
+  } catch (error) {
+    console.error("account_restore_failed", error?.message === "" ? "license_token_failed" : "license_restore_unavailable");
+    return json({ error: "license_restore_unavailable", message: "License restoration is temporarily unavailable. Please try again after licensing is configured." }, 503);
   }
   return json({ entitlements: tokens });
 }
