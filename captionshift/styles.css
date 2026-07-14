@@ -67,3 +67,4 @@
 .seo-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
 .seo-page .internal-links{color:var(--muted);line-height:2}
 @media(max-width:680px){.seo-columns{grid-template-columns:1fr;gap:22px}.seo-columns>*{min-width:0}.seo-guide{min-width:0}.nav{gap:6px}.brand{font-size:.9rem;gap:6px;min-width:0}.brand .mark{width:32px;height:32px;border-radius:10px}.mark .product-icon{width:32px;height:32px}.products-menu{flex:0 1 auto;min-width:0}.products-menu summary{font-size:.74rem;padding:8px 7px;white-space:nowrap}.account-access-link{font-size:.76rem;white-space:nowrap;flex:0 1 auto}}
+.workflow-screenshot{margin:20px 0 26px;padding:0}.workflow-screenshot img{display:block;width:100%;height:auto;max-width:900px;border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 30px rgba(21,42,52,.08)}.workflow-screenshot figcaption{color:var(--muted);font-size:.85rem;margin-top:8px}
