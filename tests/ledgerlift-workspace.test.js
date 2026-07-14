@@ -1,0 +1,88 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+
+test("LedgerLift guided workspace defines the eight honest workflow steps", () => {
+  const workspace = read("ledgerlift/workspace.js");
+  const app = read("ledgerlift/app.js");
+  const review = read("ledgerlift/review.js");
+  ["Import", "Review", "Clean", "Map Columns", "Map Accounts", "Validate", "Preview", "Export"].forEach((label) => assert.match(workspace, new RegExp(label)));
+  assert.match(workspace, /normalize the fields/i);
+  assert.match(workspace, /Preview changes/);
+  assert.match(workspace, /Apply selected changes/);
+  assert.match(workspace, /Restore all Clean changes/);
+  assert.match(workspace, /cleanPreview/);
+  assert.match(workspace, /continueToClean/);
+  assert.match(workspace, /workspaceClean/);
+  assert.match(workspace, /renderReviewTable/);
+  assert.match(workspace, /reviewSearch/);
+  assert.match(workspace, /reviewFilter/);
+  assert.match(workspace, /reviewSortColumn/);
+  assert.match(workspace, /reviewUndo/);
+  assert.match(workspace, /reviewRedo/);
+  assert.match(workspace, /reviewPageSize/);
+  assert.match(workspace, /reviewRestoreDeleted/);
+  assert.match(review, /HISTORY_LIMITS/);
+  assert.match(review, /originalOrder/);
+  assert.match(review, /getWorkingRows/);
+  assert.match(review, /clearSelection/);
+  assert.doesNotMatch(review, /console\.(log|error)/);
+  assert.match(workspace, /renderCleanSummary/);
+  assert.match(workspace, /cleanTools/);
+  assert.match(workspace, /cleanUndo/);
+  assert.match(workspace, /cleanRedo/);
+  assert.match(read("ledgerlift/cleaner.js"), /HISTORY_LIMITS/);
+  assert.match(read("ledgerlift/cleaner.js"), /createCleaner/);
+  assert.match(read("ledgerlift/cleaner.js"), /restoreCell/);
+  assert.match(read("ledgerlift/cleaner.js"), /syncReviewData/);
+  assert.match(workspace, /review-edited/);
+  assert.match(app, /function cleanRows/);
+  assert.match(app, /ledgerlift:cleaned/);
+  assert.match(app, /state\.cleanSummary/);
+  assert.match(app, /Clean your rows before validating/);
+  assert.match(workspace, /Supported here: CSV, TSV, and XLSX/);
+  assert.match(workspace, /importPreview/);
+  assert.match(workspace, /confirmImport/);
+  assert.match(workspace, /importHeaderSelect/);
+  assert.match(workspace, /importWorksheetSelect/);
+  assert.match(workspace, /canExport/);
+  assert.match(workspace, /scrollIntoView/);
+  assert.match(workspace, /button\.disabled = !available/);
+  assert.doesNotMatch(workspace, /TRNS\\t|SPL\\t|ENDTRNS/);
+});
+
+test("LedgerLift keeps source processing local and preserves the existing converter", () => {
+  const app = read("ledgerlift/app.js");
+  const index = read("ledgerlift/index.html");
+  const workspace = read("ledgerlift/workspace.js");
+  assert.match(app, /importer\.js\?v=/);
+  assert.match(app, /review\.js\?v=/);
+  assert.match(read("ledgerlift/importer.js"), /FileReader/);
+  assert.match(app, /new Blob\(\[iif\(\)\]/);
+  assert.match(app, /ledgerlift:exported/);
+  assert.match(index, /<script src="app\.js"><\/script>/);
+  assert.match(app, /workspace\.js\?v=/);
+  assert.doesNotMatch(workspace, /fetch\(|XMLHttpRequest|sendBeacon/);
+  assert.doesNotMatch(read("ledgerlift/importer.js"), /fetch\(|XMLHttpRequest|sendBeacon|console\.(log|error)/);
+});
+
+test("LedgerLift paid entry routes remain distinct from the free sales experience", () => {
+  const access = read("account-access.js");
+  const standard = read("standard-mode.js");
+  const plus = read("plus-mode.js");
+  const standardStyles = read("standard-mode.css");
+  const plusStyles = read("plus-mode.css");
+  assert.match(access, /routeOwnedLedgerLift/);
+  assert.match(access, /location\.replace\(`\$\{productHome\("ledgerlift"\)\}\?mode=\$\{serverTier\}`\)/);
+  assert.match(standard, /Start your \$\{meta\.name\} Standard workflow/);
+  assert.match(plus, /Start your \$\{meta\.name\} Plus workflow/);
+  assert.match(standardStyles, /body\.standard-mode .*#pricing/);
+  assert.match(plusStyles, /body\.plus-mode .*#pricing/);
+  assert.match(standard, /sample\.hidden = true/);
+  assert.match(plus, /sample\.hidden = true/);
+});

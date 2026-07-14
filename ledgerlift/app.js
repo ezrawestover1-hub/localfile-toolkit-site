@@ -1,34 +1,11 @@
 (() => {
   "use strict";
   const $ = (id) => document.getElementById(id);
-  const state = { headers: [], rows: [], tx: [], source: false, name: "transactions", amountMode: "signed" };
+  const state = { headers: [], rows: [], tx: [], review: null, cleaner: null, source: false, name: "transactions", amountMode: "signed", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] };
   const input = $("fileInput");
   const drop = $("dropZone");
   const status = $("fileStatus");
   const work = $("work");
-
-  function parse(text) {
-    const matrix = [];
-    let row = [], field = "", quoted = false;
-    for (let i = 0; i < text.length; i += 1) {
-      const char = text[i], next = text[i + 1];
-      if (char === '"') {
-        if (quoted && next === '"') { field += '"'; i += 1; }
-        else quoted = !quoted;
-      } else if (char === "," && !quoted) { row.push(field.trim()); field = ""; }
-      else if ((char === "\n" || char === "\r") && !quoted) {
-        if (char === "\r" && next === "\n") i += 1;
-        row.push(field.trim()); field = "";
-        if (row.some(Boolean)) matrix.push(row);
-        row = [];
-      } else field += char;
-    }
-    row.push(field.trim());
-    if (row.some(Boolean)) matrix.push(row);
-    if (matrix.length < 2) throw Error("The CSV needs headers and at least one transaction.");
-    const headers = matrix.shift();
-    return { headers, rows: matrix.map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] || ""]))) };
-  }
 
   function options(id) {
     const select = $(id);
@@ -38,30 +15,74 @@
     }));
   }
 
-  function guess(words) {
-    return state.headers.find((header) => words.some((word) => header.toLowerCase().replace(/[^a-z]/g, "").includes(word))) || state.headers[0];
+  function tier() {
+    const mode = new URLSearchParams(location.search).get("mode");
+    if (!window.SuiteGate?.paid()) return "free";
+    return mode === "plus" ? "plus" : "standard";
   }
 
-  function load(file, sample = false) {
+  function canReplaceFile() {
+    if (!state.imported || !state.rows.length) return true;
+    return window.confirm("Replacing this file will discard the current import and any edits. Continue?");
+  }
+
+  function displayName(file) { return file.name.replace(/\.[^.]+$/, ""); }
+
+  function applySuggestions(preview) {
+    const roles = preview.suggestions?.roles || {};
+    [["date", roles.date], ["desc", roles.description || roles.memo], ["amount", roles.amount], ["debit", roles.debit], ["credit", roles.credit]].forEach(([id, suggestion]) => { const select = $(id); if (select && suggestion?.column && Array.from(select.options).some((option) => option.value === suggestion.column)) select.value = suggestion.column; });
+  }
+
+  async function load(file, sample = false) {
+    if (!file) return;
     if (!sample && !window.SuiteGate.mayOpenRealDocument()) { window.SuiteGate.showUpgrade(); return; }
-    if (!file || file.size > 10 * 1024 * 1024) { window.SuiteGate.message("Choose a CSV smaller than 10 MB."); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        Object.assign(state, parse(String(reader.result)), { source: sample, name: file.name.replace(/\.[^.]+$/, "") });
-        ["date", "desc", "amount", "debit", "credit"].forEach(options);
-        $("date").value = guess(["date"]);
-        $("desc").value = guess(["description", "memo", "payee", "details"]);
-        $("amount").value = guess(["amount", "value", "total"]);
-        if ($("debit")) $("debit").value = guess(["debit", "withdrawal", "charge"]);
-        if ($("credit")) $("credit").value = guess(["credit", "deposit"]);
-        status.textContent = `${file.name} · ${state.rows.length} rows`;
-        work.classList.remove("hidden"); $("results").classList.add("hidden");
-        window.SuiteGate.update(sample);
-        window.dispatchEvent(new CustomEvent("ledgerlift:data-loaded"));
-      } catch (error) { window.SuiteGate.message(error.message); }
-    };
-    reader.readAsText(file);
+    if (!canReplaceFile()) { input.value = ""; return; }
+    try {
+      const preview = await window.LedgerLiftImporter.importFile(file, { tier: tier() });
+      Object.assign(state, { source: sample, name: displayName(file), importPreview: preview, fileMeta: preview.fileMeta, format: preview.format, delimiter: preview.delimiter, worksheetName: preview.worksheetName || "", worksheetIndex: preview.worksheetIndex || 0, headerRow: preview.headerRow, suggestions: preview.suggestions, importWarnings: preview.warnings, importErrors: preview.blocking, imported: false, review: null, cleaner: null, headers: preview.headers, rows: preview.rows, tx: [], cleaned: false, cleanSummary: null });
+      ["date", "desc", "amount", "debit", "credit"].forEach(options);
+      status.textContent = `${file.name} · ${preview.format} · ${Math.max(1, Math.round(file.size / 1024))} KB`;
+      work.classList.add("hidden"); $("results").classList.add("hidden");
+      window.SuiteGate.update(sample);
+      window.dispatchEvent(new CustomEvent("ledgerlift:import-preview-ready", { detail: { preview } }));
+    } catch (problem) {
+      window.dispatchEvent(new CustomEvent("ledgerlift:import-error", { detail: { message: problem.message, code: problem.code } }));
+      window.SuiteGate.message(problem.message);
+    }
+  }
+
+  function configureImport({ worksheetIndex = state.worksheetIndex, headerRow = state.headerRow } = {}) {
+    const current = state.importPreview;
+    if (!current) return null;
+    const sheet = current.worksheets?.[worksheetIndex];
+    const base = sheet ? { ...current, worksheetIndex, worksheetName: sheet.name, matrix: sheet.matrix, formulaWithoutCache: sheet.formulaWithoutCache, warnings: [] } : { ...current, matrix: current.matrix, warnings: [] };
+    const preview = window.LedgerLiftImporter.buildPreview(base, { worksheetIndex, headerRow });
+    state.importPreview = preview;
+    state.headers = preview.headers;
+    state.rows = preview.rows;
+    state.worksheetIndex = preview.worksheetIndex || 0;
+    state.worksheetName = preview.worksheetName || "";
+    state.headerRow = preview.headerRow;
+    state.suggestions = preview.suggestions;
+    state.importWarnings = preview.warnings;
+    state.importErrors = preview.blocking;
+    window.dispatchEvent(new CustomEvent("ledgerlift:import-preview-ready", { detail: { preview } }));
+    return preview;
+  }
+
+  function confirmImport() {
+    const preview = state.importPreview;
+    if (!preview) { window.SuiteGate.message("Choose a file before confirming the import."); return false; }
+    if (preview.blocking.length) { window.SuiteGate.message(preview.blocking[0]); return false; }
+    state.review = window.LedgerLiftReviewModel?.create({ headers: preview.headers, rows: preview.rows, rowWarnings: preview.rowWarnings, tier: tier() }) || null;
+    state.cleaner = state.review && window.LedgerLiftCleaner?.create({ review: state.review, tier: tier(), suggestedRoles: preview.suggestions?.roles || {} });
+    Object.assign(state, { imported: true, headers: preview.headers, rows: state.review?.getWorkingRows() || preview.rows, tx: [], cleaned: false, cleanSummary: null });
+    ["date", "desc", "amount", "debit", "credit"].forEach(options);
+    applySuggestions(preview);
+    status.textContent = `${preview.fileMeta.name} · ${preview.format} · ${preview.rows.length} rows ready`;
+    work.classList.remove("hidden"); $("results").classList.add("hidden");
+    window.dispatchEvent(new CustomEvent("ledgerlift:data-loaded", { detail: { preview } }));
+    return true;
   }
 
   function money(value) {
@@ -81,7 +102,33 @@
 
   function clean(value) { return String(value || "").replace(/[\t\r\n\x00-\x1f\x7f]/g, " ").trim().slice(0, 512); }
 
+  function cleanRows() {
+    const dateColumn = $("date")?.value, descColumn = $("desc")?.value, amountColumn = $("amount")?.value;
+    if (!dateColumn || !descColumn || !amountColumn) throw Error("Load a file before cleaning rows.");
+    const changes = [], warnings = [];
+    let changedRows = 0, changedCells = 0;
+    state.rows.forEach((row, index) => {
+      const rowChanges = [];
+      [[dateColumn, date(row[dateColumn]) || clean(row[dateColumn])], [descColumn, clean(row[descColumn])], [amountColumn, Number.isFinite(money(row[amountColumn])) ? money(row[amountColumn]).toFixed(2) : clean(row[amountColumn])]].forEach(([column, value]) => {
+        const before = String(row[column] ?? ""), after = String(value ?? "");
+        if (before !== after) { row[column] = after; changedCells += 1; rowChanges.push({ column, before, after }); }
+      });
+      if (rowChanges.length) { changedRows += 1; changes.push({ index, fields: rowChanges }); }
+      const normalizedDate = date(row[dateColumn]);
+      const normalizedAmount = money(row[amountColumn]);
+      if (!normalizedDate || !Number.isFinite(normalizedAmount) || normalizedAmount === 0) warnings.push({ index, date: !normalizedDate, amount: !Number.isFinite(normalizedAmount) || normalizedAmount === 0 });
+    });
+    state.cleaned = true;
+    state.cleanSummary = { changedRows, changedCells, changes: changes.slice(0, 25), warnings, totalRows: state.rows.length };
+    state.tx = [];
+    $("results").classList.add("hidden");
+    status.textContent = `${state.name} · ${state.rows.length} rows · cleaned`;
+    window.dispatchEvent(new CustomEvent("ledgerlift:cleaned", { detail: { summary: state.cleanSummary } }));
+    return state.cleanSummary;
+  }
+
   function analyze() {
+    if (!state.cleaned) { window.SuiteGate.message("Clean your rows before validating the mapping."); return; }
     const mode = $("amountMode")?.value || "signed";
     state.amountMode = mode;
     state.tx = state.rows.map((row, index) => {
@@ -117,13 +164,59 @@
     return `${lines.join("\r\n")}\r\n`;
   }
 
+  function resetImport() {
+    input.value = "";
+    Object.assign(state, { headers: [], rows: [], tx: [], review: null, cleaner: null, source: false, name: "transactions", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] });
+    work.classList.add("hidden"); $("results").classList.add("hidden"); status.textContent = "No file selected";
+    window.SuiteGate.setActive(false);
+    window.dispatchEvent(new CustomEvent("ledgerlift:cleared"));
+  }
+
   input.addEventListener("change", (event) => load(event.target.files[0]));
   drop.addEventListener("dragover", (event) => event.preventDefault());
   drop.addEventListener("drop", (event) => { event.preventDefault(); load(event.dataTransfer.files[0]); });
+  drop.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); input.click(); } });
   $("sampleBtn").addEventListener("click", () => load(new File(["Date,Description,Amount\n07/01/2026,Coffee Shop,-6.45\n07/02/2026,Client Payment,725.00\n07/03/2026,Coffee Shop,-6.45"], "sample.csv", { type: "text/csv" }), true));
-  $("clearBtn").addEventListener("click", () => { input.value = ""; state.rows = []; state.tx = []; work.classList.add("hidden"); status.textContent = "No file selected"; window.SuiteGate.setActive(false); window.dispatchEvent(new CustomEvent("ledgerlift:cleared")); });
+  $("clearBtn").addEventListener("click", () => { if (canReplaceFile()) resetImport(); });
+  window.addEventListener("ledgerlift:import-config-changed", (event) => configureImport(event.detail || {}));
+  window.addEventListener("ledgerlift:confirm-import", confirmImport);
+  window.addEventListener("ledgerlift:clean-rows", () => { try { cleanRows(); } catch (error) { window.SuiteGate.message(error.message); } });
+  window.addEventListener("ledgerlift:review-changed", (event) => {
+    if (!state.review) return;
+    state.cleaner?.syncReviewData();
+    state.rows = state.review.getWorkingRows();
+    if (["edit", "restore", "add", "delete", "restore-deleted", "undo", "redo"].includes(event.detail?.type)) {
+      state.cleaned = false;
+      state.cleanSummary = null;
+      state.tx = [];
+      $("results").classList.add("hidden");
+    }
+  });
+  window.addEventListener("ledgerlift:clean-state-changed", (event) => {
+    if (!state.cleaner) return;
+    state.rows = state.review.getWorkingRows();
+    state.cleanSummary = state.cleaner.getSummary();
+    if (event.detail?.type !== "review-change") state.cleaned = true;
+    state.tx = [];
+    $("results").classList.add("hidden");
+  });
+  window.addEventListener("ledgerlift:review-edited", () => { state.cleaned = false; state.cleanSummary = null; state.tx = []; $("results").classList.add("hidden"); });
   $("analyze").addEventListener("click", analyze);
-  $("download").addEventListener("click", () => { try { if (!state.source && window.SuiteGate.used()) { window.SuiteGate.showUpgrade(); return; } const blob = new Blob([iif()], { type: "text/plain" }), anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob); anchor.download = `${state.name}.iif`; anchor.click(); setTimeout(() => URL.revokeObjectURL(anchor.href), 1000); if (!state.source) window.SuiteGate.markUsed(); } catch (error) { window.SuiteGate.message(error.message); } });
-  window.LedgerLiftCore = { state, analyze, renderRows, exportIif: iif };
+  $("download").addEventListener("click", () => { try { if (window.LedgerLiftWorkspace && !window.LedgerLiftWorkspace.canExport()) { window.SuiteGate.message("Review the preview and resolve every row marked Review before exporting."); return; } if (state.tx.some((transaction) => !transaction.ok)) { window.SuiteGate.message("Resolve every row marked Review before exporting."); return; } if (!state.source && window.SuiteGate.used()) { window.SuiteGate.showUpgrade(); return; } const blob = new Blob([iif()], { type: "text/plain" }), anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob); anchor.download = `${state.name}.iif`; anchor.click(); setTimeout(() => URL.revokeObjectURL(anchor.href), 1000); if (!state.source) window.SuiteGate.markUsed(); window.dispatchEvent(new Event("ledgerlift:exported")); } catch (error) { window.SuiteGate.message(error.message); } });
+  window.LedgerLiftCore = { state, analyze, cleanRows, renderRows, exportIif: iif, getTier: tier, markCleanReady: () => { state.cleaned = true; }, syncReviewRows: () => { if (state.review) state.rows = state.review.getWorkingRows(); } };
+  const importerScript = document.createElement("script");
+  importerScript.src = "importer.js?v=8f5e2b1";
+  importerScript.onload = () => {
+    const reviewScript = document.createElement("script");
+    reviewScript.src = "review.js?v=8f5e2b1";
+    reviewScript.onload = () => {
+      const cleanerScript = document.createElement("script");
+      cleanerScript.src = "cleaner.js?v=8f5e2b1";
+      cleanerScript.onload = () => { const workspaceScript = document.createElement("script"); workspaceScript.src = "workspace.js?v=8f5e2b1"; document.head.append(workspaceScript); };
+      document.head.append(cleanerScript);
+    };
+    document.head.append(reviewScript);
+  };
+  document.head.append(importerScript);
   window.dispatchEvent(new Event("ledgerlift:ready"));
 })();
