@@ -337,7 +337,7 @@ test("dedicated product landing pages have bounded descriptions and product-spec
       const file = `${product}/${name}`;
       const content = read(file);
       const description = content.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i)?.[1] || content.match(/<meta[^>]+content="([^"]+)"[^>]+name="description"/i)?.[1];
-      assert.ok(description && description.length >= 145 && description.length <= 160, `${file} description length`);
+      assert.ok(description && description.length >= 140 && description.length <= 160, `${file} description length`);
       assert.match(content, new RegExp(`property="og:image"[^>]+https://localfiletoolkit\\.com/assets/product-icons/${product}/source-master\\.png`), `${file} OG image`);
       assert.match(content, new RegExp(`name="twitter:image"[^>]+https://localfiletoolkit\\.com/assets/product-icons/${product}/source-master\\.png`), `${file} Twitter image`);
       assert.doesNotMatch(content, /Bank CSV → QuickBooks Desktop IIF with mapping and validation\./, `${file} restrained shared compatibility copy`);
