@@ -128,7 +128,7 @@ test("Standard routes are separate paid workspaces with core entitlement gating"
   });
 });
 
-test("LedgerLift ownership is product-specific and routes owned users into a quiet workspace", () => {
+test("LedgerHarbor ownership is product-specific and routes owned users into a quiet workspace", () => {
   const access = read("account-access.js");
   const license = read("license.js");
   const worker = read("worker.js");
@@ -145,10 +145,10 @@ test("LedgerLift ownership is product-specific and routes owned users into a qui
   assert.match(read("plus-mode.js"), /hasBundle/);
   assert.match(read("standard-mode.js"), /hasBundle/);
   assert.match(read("LEDGERLIFT_PRODUCT_MATRIX.md"), /Free \/ unpaid/);
-  assert.match(read("LEDGERLIFT_PRODUCT_MATRIX.md"), /LedgerLift Standard/);
-  assert.match(read("LEDGERLIFT_PRODUCT_MATRIX.md"), /LedgerLift Plus/);
+  assert.match(read("LEDGERLIFT_PRODUCT_MATRIX.md"), /LedgerHarbor Standard/);
+  assert.match(read("LEDGERLIFT_PRODUCT_MATRIX.md"), /LedgerHarbor Plus/);
   assert.match(read("LEDGERLIFT_PRODUCT_MATRIX.md"), /not inferred from owning five individual products/);
-  assert.match(read("checkout-portal/checkout.js"), /This purchase unlocks LedgerLift only/);
+  assert.match(read("checkout-portal/checkout.js"), /This purchase unlocks LedgerHarbor only/);
   assert.match(read("checkout-portal/success.js"), /handoffAuthenticatedBuyer/);
   assert.match(read("checkout-portal/purchase-success.html"), /connect-src 'self'/);
   assert.match(read("_headers"), /\/ledgerlift\/\*[\s\S]*connect-src 'self'/);
@@ -156,7 +156,7 @@ test("LedgerLift ownership is product-specific and routes owned users into a qui
   assert.match(read("ledgerlift/_headers"), /connect-src 'self'/);
 });
 
-test("PixelPort ownership is product-specific and routes owned users into distinct workspaces", () => {
+test("PixelRefinery ownership is product-specific and routes owned users into distinct workspaces", () => {
   const access = read("account-access.js");
   const common = read("pixelport/common.js");
   const app = read("pixelport/app.js");
@@ -173,15 +173,15 @@ test("PixelPort ownership is product-specific and routes owned users into distin
   assert.match(app, /mayOpenRealDocument/);
   assert.match(plus, /canUsePlus\("pixelport"\)/);
   assert.match(plus, /Batch image queue/);
-  assert.match(checkout, /This purchase unlocks PixelPort only/);
-  assert.match(checkout, /PixelPort Standard only; other products remain separate/);
-  assert.match(checkout, /Batch image queue and reusable presets \(PixelPort Plus\)/);
+  assert.match(checkout, /This purchase unlocks PixelRefinery only/);
+  assert.match(checkout, /PixelRefinery Standard only; other products remain separate/);
+  assert.match(checkout, /Batch image queue and reusable presets \(PixelRefinery Plus\)/);
   assert.match(read("plus-mode.js"), /source: capabilities\.bundle/);
   assert.match(read("_headers"), /\/pixelport\/\*[\s\S]*connect-src 'self'/);
   assert.match(read("pixelport/_headers"), /connect-src 'self'/);
   assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /Free \/ unpaid/);
-  assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /PixelPort Standard/);
-  assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /PixelPort Plus/);
+  assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /PixelRefinery Standard/);
+  assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /PixelRefinery Plus/);
   assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /not inferred from owning five individual products/);
 });
 
@@ -286,7 +286,7 @@ test("dedicated product landing pages have bounded descriptions and product-spec
   });
 });
 
-test("LedgerLift SEO pages have unique metadata, structured data, headings, and working internal routes", () => {
+test("LedgerHarbor SEO pages have unique metadata, structured data, headings, and working internal routes", () => {
   const pages = ["ledgerlift/index.html", "ledgerlift/csv-to-iif-converter.html", "ledgerlift/bank-csv-to-iif.html", "ledgerlift/debit-credit-csv-to-iif.html", "ledgerlift/create-iif-from-spreadsheet.html"];
   const titles = new Set(); const descriptions = new Set();
   pages.forEach((file) => {
@@ -307,11 +307,11 @@ test("LedgerLift SEO pages have unique metadata, structured data, headings, and 
   const routes = ["csv-to-iif-converter.html", "bank-csv-to-iif.html", "debit-credit-csv-to-iif.html", "create-iif-from-spreadsheet.html"];
   routes.forEach((route) => assert.ok(fs.existsSync(path.join(root, "ledgerlift", route)), route));
   const index = read("ledgerlift/index.html");
-  ["../index.html", "../pricing.html", "../account/", "privacy.html", "security.html", ...routes].forEach((href) => assert.match(index, new RegExp(`href="${href.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}`), `LedgerLift link ${href}`));
+  ["../index.html", "../pricing.html", "../account/", "privacy.html", "security.html", ...routes].forEach((href) => assert.match(index, new RegExp(`href="${href.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}`), `LedgerHarbor link ${href}`));
   assert.match(read("sitemap.xml"), /ledgerlift\/(bank-csv-to-iif|debit-credit-csv-to-iif|create-iif-from-spreadsheet)\.html/);
 });
 
-test("PixelPort SEO pages have unique metadata, format guidance, structured data, and sitemap coverage", () => {
+test("PixelRefinery SEO pages have unique metadata, format guidance, structured data, and sitemap coverage", () => {
   const pages = ["pixelport/index.html", "pixelport/png-to-jpg-converter.html", "pixelport/jpg-to-png-converter.html", "pixelport/webp-to-jpg-converter.html", "pixelport/webp-to-png-converter.html", "pixelport/png-to-webp-converter.html", "pixelport/avif-to-jpg-converter.html", "pixelport/avif-to-png-converter.html", "pixelport/private-image-converter.html"];
   const titles = new Set(); const descriptions = new Set();
   pages.forEach((file) => {
@@ -332,14 +332,14 @@ test("PixelPort SEO pages have unique metadata, format guidance, structured data
   });
   assert.equal(titles.size, pages.length);
   assert.equal(descriptions.size, pages.length);
-  assert.match(read("pixelport/index.html"), /<title>Private Image Converter for PNG, JPG, WebP and AVIF \| PixelPort<\/title>/);
+  assert.match(read("pixelport/index.html"), /<title>Private Image Converter for PNG, JPG, WebP and AVIF \| PixelRefinery<\/title>/);
   assert.match(read("pixelport/index.html"), /<h1>Convert Images Without Uploading Them<\/h1>/);
   const routes = pages.slice(1).map((file) => file.replace("pixelport/", ""));
   routes.forEach((route) => assert.ok(fs.existsSync(path.join(root, "pixelport", route)), route));
   const sitemap = read("sitemap.xml");
   pages.forEach((file) => { const url = file === "pixelport/index.html" ? "https://localfiletoolkit.com/pixelport/" : `https://localfiletoolkit.com/${file}`; assert.match(sitemap, new RegExp(url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${file} sitemap`); });
   const index = read("pixelport/index.html");
-  ["png-to-jpg-converter.html", "jpg-to-png-converter.html", "webp-to-png-converter.html", "png-to-webp-converter.html", "avif-to-jpg-converter.html", "avif-to-png-converter.html", "private-image-converter.html", "../index.html", "../pricing.html", "../account/", "privacy.html", "security.html"].forEach((href) => assert.match(index, new RegExp(`href="${href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), `PixelPort link ${href}`));
+  ["png-to-jpg-converter.html", "jpg-to-png-converter.html", "webp-to-png-converter.html", "png-to-webp-converter.html", "avif-to-jpg-converter.html", "avif-to-png-converter.html", "private-image-converter.html", "../index.html", "../pricing.html", "../account/", "privacy.html", "security.html"].forEach((href) => assert.match(index, new RegExp(`href="${href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), `PixelRefinery link ${href}`));
 });
 
 test("ContactCraft SEO pages have unique metadata, field guidance, structured data, and sitemap coverage", () => {
@@ -490,7 +490,7 @@ test("checkout portal has separate sandbox and production guards", () => {
   assert.match(checkout, /Environment\.set\("sandbox"\)/);
 });
 
-test("LedgerLift Plus promises are implemented and license-gated", () => {
+test("LedgerHarbor Plus promises are implemented and license-gated", () => {
   const plus = read("ledgerlift/plus.js");
   ["Save current", "Separate Debit and Credit columns", "Categorization rules", "Mark duplicates", "Download review report", "getCapabilities"].forEach((value) => assert.match(plus, new RegExp(value.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&"))));
   assert.match(plus, /canUsePlus\("ledgerlift"\)/);
@@ -499,7 +499,7 @@ test("LedgerLift Plus promises are implemented and license-gated", () => {
   assert.match(read("checkout-portal/checkout.js"), /Saved mapping and account profiles/);
 });
 
-test("PixelPort Plus promises are implemented and license-gated", () => {
+test("PixelRefinery Plus promises are implemented and license-gated", () => {
   const plus = read("pixelport/plus.js");
   ["Batch image queue", "Save preset", "Filename prefix", "Filename suffix", "Custom color", "Optimize for web", "getCapabilities"].forEach((value) => assert.match(plus, new RegExp(value.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&"))));
   assert.match(plus, /canUsePlus\("pixelport"\)/);
@@ -586,7 +586,7 @@ test("CaptionShift Plus promises are implemented and license-gated", () => {
   assert.match(read("checkout-portal/checkout.js"), /Saved timing presets and find-and-replace cleanup/);
 });
 
-test("LedgerLift trial survives refresh and only counts a real export", () => {
+test("LedgerHarbor trial survives refresh and only counts a real export", () => {
   const common = read("ledgerlift/common.js");
   const app = read("ledgerlift/app.js");
   assert.match(common, /localStorage\.getItem\(key\) === "used"/);

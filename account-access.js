@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const products = Object.freeze({ ledgerlift: "LedgerLift", pixelport: "PixelPort", contactcraft: "ContactCraft", calendarflow: "CalendarFlow", captionshift: "CaptionShift" });
+  const products = Object.freeze({ ledgerlift: "LedgerHarbor", pixelport: "PixelRefinery", contactcraft: "ContactCraft", calendarflow: "CalendarFlow", captionshift: "CaptionShift" });
   const productHome = (product) => `/${product}/index.html`;
   const standardHome = (product) => `${productHome(product)}?mode=standard`;
   const plusHome = (product) => `${productHome(product)}?mode=plus`;
@@ -181,7 +181,7 @@
         if (bundleKicker) bundleKicker.textContent = "Your complete suite";
         if (bundleHeading) bundleHeading.textContent = "Full Plus access is active.";
         if (bundleStrong) bundleStrong.textContent = "5 products ready";
-        if (bundleCopy) bundleCopy.textContent = "LedgerLift, PixelPort, ContactCraft, CalendarFlow, and CaptionShift are all connected to your account. No second purchase is needed.";
+        if (bundleCopy) bundleCopy.textContent = "LedgerHarbor, PixelRefinery, ContactCraft, CalendarFlow, and CaptionShift are all connected to your account. No second purchase is needed.";
         if (bundleLink) { bundleLink.textContent = "Access other products"; bundleLink.href = "/account/"; }
       }
       return;

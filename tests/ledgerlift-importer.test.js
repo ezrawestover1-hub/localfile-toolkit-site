@@ -13,7 +13,7 @@ const loadImporter = () => {
   return sandbox.window.LedgerLiftImporter;
 };
 
-test("LedgerLift parses quoted CSV, BOM text, metadata rows, and column suggestions", () => {
+test("LedgerHarbor parses quoted CSV, BOM text, metadata rows, and column suggestions", () => {
   const importer = loadImporter();
   const parsed = importer.parseDelimited("\ufeffStatement for Fictional Bank\r\nTransaction Date,Description,Amount\r\n07/01/2026,\"Coffee, Shop\",(6.45)\r\n07/02/2026,Client Payment,725.00\r\n");
   const preview = importer.buildPreview({ matrix: parsed.matrix, format: "CSV", delimiter: ",", worksheets: [] });
@@ -25,7 +25,7 @@ test("LedgerLift parses quoted CSV, BOM text, metadata rows, and column suggesti
   assert.equal(preview.estimatedTransactionRows, 2);
 });
 
-test("LedgerLift parses TSV, blank rows, uneven rows, and debit-credit suggestions", () => {
+test("LedgerHarbor parses TSV, blank rows, uneven rows, and debit-credit suggestions", () => {
   const importer = loadImporter();
   const parsed = importer.parseDelimited("Date\tDescription\tDebit\tCredit\tBalance\n07/01/2026\tCoffee\t6.45\t\t100.00\n\n\n\n07/02/2026\tClient Payment\t\t725.00\t825.00\n07/03/2026\tTrailing\t1.00\n", "\t");
   const preview = importer.buildPreview({ matrix: parsed.matrix, format: "TSV", delimiter: "\t", worksheets: [] });
@@ -37,7 +37,7 @@ test("LedgerLift parses TSV, blank rows, uneven rows, and debit-credit suggestio
   assert.ok(preview.warnings.some((warning) => /blank rows/i.test(warning.message)));
 });
 
-test("LedgerLift rejects empty, unsupported, tier-ineligible, and mismatched files", () => {
+test("LedgerHarbor rejects empty, unsupported, tier-ineligible, and mismatched files", () => {
   const importer = loadImporter();
   assert.throws(() => importer.validateFile({ name: "empty.csv", size: 0, type: "text/csv" }, "free"), /appears to be empty/i);
   assert.throws(() => importer.validateFile({ name: "data.xls", size: 12, type: "application/octet-stream" }, "plus"), /not supported yet/i);
@@ -46,7 +46,7 @@ test("LedgerLift rejects empty, unsupported, tier-ineligible, and mismatched fil
   assert.equal(importer.validateFile({ name: "data.xlsx", size: 12, type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }, "standard").extension, "xlsx");
 });
 
-test("LedgerLift keeps XLSX parsing local and formula-safe", () => {
+test("LedgerHarbor keeps XLSX parsing local and formula-safe", () => {
   const source = read("ledgerlift/importer.js");
   assert.match(source, /parseXlsxBuffer/);
   assert.match(source, /DecompressionStream\("deflate-raw"\)/);

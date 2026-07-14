@@ -136,7 +136,7 @@
     if (state.mapper && !window.LedgerLiftWorkspace?.state?.mapColumnsVisited) { window.SuiteGate.message("Complete Map Columns before validating the mapping."); return; }
     if (state.mapper && !state.mapper.getValidation().canContinue) { window.SuiteGate.message("Resolve the required Map Columns issues before validating the mapping."); return; }
     if (state.accountMapper && !window.LedgerLiftWorkspace?.state?.mapAccountsVisited) { window.SuiteGate.message("Complete Map Accounts before validating the mapping."); return; }
-    if (!state.validator) { window.SuiteGate.message("LedgerLift could not initialize local validation for this import."); return; }
+    if (!state.validator) { window.SuiteGate.message("LedgerHarbor could not initialize local validation for this import."); return; }
     const report = state.validator.validate();
     state.validationReport = report;
     state.amountMode = report.mode;
@@ -259,7 +259,7 @@
   async function saveProject(name) {
     if (!state.imported || !state.projectStore) return { ok: false, reason: "Import a file before saving a project." };
     let result;
-    try { result = await state.projectStore.save(name, projectSnapshot(), state.projectId); } catch { return { ok: false, reason: "LedgerLift could not save this project on the device." }; }
+    try { result = await state.projectStore.save(name, projectSnapshot(), state.projectId); } catch { return { ok: false, reason: "LedgerHarbor could not save this project on the device." }; }
     if (result.ok) { state.projectId = result.project.id; state.projectName = result.project.name; window.dispatchEvent(new CustomEvent("ledgerlift:project-saved", { detail: { project: result.project } })); }
     return result;
   }
@@ -283,7 +283,7 @@
     return { ok: true, project: { id: project.id, name: project.name, rowCount: project.rowCount } };
   }
 
-  async function deleteProject(id) { let result; try { result = await state.projectStore?.remove?.(id); } catch { result = { ok: false, reason: "LedgerLift could not remove this project." }; } if (result?.ok) window.dispatchEvent(new CustomEvent("ledgerlift:project-deleted", { detail: { id } })); return result || { ok: false, reason: "Saved projects are unavailable." }; }
+  async function deleteProject(id) { let result; try { result = await state.projectStore?.remove?.(id); } catch { result = { ok: false, reason: "LedgerHarbor could not remove this project." }; } if (result?.ok) window.dispatchEvent(new CustomEvent("ledgerlift:project-deleted", { detail: { id } })); return result || { ok: false, reason: "Saved projects are unavailable." }; }
 
   window.addEventListener("ledgerlift:account-mapping-changed", () => { const destinations = state.accountMapper?.getState?.().destinations; if (destinations?.length || state.destinationLibrary?.limit) state.destinationLibrary?.replace?.(destinations || []); });
   const mapperScript = document.createElement("script");

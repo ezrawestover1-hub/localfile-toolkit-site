@@ -35,7 +35,7 @@
       if (next.length > limit) return { ok: false, reason: `This ${tier === "plus" ? "Plus" : "Standard"} workspace supports up to ${limit} saved destinations.` };
       const validParents = new Set(next.filter((item) => item.type === "account").map((item) => item.id));
       next.forEach((item) => { if (!validParents.has(item.parentId)) item.parentId = ""; });
-      return write(next) ? { ok: true, count: next.length } : { ok: false, reason: "LedgerLift could not save the destination library on this device." };
+      return write(next) ? { ok: true, count: next.length } : { ok: false, reason: "LedgerHarbor could not save the destination library on this device." };
     }
     return { tier, limit, storageKey: STORAGE_KEY, list, replace, cleanDestination };
   }

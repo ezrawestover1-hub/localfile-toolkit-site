@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("LedgerLift guided workspace defines the eight honest workflow steps", () => {
+test("LedgerHarbor guided workspace defines the eight honest workflow steps", () => {
   const workspace = read("ledgerlift/workspace.js");
   const app = read("ledgerlift/app.js");
   const review = read("ledgerlift/review.js");
@@ -81,7 +81,7 @@ test("LedgerLift guided workspace defines the eight honest workflow steps", () =
   assert.doesNotMatch(workspace, /TRNS\\t|SPL\\t|ENDTRNS/);
 });
 
-test("LedgerLift keeps source processing local and preserves the existing converter", () => {
+test("LedgerHarbor keeps source processing local and preserves the existing converter", () => {
   const app = read("ledgerlift/app.js");
   const index = read("ledgerlift/index.html");
   const workspace = read("ledgerlift/workspace.js");
@@ -96,7 +96,7 @@ test("LedgerLift keeps source processing local and preserves the existing conver
   assert.doesNotMatch(read("ledgerlift/importer.js"), /fetch\(|XMLHttpRequest|sendBeacon|console\.(log|error)/);
 });
 
-test("LedgerLift tier state stays local to the LedgerLift workspace", () => {
+test("LedgerHarbor tier state stays local to the LedgerHarbor workspace", () => {
   const app = read("ledgerlift/app.js");
   const workspace = read("ledgerlift/workspace.js");
   const cleaner = read("ledgerlift/cleaner.js");

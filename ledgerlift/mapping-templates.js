@@ -44,7 +44,7 @@
       if (items.some((item) => item.name.toLocaleLowerCase() === cleanName.toLocaleLowerCase())) return { ok: false, reason: "A mapping template with that name already exists." };
       if (items.length >= limit) return { ok: false, reason: `This ${tier === "plus" ? "Plus" : "Standard"} workspace has reached its ${limit}-template limit.` };
       items.unshift(template);
-      if (!write(items)) return { ok: false, reason: "LedgerLift could not save this template on the device." };
+      if (!write(items)) return { ok: false, reason: "LedgerHarbor could not save this template on the device." };
       return { ok: true, template: clone(template) };
     }
     function remove(id) {

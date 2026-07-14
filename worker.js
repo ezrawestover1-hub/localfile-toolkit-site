@@ -446,7 +446,7 @@ async function handleContact(request, env) {
   if (body.honeypot) return new Response(null, { status: 204 });
   const fields = { name: cleanText(body.name, 120), email: normalizeEmail(body.email), topic: cleanText(body.topic, 80), product: cleanText(body.product, 80), subject: cleanText(body.subject, 180), message: cleanText(body.message, 5000), transaction_id: cleanText(body.transaction_id, 140) };
   const topics = new Set(["General question", "Technical support", "Purchase or billing", "License activation", "Privacy question", "Refund request", "Other"]);
-  const products = new Set(["LocalFile Toolkit", "LedgerLift", "PixelPort", "ContactCraft", "CalendarFlow", "CaptionShift", "Five-product bundle"]);
+  const products = new Set(["LocalFile Toolkit", "LedgerHarbor", "PixelRefinery", "ContactCraft", "CalendarFlow", "CaptionShift", "Five-product bundle"]);
   if (!fields.name || !validEmail(fields.email) || !topics.has(fields.topic) || !products.has(fields.product) || !fields.subject || !fields.message || body.consent !== true) return json({ ok: false, message: "Please check the form and try again." }, 400);
   const result = await sendSupportEmail(env, "[LocalFile Toolkit Contact] " + fields.subject, fields);
   return deliveryResponse(result);
@@ -459,7 +459,7 @@ async function handleRefundRequest(request, env) {
   if (!body || !hasOnlyKeys(body, allowed)) return json({ ok: false, message: "Please check the form and try again." }, 400);
   if (body.honeypot) return new Response(null, { status: 204 });
   const fields = { name: cleanText(body.name, 120), email: normalizeEmail(body.email), transaction_id: cleanText(body.transaction_id, 140), product: cleanText(body.product, 80), plan: cleanText(body.plan, 80), purchase_date: cleanText(body.purchase_date, 40), reason: cleanText(body.reason, 160), details: cleanText(body.details, 5000) };
-  const products = new Set(["LedgerLift", "PixelPort", "ContactCraft", "CalendarFlow", "CaptionShift", "Five-product bundle"]);
+  const products = new Set(["LedgerHarbor", "PixelRefinery", "ContactCraft", "CalendarFlow", "CaptionShift", "Five-product bundle"]);
   const plans = new Set(["Standard", "Plus", "Five-product bundle"]);
   if (!fields.name || !validEmail(fields.email) || !fields.transaction_id || !products.has(fields.product) || !plans.has(fields.plan) || !/^\d{4}-\d{2}-\d{2}$/.test(fields.purchase_date) || !fields.reason || !fields.details || body.accurate !== true) return json({ ok: false, message: "Please check the form and try again." }, 400);
   const result = await sendSupportEmail(env, "[LocalFile Toolkit Refund Request] " + fields.reason, fields);

@@ -37,14 +37,14 @@
       if (items.some((item) => item.name.toLocaleLowerCase() === cleanName.toLocaleLowerCase())) return { ok: false, reason: "A value-mapping template with that name already exists." };
       if (items.length >= limit) return { ok: false, reason: `This ${tier === "plus" ? "Plus" : "Standard"} workspace has reached its ${limit}-template limit.` };
       items.unshift(template);
-      return write(items) ? { ok: true, template: clone(template) } : { ok: false, reason: "LedgerLift could not save this template on the device." };
+      return write(items) ? { ok: true, template: clone(template) } : { ok: false, reason: "LedgerHarbor could not save this template on the device." };
     }
     function rename(id, name) {
       const cleanName = safeName(name), items = read(), item = items.find((candidate) => candidate.id === id);
       if (!item || !cleanName) return { ok: false, reason: "Enter a valid template name." };
       if (items.some((candidate) => candidate.id !== id && candidate.name.toLocaleLowerCase() === cleanName.toLocaleLowerCase())) return { ok: false, reason: "A value-mapping template with that name already exists." };
       item.name = cleanName;
-      return write(items) ? { ok: true, template: clone(item) } : { ok: false, reason: "LedgerLift could not rename this template." };
+      return write(items) ? { ok: true, template: clone(item) } : { ok: false, reason: "LedgerHarbor could not rename this template." };
     }
     function remove(id) { const items = read(), next = items.filter((item) => item.id !== id); return next.length !== items.length && write(next); }
     function preview(template, records = [], signature = []) {

@@ -115,7 +115,7 @@
         const button = card.querySelector("[data-checkout]");
         if (description) description.textContent = "For repeat workflows that need reusable mappings, categorization, duplicate review, and reports.";
         if (list) list.innerHTML = "<li>Everything in Standard</li><li>Saved mapping and account profiles</li><li>Debit / credit mapping, categorization, duplicate review, and reports</li>";
-        if (button) button.textContent = "Get LedgerLift Plus";
+        if (button) button.textContent = "Get LedgerHarbor Plus";
       });
       document.querySelectorAll(".compare tr").forEach(row => {
         const label = row.querySelector("th")?.textContent || "";
@@ -127,7 +127,7 @@
       document.querySelectorAll(".faq details").forEach(detail => {
         if (detail.querySelector("summary")?.textContent.includes("subscription")) {
           const answer = detail.querySelector("p");
-          if (answer) answer.textContent = "No. It is a one-time license with no recurring subscription or automatic renewal. LedgerLift Plus includes the saved profiles, advanced mapping, categorization, duplicate review, and reporting controls shown on this page.";
+          if (answer) answer.textContent = "No. It is a one-time license with no recurring subscription or automatic renewal. LedgerHarbor Plus includes the saved profiles, advanced mapping, categorization, duplicate review, and reporting controls shown on this page.";
         }
       });
       return;

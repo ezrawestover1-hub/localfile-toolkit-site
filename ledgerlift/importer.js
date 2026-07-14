@@ -52,14 +52,14 @@
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(error("LedgerLift could not read this file. Check that it is not locked or password-protected, then try again.", "read_error"));
+      reader.onerror = () => reject(error("LedgerHarbor could not read this file. Check that it is not locked or password-protected, then try again.", "read_error"));
       reader.readAsArrayBuffer(file);
     });
   }
 
   function decodeText(buffer) {
     try { return new TextDecoder("utf-8", { fatal: false }).decode(buffer).replace(/^\uFEFF/, ""); }
-    catch { throw error("LedgerLift could not read this text file. Save it as UTF-8 CSV or TSV and try again.", "decode_error"); }
+    catch { throw error("LedgerHarbor could not read this text file. Save it as UTF-8 CSV or TSV and try again.", "decode_error"); }
   }
 
   function isZip(bytes) { return bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04; }
@@ -105,7 +105,7 @@
       } else field += char;
     }
     if (field || row.length) pushRow();
-    if (quoted) throw error("LedgerLift could not read this text file because a quoted value never closed. Check the file and try again.", "malformed_text");
+    if (quoted) throw error("LedgerHarbor could not read this text file because a quoted value never closed. Check the file and try again.", "malformed_text");
     return { matrix: rows, delimiter };
   }
 
@@ -120,12 +120,12 @@
     const bytes = new Uint8Array(buffer);
     let end = -1;
     for (let index = bytes.length - 22; index >= Math.max(0, bytes.length - 65557); index -= 1) if (readU32(bytes, index) === 0x06054b50) { end = index; break; }
-    if (end < 0) throw error("LedgerLift could not read this spreadsheet. The XLSX archive is incomplete or password-protected.", "invalid_xlsx");
+    if (end < 0) throw error("LedgerHarbor could not read this spreadsheet. The XLSX archive is incomplete or password-protected.", "invalid_xlsx");
     const total = readU16(bytes, end + 10), centralOffset = readU32(bytes, end + 16);
     const entries = new Map();
     let offset = centralOffset;
     for (let index = 0; index < total; index += 1) {
-      if (readU32(bytes, offset) !== 0x02014b50) throw error("LedgerLift could not read this spreadsheet. The workbook archive is malformed.", "invalid_xlsx");
+      if (readU32(bytes, offset) !== 0x02014b50) throw error("LedgerHarbor could not read this spreadsheet. The workbook archive is malformed.", "invalid_xlsx");
       const flags = readU16(bytes, offset + 8), compression = readU16(bytes, offset + 10), compressedSize = readU32(bytes, offset + 20), nameLength = readU16(bytes, offset + 28), extraLength = readU16(bytes, offset + 30), commentLength = readU16(bytes, offset + 32), localOffset = readU32(bytes, offset + 42);
       const name = new TextDecoder().decode(bytes.subarray(offset + 46, offset + 46 + nameLength));
       if (!(flags & 1)) {
@@ -135,7 +135,7 @@
         let content;
         if (compression === 0) content = compressed;
         else if (compression === 8 && typeof DecompressionStream !== "undefined") content = new Uint8Array(await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer());
-        else throw error("LedgerLift could not read this spreadsheet because its compression method is not supported.", "invalid_xlsx");
+        else throw error("LedgerHarbor could not read this spreadsheet because its compression method is not supported.", "invalid_xlsx");
         entries.set(name, content);
       }
       offset += 46 + nameLength + extraLength + commentLength;
@@ -146,7 +146,7 @@
   function xmlDocument(bytes) {
     const xml = new TextDecoder().decode(bytes);
     const document = new DOMParser().parseFromString(xml, "application/xml");
-    if (document.querySelector("parsererror")) throw error("LedgerLift could not read this spreadsheet because one of its worksheets is malformed.", "invalid_xlsx");
+    if (document.querySelector("parsererror")) throw error("LedgerHarbor could not read this spreadsheet because one of its worksheets is malformed.", "invalid_xlsx");
     return document;
   }
 
@@ -203,7 +203,7 @@
     const entries = await unzip(buffer);
     const workbookBytes = entries.get("xl/workbook.xml");
     const relsBytes = entries.get("xl/_rels/workbook.xml.rels");
-    if (!workbookBytes || !relsBytes) throw error("LedgerLift could not read this spreadsheet because it has no usable workbook structure.", "invalid_xlsx");
+    if (!workbookBytes || !relsBytes) throw error("LedgerHarbor could not read this spreadsheet because it has no usable workbook structure.", "invalid_xlsx");
     const workbook = xmlDocument(workbookBytes), rels = xmlDocument(relsBytes), relationships = {};
     descendants(rels, "Relationship").forEach((relationship) => { relationships[relationship.getAttribute("Id")] = relationship.getAttribute("Target"); });
     const sharedStrings = entries.get("xl/sharedStrings.xml") ? descendants(xmlDocument(entries.get("xl/sharedStrings.xml")), "si").map(cellText) : [];
@@ -287,8 +287,8 @@
     const blankRows = rawRows.filter((row) => !rowHasValue(row)).length + matrix.slice(0, headerRow).filter((row) => !rowHasValue(row)).length;
     const dateCandidates = suggestions.candidates.date.filter((candidate) => candidate.score >= 6);
     const amountCandidates = ["amount", "debit", "credit"].flatMap((role) => suggestions.candidates[role].filter((candidate) => candidate.score >= 6));
-    if (blankColumns) warnings.push({ level: "warning", message: `${blankColumns} column name${blankColumns === 1 ? " is" : "s are"} blank. LedgerLift filled in a temporary name so you can review it.` });
-    if (duplicateColumns) warnings.push({ level: "warning", message: "Some column names repeat. LedgerLift added numbered names so every column can be selected." });
+    if (blankColumns) warnings.push({ level: "warning", message: `${blankColumns} column name${blankColumns === 1 ? " is" : "s are"} blank. LedgerHarbor filled in a temporary name so you can review it.` });
+    if (duplicateColumns) warnings.push({ level: "warning", message: "Some column names repeat. LedgerHarbor added numbered names so every column can be selected." });
     if (unevenRows) warnings.push({ level: "warning", message: `${unevenRows} row${unevenRows === 1 ? " has" : "s have"} an unexpected number of values. Missing cells were left blank.` });
     if (blankRows >= 3) warnings.push({ level: "info", message: `${blankRows} blank rows were found and will not be treated as transactions.` });
     if (dateCandidates.length > 1) warnings.push({ level: "warning", message: "Multiple columns look like dates. Confirm the date suggestion before continuing." });
@@ -304,7 +304,7 @@
       transactionIndex += 1;
     });
     if (descriptionColumn && rows.some((row) => /\b(opening|closing|statement)\s+(balance|total)\b/i.test(String(row[descriptionColumn] || "")))) warnings.push({ level: "warning", message: "Some statement summary rows may be mixed with the transactions. Review them before mapping." });
-    if (base.formulaWithoutCache) warnings.push({ level: "warning", message: "Some formula cells had no saved display value, so LedgerLift left them blank without evaluating the formulas." });
+    if (base.formulaWithoutCache) warnings.push({ level: "warning", message: "Some formula cells had no saved display value, so LedgerHarbor left them blank without evaluating the formulas." });
     const blocking = [];
     if (!width || !matrix.some((row, index) => index > headerRow && rowHasValue(row))) blocking.push("No transaction rows were found. Choose a file with a header row followed by data.");
     return { ...base, matrix, headers, rows, rowWarnings, headerRow, detectedHeaderRow: detected.index, headerConfidence: detected.confidence, headerOptions: matrix.slice(0, Math.min(30, matrix.length)).map((row, index) => ({ index, label: `Row ${index + 1}`, preview: row.filter((value) => String(value ?? "").trim()).slice(0, 3).join(" · ") })), suggestions, warnings: [...(base.warnings || []), ...warnings], blocking, estimatedTransactionRows: rows.length, columns: width, blankRows, rawRows: matrix.length, formulaWithoutCache: base.formulaWithoutCache || 0 };

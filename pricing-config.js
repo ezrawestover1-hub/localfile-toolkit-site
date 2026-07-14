@@ -1,13 +1,13 @@
 window.LOCALFILE_PRICING = Object.freeze({
   ledgerlift: Object.freeze({
-    name: "LedgerLift",
+    name: "LedgerHarbor",
     standard: 1999,
     plus: 2499,
     upgrade: 500,
     checkout: "ledgerlift"
   }),
   pixelport: Object.freeze({
-    name: "PixelPort",
+    name: "PixelRefinery",
     standard: 299,
     plus: 599,
     upgrade: 300,

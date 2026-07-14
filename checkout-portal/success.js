@@ -4,7 +4,7 @@
   const product = params.get("product");
   const plan = params.get("plan");
   const allowed = new Set(["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"]);
-  const names = { ledgerlift: "LedgerLift", pixelport: "PixelPort", contactcraft: "ContactCraft", calendarflow: "CalendarFlow", captionshift: "CaptionShift" };
+  const names = { ledgerlift: "LedgerHarbor", pixelport: "PixelRefinery", contactcraft: "ContactCraft", calendarflow: "CalendarFlow", captionshift: "CaptionShift" };
   const bundlePurchase = product === "suite" && plan === "bundle";
   const productPath = allowed.has(product) ? `../${product}/index.html` : "../index.html";
   const paidPath = bundlePurchase ? "/account/" : allowed.has(product) && plan === "plus" ? `/${product}/index.html?mode=plus` : allowed.has(product) && plan === "standard" ? `/${product}/index.html?mode=standard` : productPath;

@@ -12,8 +12,8 @@ Create these one-time products/prices in Paddle:
 
 | Product | Standard | Plus |
 |---|---:|---:|
-| LedgerLift | $19.99 | $24.99 |
-| PixelPort | $2.99 | $5.99 |
+| LedgerHarbor | $19.99 | $24.99 |
+| PixelRefinery | $2.99 | $5.99 |
 | ContactCraft | $9.99 | $12.99 |
 | CalendarFlow | $9.99 | $12.99 |
 | CaptionShift | $6.99 | $9.99 |

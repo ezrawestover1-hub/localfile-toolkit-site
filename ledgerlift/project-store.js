@@ -20,7 +20,7 @@
         const request = source.open(DB_NAME, 1);
         request.onupgradeneeded = () => { if (!request.result.objectStoreNames.contains(STORE_NAME)) request.result.createObjectStore(STORE_NAME, { keyPath: "id" }); };
         request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error || new Error("LedgerLift could not open local project storage."));
+        request.onerror = () => reject(request.error || new Error("LedgerHarbor could not open local project storage."));
       });
       return dbPromise;
     }
@@ -28,7 +28,7 @@
       return new Promise((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, mode), store = transaction.objectStore(STORE_NAME); let result;
         try { result = action(store); } catch (error) { reject(error); return; }
-        result.onsuccess = () => resolve(result.result); result.onerror = () => reject(result.error || new Error("LedgerLift local project storage failed."));
+        result.onsuccess = () => resolve(result.result); result.onerror = () => reject(result.error || new Error("LedgerHarbor local project storage failed."));
       });
     }
     async function list() {
@@ -47,9 +47,9 @@
       const currentProjects = await list(); if (!existing && currentProjects.length >= limit) return { ok: false, reason: `This ${tier === "plus" ? "Plus" : "Standard"} workspace has reached its ${limit}-project limit.` };
       if (adapter?.put) { await adapter.put(clone(project)); return { ok: true, project: metadata(project) }; }
       let db;
-      try { db = await open(); } catch { return { ok: false, reason: "LedgerLift could not save this project on the device." }; }
+      try { db = await open(); } catch { return { ok: false, reason: "LedgerHarbor could not save this project on the device." }; }
       if (!db) { memory.set(project.id, clone(project)); return { ok: true, project: metadata(project), persistent: false }; }
-      try { await request(db, "readwrite", (store) => store.put(project)); return { ok: true, project: metadata(project) }; } catch { return { ok: false, reason: "LedgerLift could not save this project on the device." }; }
+      try { await request(db, "readwrite", (store) => store.put(project)); return { ok: true, project: metadata(project) }; } catch { return { ok: false, reason: "LedgerHarbor could not save this project on the device." }; }
     }
     async function load(id) {
       if (!limit) return null;
@@ -59,7 +59,7 @@
     async function remove(id) {
       if (!limit) return { ok: false, reason: "Saved projects are available in Standard and Plus workspaces." };
       if (adapter?.remove) { await adapter.remove(id); return { ok: true }; }
-      try { const db = await open(); if (!db) return { ok: memory.delete(id) }; await request(db, "readwrite", (store) => store.delete(id)); return { ok: true }; } catch { return { ok: false, reason: "LedgerLift could not remove this project." }; }
+      try { const db = await open(); if (!db) return { ok: memory.delete(id) }; await request(db, "readwrite", (store) => store.delete(id)); return { ok: true }; } catch { return { ok: false, reason: "LedgerHarbor could not remove this project." }; }
     }
     return { tier, limit, dbName: DB_NAME, storeName: STORE_NAME, list, save, load, remove, metadata };
   }

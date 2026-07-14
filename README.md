@@ -2,8 +2,8 @@
 
 Five static, privacy-first converter website prototypes:
 
-1. LedgerLift — CSV to IIF
-2. PixelPort — PNG/JPG/WebP/AVIF
+1. LedgerHarbor — CSV to IIF
+2. PixelRefinery — PNG/JPG/WebP/AVIF
 3. ContactCraft — VCF/vCard and CSV
 4. CalendarFlow — ICS/iCalendar and CSV
 5. CaptionShift — SRT/VTT/SBV/ASS
@@ -12,8 +12,8 @@ Five static, privacy-first converter website prototypes:
 
 | Product | Standard | Plus |
 |---|---:|---:|
-| LedgerLift | $19.99 | $24.99 |
-| PixelPort | $2.99 | $5.99 |
+| LedgerHarbor | $19.99 | $24.99 |
+| PixelRefinery | $2.99 | $5.99 |
 | ContactCraft | $9.99 | $12.99 |
 | CalendarFlow | $9.99 | $12.99 |
 | CaptionShift | $6.99 | $9.99 |

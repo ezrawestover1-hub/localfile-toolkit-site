@@ -140,7 +140,7 @@
     projectControls.append(projectName, saveProject, projectPersistenceStatus);
     heading.append(headingCopy, projectControls, tierBadge);
     const list = make("ol", "workflow-steps");
-    list.setAttribute("aria-label", "LedgerLift conversion steps");
+    list.setAttribute("aria-label", "LedgerHarbor conversion steps");
     steps.forEach((step) => list.append(createStepButton(step)));
     const message = make("div", "workflow-message");
     message.id = "workflowMessage";
@@ -152,7 +152,7 @@
     entry.id = "workspaceEntry";
     entry.setAttribute("aria-labelledby", "workspaceEntryTitle");
     const entryHeading = make("div", "workspace-entry-heading");
-    entryHeading.append(make("h3", "", "Upload a transaction file"), make("p", "", "LedgerLift will inspect the file and help identify its columns."));
+    entryHeading.append(make("h3", "", "Upload a transaction file"), make("p", "", "LedgerHarbor will inspect the file and help identify its columns."));
     entryHeading.querySelector("h3").id = "workspaceEntryTitle";
     const entryActions = make("div", "workspace-entry-actions");
     entryActions.id = "workspaceEntryActions";
@@ -178,7 +178,7 @@
     importPreview.setAttribute("aria-labelledby", "importPreviewTitle");
     const previewHeading = make("div", "workspace-review-header");
     const previewCopy = make("div");
-    previewCopy.append(make("h3", "", "Import preview"), make("p", "", "Check the detected structure before LedgerLift adds these rows to your workspace."));
+    previewCopy.append(make("h3", "", "Import preview"), make("p", "", "Check the detected structure before LedgerHarbor adds these rows to your workspace."));
     previewCopy.querySelector("h3").id = "importPreviewTitle";
     previewCopy.querySelector("h3").tabIndex = -1;
     const previewStatus = make("strong", "workspace-review-summary", "No file inspected");
@@ -296,7 +296,7 @@
     const cleanSummary = make("div", "clean-summary"); cleanSummary.id = "cleanSummary"; cleanSummary.setAttribute("aria-live", "polite");
     const cleanTools = make("div", "clean-tools"); cleanTools.id = "cleanTools";
     const cleanPreview = make("section", "clean-preview hidden"); cleanPreview.id = "cleanPreview"; cleanPreview.setAttribute("aria-labelledby", "cleanPreviewTitle");
-    cleanPreview.append(make("h4", "", "Preview changes"), make("p", "", "These values have not changed yet. Include only the rows and cells you want LedgerLift to apply."));
+    cleanPreview.append(make("h4", "", "Preview changes"), make("p", "", "These values have not changed yet. Include only the rows and cells you want LedgerHarbor to apply."));
     cleanPreview.querySelector("h4").id = "cleanPreviewTitle";
     const cleanPreviewMeta = make("div", "clean-preview-meta", ""); cleanPreviewMeta.id = "cleanPreviewMeta";
     const cleanPreviewWrap = make("div", "table-wrap clean-preview-table"); const cleanPreviewTable = make("table"); cleanPreviewTable.append(make("caption", "sr-only", "Cleaning changes before and after preview"), make("thead"), make("tbody")); cleanPreviewTable.querySelector("thead").id = "cleanPreviewHead"; cleanPreviewTable.querySelector("tbody").id = "cleanPreviewRows"; cleanPreviewWrap.append(cleanPreviewTable);
@@ -320,7 +320,7 @@
     mapPanel.setAttribute("aria-labelledby", "workspaceMapColumnsTitle");
     const mapHeader = make("div", "workspace-review-header");
     const mapCopy = make("div");
-    mapCopy.append(make("h3", "", "Map your columns"), make("p", "", "Confirm what each source column means before LedgerLift prepares your transactions."));
+    mapCopy.append(make("h3", "", "Map your columns"), make("p", "", "Confirm what each source column means before LedgerHarbor prepares your transactions."));
     mapCopy.querySelector("h3").id = "workspaceMapColumnsTitle";
     const mapStatus = make("strong", "workspace-review-summary", "Mapping not confirmed"); mapStatus.id = "mappingStatus";
     mapHeader.append(mapCopy, mapStatus);
@@ -351,7 +351,7 @@
     const deleteTemplate = make("button", "button quiet", "Delete selected template"); deleteTemplate.type = "button"; deleteTemplate.id = "mappingDeleteTemplate";
     templateControls.append(templateName, saveTemplate, templateSelect, applyTemplate, deleteTemplate); templatePanel.append(templateUnavailable, templateControls);
     const mapPreview = make("section", "mapping-preview"); mapPreview.id = "mappingPreview"; mapPreview.setAttribute("aria-labelledby", "mappingPreviewTitle");
-    mapPreview.append(make("h4", "", "Mapping preview"), make("p", "", "A small sample of the fields LedgerLift will carry forward. This does not change your data.")); mapPreview.querySelector("h4").id = "mappingPreviewTitle";
+    mapPreview.append(make("h4", "", "Mapping preview"), make("p", "", "A small sample of the fields LedgerHarbor will carry forward. This does not change your data.")); mapPreview.querySelector("h4").id = "mappingPreviewTitle";
     const mapPreviewMeta = make("div", "mapping-preview-meta", ""); mapPreviewMeta.id = "mappingPreviewMeta";
     const mapPreviewWrap = make("div", "table-wrap mapping-preview-table"); const mapPreviewTable = make("table"); mapPreviewTable.append(make("caption", "sr-only", "Preview of mapped transaction fields"), make("thead"), make("tbody")); mapPreviewTable.querySelector("thead").id = "mappingPreviewHead"; mapPreviewTable.querySelector("tbody").id = "mappingPreviewRows"; mapPreviewWrap.append(mapPreviewTable); mapPreview.append(mapPreviewMeta, mapPreviewWrap);
     const mapActions = make("div", "workspace-map-actions");
@@ -363,7 +363,7 @@
     accountPanel.id = "workspaceMapAccounts";
     accountPanel.setAttribute("aria-labelledby", "workspaceMapAccountsTitle");
     const accountHeader = make("div", "workspace-review-header");
-    const accountCopy = make("div"); accountCopy.append(make("h3", "", "Map accounts and transaction details"), make("p", "", "Match imported account, category, and name values to the values LedgerLift should use in the converted file.")); accountCopy.querySelector("h3").id = "workspaceMapAccountsTitle";
+    const accountCopy = make("div"); accountCopy.append(make("h3", "", "Map accounts and transaction details"), make("p", "", "Match imported account, category, and name values to the values LedgerHarbor should use in the converted file.")); accountCopy.querySelector("h3").id = "workspaceMapAccountsTitle";
     const accountStatus = make("strong", "workspace-review-summary", "Mapping not ready"); accountStatus.id = "accountMappingStatus"; accountHeader.append(accountCopy, accountStatus);
     const accountMeta = make("div", "account-meta"); ["accountFileMeta", "accountRowsMeta", "accountUniqueMeta", "accountMappedMeta", "accountUnmappedMeta", "accountAffectedMeta"].forEach((id) => { const item = make("div", "account-meta-item", ""); item.id = id; accountMeta.append(item); });
     const accountNotice = make("div", "account-notice", "All source values are inspected locally. Suggestions are not confirmed until you accept them."); accountNotice.id = "accountMappingNotice"; accountNotice.setAttribute("role", "status"); accountNotice.setAttribute("aria-live", "polite");
@@ -389,7 +389,7 @@
     const accountTemplates = make("section", "account-mapping-templates"); accountTemplates.id = "accountMappingTemplates"; accountTemplates.setAttribute("aria-labelledby", "accountTemplatesTitle"); accountTemplates.append(make("h4", "", "Saved value-mapping templates"), make("p", "", "Templates store only the source value you explicitly mapped, its role, and destination structure—not transaction rows or amounts.")); accountTemplates.querySelector("h4").id = "accountTemplatesTitle";
     const accountTemplateUnavailable = make("p", "account-template-unavailable", "Persistent value-mapping templates are available in Standard and Plus workspaces."); accountTemplateUnavailable.id = "accountTemplateUnavailable"; accountTemplates.append(accountTemplateUnavailable);
     const accountTemplateControls = make("div", "account-template-controls"); accountTemplateControls.id = "accountTemplateControls"; const accountTemplateName = make("input"); accountTemplateName.id = "accountTemplateName"; accountTemplateName.placeholder = "Template name"; accountTemplateName.setAttribute("aria-label", "New value-mapping template name"); const accountSaveTemplate = make("button", "button secondary", "Save template"); accountSaveTemplate.type = "button"; accountSaveTemplate.id = "accountSaveTemplate"; const accountTemplateSelect = make("select"); accountTemplateSelect.id = "accountTemplateSelect"; accountTemplateSelect.setAttribute("aria-label", "Saved value-mapping template"); const accountApplyTemplate = make("button", "button quiet", "Preview selected template"); accountApplyTemplate.type = "button"; accountApplyTemplate.id = "accountPreviewTemplate"; const accountApplyConfirmed = make("button", "button quiet", "Apply selected matches"); accountApplyConfirmed.type = "button"; accountApplyConfirmed.id = "accountApplyTemplate"; const accountRenameTemplate = make("button", "button quiet", "Rename template"); accountRenameTemplate.type = "button"; accountRenameTemplate.id = "accountRenameTemplate"; const accountDeleteTemplate = make("button", "button quiet", "Delete template"); accountDeleteTemplate.type = "button"; accountDeleteTemplate.id = "accountDeleteTemplate"; accountTemplateControls.append(accountTemplateName, accountSaveTemplate, accountTemplateSelect, accountApplyTemplate, accountApplyConfirmed, accountRenameTemplate, accountDeleteTemplate); accountTemplates.append(accountTemplateControls);
-    const accountPreview = make("section", "account-mapping-preview"); accountPreview.id = "accountMappingPreview"; accountPreview.setAttribute("aria-labelledby", "accountPreviewTitle"); accountPreview.append(make("h4", "", "Account mapping preview"), make("p", "", "This preview shows assigned accounts and names. LedgerLift has not completed accounting validation yet.")); accountPreview.querySelector("h4").id = "accountPreviewTitle"; const accountPreviewMeta = make("div", "account-preview-meta", ""); accountPreviewMeta.id = "accountPreviewMeta"; const accountPreviewWrap = make("div", "table-wrap account-preview-table"); const accountPreviewTable = make("table"); accountPreviewTable.append(make("caption", "sr-only", "Preview of account mappings"), make("thead"), make("tbody")); accountPreviewTable.querySelector("thead").id = "accountPreviewHead"; accountPreviewTable.querySelector("tbody").id = "accountPreviewRows"; accountPreviewWrap.append(accountPreviewTable); accountPreview.append(accountPreviewMeta, accountPreviewWrap);
+    const accountPreview = make("section", "account-mapping-preview"); accountPreview.id = "accountMappingPreview"; accountPreview.setAttribute("aria-labelledby", "accountPreviewTitle"); accountPreview.append(make("h4", "", "Account mapping preview"), make("p", "", "This preview shows assigned accounts and names. LedgerHarbor has not completed accounting validation yet.")); accountPreview.querySelector("h4").id = "accountPreviewTitle"; const accountPreviewMeta = make("div", "account-preview-meta", ""); accountPreviewMeta.id = "accountPreviewMeta"; const accountPreviewWrap = make("div", "table-wrap account-preview-table"); const accountPreviewTable = make("table"); accountPreviewTable.append(make("caption", "sr-only", "Preview of account mappings"), make("thead"), make("tbody")); accountPreviewTable.querySelector("thead").id = "accountPreviewHead"; accountPreviewTable.querySelector("tbody").id = "accountPreviewRows"; accountPreviewWrap.append(accountPreviewTable); accountPreview.append(accountPreviewMeta, accountPreviewWrap);
     const accountActionsBottom = make("div", "workspace-account-actions"); const backToColumns = make("button", "button secondary", "Back to Map Columns"); backToColumns.type = "button"; backToColumns.id = "backToMapColumns"; backToColumns.addEventListener("click", () => setStep(4)); const continueToValidate = make("button", "button", "Continue to Validate"); continueToValidate.type = "button"; continueToValidate.id = "continueToValidate"; continueToValidate.addEventListener("click", () => { const accountModel = accountMapperModel(); if (!accountModel?.getValidation().canContinue) return; window.LedgerLiftCore?.markMapAccountsReady?.(accountModel.getState()); state.mapAccountsVisited = true; window.LedgerLiftCore?.validate?.(); }); accountActionsBottom.append(backToColumns, continueToValidate);
     accountPanel.append(accountHeader, accountMeta, accountNotice, sourceAccount, accountToolbar, accountActions, accountIssues, valueList, destinationPanel, accountTemplates, accountPreview, accountActionsBottom);
 
@@ -418,7 +418,7 @@
     const sectionTitle = converter.querySelector(".section-title");
     if (sectionTitle) {
       sectionTitle.querySelector("h2").textContent = "Upload a transaction file";
-      sectionTitle.querySelector("p").textContent = "LedgerLift will inspect the file and help identify its columns.";
+      sectionTitle.querySelector("p").textContent = "LedgerHarbor will inspect the file and help identify its columns.";
     }
     const work = $("work");
     if (work) {
@@ -444,10 +444,10 @@
     start.addEventListener("click", () => { clear?.click(); $("fileInput")?.focus(); });
     upload.addEventListener("click", () => $("fileInput")?.click());
     $("saveCurrentProject").addEventListener("click", async () => {
-      const name = $("projectName").value.trim() || window.LedgerLiftCore?.state?.name || "LedgerLift project";
+      const name = $("projectName").value.trim() || window.LedgerLiftCore?.state?.name || "LedgerHarbor project";
       const result = await window.LedgerLiftCore?.saveProject?.(name);
       if (result?.ok) { state.projectName = result.project.name; $("projectName").value = result.project.name; projectStatus(`Saved “${result.project.name}” on this device.`); await refreshSavedProjects(); }
-      else projectStatus(result?.reason || "LedgerLift could not save this project.", true);
+      else projectStatus(result?.reason || "LedgerHarbor could not save this project.", true);
     });
     $("savedProjectList").addEventListener("click", async (event) => {
       const open = event.target.closest("[data-project-open]");
@@ -729,7 +729,7 @@
     const bulk = $("accountBulkDestination"); bulk.replaceChildren(make("option", "", "Choose destination")); bulk.firstChild.value = ""; modelState.destinations.forEach((destination) => { const option = make("option", "", destination.name); option.value = destination.id; bulk.append(option); });
     const destinationAccountType = $("accountDestinationAccountType"), destinationParent = $("accountDestinationParent"); const accountTypeVisible = $("accountDestinationType").value === "account"; destinationAccountType.closest("label").hidden = !accountTypeVisible; destinationParent.closest("label").hidden = !accountTypeVisible; destinationParent.replaceChildren(make("option", "", "No parent")); destinationParent.firstChild.value = ""; modelState.destinations.filter((destination) => destination.type === "account").forEach((destination) => { const option = make("option", "", destination.parentId ? `${accountDestinationName(destination.parentId)}:${destination.name}` : destination.name); option.value = destination.id; destinationParent.append(option); });
     const destinationList = $("accountDestinationList"); destinationList.replaceChildren(); if (!modelState.destinations.length) destinationList.append(make("p", "destination-empty", "No destinations created in this session yet.")); modelState.destinations.forEach((destination) => { const item = make("div", "destination-item"); item.append(make("strong", "", destination.parentId ? `${accountDestinationName(destination.parentId)}:${destination.name}` : destination.name), make("span", "", `${destinationTypeLabel(destination.type)}${destination.accountType ? ` · ${destination.accountType}` : ""}`)); destinationList.append(item); });
-    const destinationLibrary = core?.destinationLibrary; $("accountDestinationLibraryNote").textContent = destinationLibrary?.limit ? "Created destinations are reused across eligible LedgerLift projects on this device. Transaction rows are not stored in this library." : "Destinations are kept for this project session in the Free workspace.";
+    const destinationLibrary = core?.destinationLibrary; $("accountDestinationLibraryNote").textContent = destinationLibrary?.limit ? "Created destinations are reused across eligible LedgerHarbor projects on this device. Transaction rows are not stored in this library." : "Destinations are kept for this project session in the Free workspace.";
     const store = model.getTemplateStore?.(), eligible = Boolean(store && store.limit > 0); $("accountTemplateControls").hidden = !eligible; $("accountTemplateUnavailable").hidden = eligible; if (eligible) { const select = $("accountTemplateSelect"); select.replaceChildren(); store.list().forEach((template) => { const option = make("option", "", template.name); option.value = template.id; select.append(option); }); const has = select.options.length > 0; $("accountPreviewTemplate").disabled = !has; $("accountApplyTemplate").disabled = !has || !accountView.templatePreview?.matches?.length; $("accountRenameTemplate").disabled = !has; $("accountDeleteTemplate").disabled = !has; }
     const preview = model.getPreview(6); $("accountPreviewMeta").textContent = `${preview.length} sample rows shown · unresolved fields are not final validation results.`; const previewHead = $("accountPreviewHead"); previewHead.replaceChildren(); ["Date", "Description", "Amount", "Source account", "Destination account/category", "Name", "Class", "Customer/job", "Status"].forEach((label) => { const th = make("th", "", label); th.scope = "col"; previewHead.append(th); }); const previewBody = $("accountPreviewRows"); previewBody.replaceChildren(); preview.forEach((row) => { const tr = make("tr"); [row.date, row.description, row.amount || `${row.debit || ""} / ${row.credit || ""}`, row.sourceAccount, row.destination, row.name, row.className, row.customerJob, row.status].forEach((value) => tr.append(make("td", "", textForDisplay(value) || "—"))); previewBody.append(tr); });
     if (accountView.templatePreview) { const summary = accountView.templatePreview; $("accountMappingNotice").textContent = `${summary.matches?.length || 0} template matches previewed; ${summary.unmatched?.length || 0} current values have no saved match. Applying will remain local and reversible.`; }
@@ -1350,7 +1350,7 @@
     renderReviewTable();
   });
   window.addEventListener("ledgerlift:import-preview-ready", (event) => { state.imported = false; state.current = 1; renderImportPreview(event.detail?.preview); render(); $("importPreviewTitle")?.focus(); });
-  window.addEventListener("ledgerlift:import-error", (event) => { $("workflowMessage").textContent = event.detail?.message || "LedgerLift could not read that file. Choose another file and try again."; $("workflowMessage").dataset.error = "true"; $("workflowMessage")?.focus(); });
+  window.addEventListener("ledgerlift:import-error", (event) => { $("workflowMessage").textContent = event.detail?.message || "LedgerHarbor could not read that file. Choose another file and try again."; $("workflowMessage").dataset.error = "true"; $("workflowMessage")?.focus(); });
   window.addEventListener("ledgerlift:data-loaded", () => { accountSelected.clear(); state.projectId = ""; state.projectName = ""; state.imported = true; state.cleaned = false; state.cleanVisited = false; state.cleanSummary = null; state.mapColumnsVisited = false; state.mapAccountsVisited = false; state.analyzed = false; state.previewed = false; state.exported = false; state.current = 2; renderReviewTable(); render(); $("workspaceReviewTitle")?.focus(); });
   window.addEventListener("ledgerlift:project-saved", (event) => { state.projectId = event.detail?.project?.id || state.projectId; state.projectName = event.detail?.project?.name || state.projectName; render(); });
   window.addEventListener("ledgerlift:project-loaded", (event) => {

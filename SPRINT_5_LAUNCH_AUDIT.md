@@ -16,7 +16,7 @@ on Cloudflare, email, Paddle, and legal configuration outside this repository.
 - 1,316 local links were checked with no missing targets.
 - All 30 dedicated SEO landing routes have a title, description, canonical URL,
   share image, and exactly one H1.
-- LedgerLift, PixelPort, ContactCraft, CalendarFlow, and CaptionShift each
+- LedgerHarbor, PixelRefinery, ContactCraft, CalendarFlow, and CaptionShift each
   completed a real sample conversion and download in the browser without
   console errors.
 - The five product homepages have no horizontal overflow at 1440px desktop or
