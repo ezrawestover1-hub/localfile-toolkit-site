@@ -668,3 +668,14 @@ test("account setup stages passwords until email verification", () => {
   assert.match(read("account/reset.js"), /replace\(\/\\D\/g/);
   assert.match(read("worker.js"), /SELECT id FROM customers WHERE normalized_email/);
 });
+
+test("advertising and sales handoff only references real SEO landing pages", () => {
+  const handoff = read("ADVERTISING_SALES_HANDOFF.md");
+  const routes = [...handoff.matchAll(/`(\/[a-z]+\/[a-z0-9-]+\.html)`/g)].map((match) => match[1]);
+  assert.ok(routes.length >= 15);
+  routes.forEach((route) => assert.ok(fs.existsSync(path.join(root, route.slice(1))), `handoff route ${route}`));
+  ["LedgerHarbor", "PixelRefinery", "ContactCraft", "CalendarFlow", "CaptionShift"].forEach((product) => assert.match(handoff, new RegExp(product)));
+  assert.match(handoff, /Plus adds/);
+  assert.match(handoff, /Never claim perfect preservation/);
+  assert.match(read("ADVERTISING_PLAN.md"), /ADVERTISING_SALES_HANDOFF\.md/);
+});

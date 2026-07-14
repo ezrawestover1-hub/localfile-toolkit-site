@@ -1,6 +1,10 @@
 # Privacy-safe advertising plan
 
-Status: **Campaign-ready after production checkout is verified**
+Status: **Campaign-ready for a controlled exact-intent test; first live payment still needs end-to-end observation**
+
+For the complete marketer and sales handoff, use
+[ADVERTISING_SALES_HANDOFF.md](ADVERTISING_SALES_HANDOFF.md). This document
+keeps the detailed campaign notes and the new handoff intentionally aligned.
 
 LocalFile Toolkit has enough focused landing pages to begin with high-intent
 search advertising. Do not add advertising pixels, analytics scripts, or remote
@@ -10,13 +14,14 @@ report maintained outside the converter experience.
 
 ## Launch prerequisites
 
-Do not spend on paid traffic until all of these are true:
+Do not spend meaningful budget on paid traffic until all of these are true:
 
 - `localfiletoolkit.com` resolves and serves the final HTTPS site.
 - `/api/readiness` is green on the production Worker.
-- A controlled live Standard purchase creates the correct product entitlement
-  after a verified Paddle webhook.
-- A controlled bundle purchase creates only the promised Plus entitlements.
+- The first live Standard purchase creates the correct product entitlement after
+  a verified Paddle webhook and is monitored in Paddle, Worker logs, and D1.
+- The first bundle purchase creates only the promised Plus entitlements and is
+  monitored in the same way.
 - Refund, support, account verification, and password reset delivery work.
 - Terms, privacy, refunds, and operator details have final approval.
 
