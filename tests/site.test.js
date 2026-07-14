@@ -338,8 +338,8 @@ test("dedicated product landing pages have bounded descriptions and product-spec
       const content = read(file);
       const description = content.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i)?.[1] || content.match(/<meta[^>]+content="([^"]+)"[^>]+name="description"/i)?.[1];
       assert.ok(description && description.length >= 140 && description.length <= 160, `${file} description length`);
-      assert.match(content, new RegExp(`property="og:image"[^>]+https://localfiletoolkit\\.com/assets/product-icons/${product}/source-master\\.png`), `${file} OG image`);
-      assert.match(content, new RegExp(`name="twitter:image"[^>]+https://localfiletoolkit\\.com/assets/product-icons/${product}/source-master\\.png`), `${file} Twitter image`);
+      assert.match(content, new RegExp(`property="og:image"[^>]+https://localfiletoolkit\\.com/assets/(?:product-icons/${product}/source-master|social/[^/]+/[^/]+-social-1200x630)\\.png`), `${file} OG image`);
+      assert.match(content, new RegExp(`name="twitter:image"[^>]+https://localfiletoolkit\\.com/assets/(?:product-icons/${product}/source-master|social/[^/]+/[^/]+-social-1200x630)\\.png`), `${file} Twitter image`);
       assert.doesNotMatch(content, /Bank CSV → QuickBooks Desktop IIF with mapping and validation\./, `${file} restrained shared compatibility copy`);
     });
   });
@@ -437,6 +437,59 @@ test("LedgerHarbor education cluster is indexable, linked, and honest", () => {
   guides.forEach((name) => assert.match(sitemap, new RegExp(`https://localfiletoolkit\\.com/ledgerlift/guides/${name}`), `${name} sitemap`));
   assert.match(sitemap, /https:\/\/localfiletoolkit\.com\/ledgerlift\/guides\//, "guide area sitemap");
   ["account/", "checkout-portal/", "api/", "license/", "purchase-success"].forEach((route) => assert.doesNotMatch(sitemap, new RegExp(route.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")), `${route} excluded from sitemap`));
+});
+
+test("social assets and product share metadata are local, dimensioned, and product-specific", () => {
+  const products = {
+    ledgerlift: ["LedgerHarbor", "ledgerharbor", "csv-to-iif-converter.html"],
+    pixelport: ["PixelRefinery", "pixelrefinery", "png-to-jpg-converter.html"],
+    contactcraft: ["ContactCraft", "contactcraft", "vcf-to-csv-converter.html"],
+    calendarflow: ["CalendarFlow", "calendarflow", "ics-to-csv-converter.html"],
+    captionshift: ["CaptionShift", "captionshift", "srt-to-vtt-converter.html"]
+  };
+  const variants = [["social", 1200, 630], ["landscape", 1200, 628], ["square", 1200, 1200]];
+  for (const [product, [name, social, primary]] of Object.entries(products)) {
+    const assetPaths = variants.map(([variant, width, height]) => {
+      const asset = `assets/social/${social}/${social}-${variant}-${width}x${height}.png`;
+      assert.equal(fs.existsSync(path.join(root, asset)), true, asset);
+      const buffer = fs.readFileSync(path.join(root, asset));
+      assert.equal(buffer.toString("ascii", 1, 4), "PNG", `${asset} PNG`);
+      assert.equal(buffer.readUInt32BE(16), width, `${asset} width`);
+      assert.equal(buffer.readUInt32BE(20), height, `${asset} height`);
+      assert.ok(fs.statSync(path.join(root, asset)).size > 0, `${asset} nonempty`);
+      return `https://localfiletoolkit.com/${asset}`;
+    });
+    const homepage = read(`${product}/index.html`);
+    const formatPage = read(`${product}/${primary}`);
+    for (const [content, file] of [[homepage, `${product}/index.html`], [formatPage, `${product}/${primary}`]]) {
+      assert.match(content, /property="og:image"[^>]+https:\/\/localfiletoolkit\.com\/assets\/social\//i, `${file} OG image`);
+      assert.match(content, /property="og:image:width"[^>]+content="1200"/i, `${file} OG width`);
+      assert.match(content, /property="og:image:height"[^>]+content="630"/i, `${file} OG height`);
+      assert.match(content, /property="og:image:alt"[^>]+content="[^"]+"/i, `${file} OG alt`);
+      assert.match(content, /name="twitter:card"[^>]+content="summary_large_image"/i, `${file} Twitter card`);
+      assert.match(content, /name="twitter:image"[^>]+https:\/\/localfiletoolkit\.com\/assets\/social\//i, `${file} Twitter image`);
+    }
+    const screenshot = `assets/screenshots/${product}-workflow-900x700.png`;
+    assert.equal(fs.existsSync(path.join(root, screenshot)), true, screenshot);
+    assert.match(formatPage, new RegExp(`class="workflow-screenshot"[\\s\\S]*src="\\.\\./${screenshot.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}"`), `${product} visible workflow screenshot`);
+    assert.match(formatPage, /loading="lazy"[^>]+alt="[^"]+"/, `${product} screenshot alt and lazy loading`);
+    assert.match(formatPage, /width="900" height="700"/, `${product} screenshot dimensions`);
+    assert.ok(assetPaths[0].includes(`${social}-social-1200x630.png`), `${product} social asset mapping`);
+  }
+  const publicHtml = [
+    ...fs.readdirSync(root).filter((file) => file.endsWith(".html")),
+    ...Object.keys(products).flatMap((product) => fs.readdirSync(path.join(root, product)).filter((file) => file.endsWith(".html")).map((file) => `${product}/${file}`)),
+    ...fs.readdirSync(path.join(root, "ledgerlift/guides")).filter((file) => file.endsWith(".html")).map((file) => `ledgerlift/guides/${file}`)
+  ];
+  publicHtml.forEach((file) => {
+    const content = read(file);
+    [...content.matchAll(/(?:property|name)="(?:og:image|twitter:image)"[^>]+content="(https?:\/\/[^"\s]+)"/gi)].forEach((match) => {
+      assert.match(match[1], /^https:\/\/localfiletoolkit\.com\/assets\//, `${file} uses local image host`);
+    });
+  });
+  assert.doesNotMatch(read("sitemap.xml"), /assets\/social\//, "sitemap contains routes, not assets");
+  const changedText = Object.keys(products).map((product) => read(`${product}/index.html`).split("</head>", 1)[0]).join("\n");
+  assert.doesNotMatch(changedText, /100% secure|guaranteed|perfect conversion|works with every file|lossless|universal compatibility|cloud backup|AI powered|\btestimonial\b|\brating\b/i, "product metadata avoids prohibited claims");
 });
 
 test("PixelPort SEO pages have unique metadata, format guidance, structured data, and sitemap coverage", () => {
