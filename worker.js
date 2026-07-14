@@ -793,6 +793,11 @@ export async function handleRequest(request, env) {
   if (request.method === "POST" && url.pathname === "/api/license/verify") return handleVerify(request, env);
   if (request.method === "POST" && url.pathname === "/api/contact") return handleContact(request, env);
   if (request.method === "POST" && url.pathname === "/api/refund-request") return handleRefundRequest(request, env);
+  if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/") {
+    const indexUrl = new URL(request.url);
+    indexUrl.pathname = "/index.html";
+    return env.ASSETS.fetch(new Request(indexUrl, request));
+  }
   return env.ASSETS.fetch(request);
 }
 
