@@ -13,7 +13,7 @@ still be completed and recorded before enabling live checkout.
 - [x] The Worker config declares the `RATE_LIMITER` binding and fails closed when
   the durable limiter is unavailable.
 - [x] Static `.html` URLs are served directly so sitemap, canonical, and final URL agree.
-- [x] Checkout configuration is environment-specific: local development is sandbox-safe and production uses the verified live catalog configuration.
+- [x] Checkout configuration is environment-specific: local development is sandbox-safe and production declares its live catalog configuration.
 
 ## Repository checks completed in Sprints 3–5
 
@@ -25,11 +25,12 @@ still be completed and recorded before enabling live checkout.
   five applets without console errors.
 - [x] Desktop (1440px) and mobile (390px) checks show no horizontal overflow on
   the five product homepages.
-- [x] All 81 automated tests pass; JavaScript syntax checks, JSON-LD parsing, and
+- [x] All 151 automated tests pass; JavaScript syntax checks, JSON-LD parsing, and
   local-link validation pass.
-- [x] The production domain, live catalog, production configuration, and readiness
-  endpoint were verified after deployment. Continue monitoring the first live
-  transaction because a real payment has not yet been completed in this rollout.
+- [ ] After deployment, verify the production domain, live catalog, production
+  configuration, and `/api/readiness` endpoint. Do not mark this complete until
+  the final domain returns the expected production configuration and every
+  readiness check is true.
 
 ## Account-owned launch gates
 
@@ -51,6 +52,12 @@ still be completed and recorded before enabling live checkout.
 Do not mark the launch gates complete based on the public success URL. Paid access
 must be observed in D1 after a verified webhook, and `/api/readiness` must remain
 green while checkout is enabled.
+
+## Current controlled-launch documents
+
+- [Production launch observation checklist](PRODUCTION_LAUNCH_CHECKLIST.md)
+- [Google Ads controlled-launch plan](GOOGLE_ADS_CONTROLLED_LAUNCH.md)
+- [Launch-readiness audit](LAUNCH_READINESS_AUDIT.md)
 
 
 ## Payments
