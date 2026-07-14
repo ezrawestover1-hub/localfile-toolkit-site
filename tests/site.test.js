@@ -271,6 +271,21 @@ test("product pages and legal subpages have SEO descriptions", () => {
   });
 });
 
+test("dedicated product landing pages have bounded descriptions and product-specific share images", () => {
+  const products = ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"];
+  products.forEach((product) => {
+    fs.readdirSync(path.join(root, product)).filter((name) => name.endsWith(".html") && !["index.html", "privacy.html", "security.html", "terms.html"].includes(name)).forEach((name) => {
+      const file = `${product}/${name}`;
+      const content = read(file);
+      const description = content.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i)?.[1] || content.match(/<meta[^>]+content="([^"]+)"[^>]+name="description"/i)?.[1];
+      assert.ok(description && description.length >= 145 && description.length <= 160, `${file} description length`);
+      assert.match(content, new RegExp(`property="og:image"[^>]+https://localfiletoolkit\\.com/assets/product-icons/${product}/source-master\\.png`), `${file} OG image`);
+      assert.match(content, new RegExp(`name="twitter:image"[^>]+https://localfiletoolkit\\.com/assets/product-icons/${product}/source-master\\.png`), `${file} Twitter image`);
+      assert.doesNotMatch(content, /Bank CSV → QuickBooks Desktop IIF with mapping and validation\./, `${file} restrained shared compatibility copy`);
+    });
+  });
+});
+
 test("LedgerLift SEO pages have unique metadata, structured data, headings, and working internal routes", () => {
   const pages = ["ledgerlift/index.html", "ledgerlift/csv-to-iif-converter.html", "ledgerlift/bank-csv-to-iif.html", "ledgerlift/debit-credit-csv-to-iif.html", "ledgerlift/create-iif-from-spreadsheet.html"];
   const titles = new Set(); const descriptions = new Set();
@@ -455,9 +470,24 @@ test("Paddle configuration is sandbox-only for verification", () => {
   assert.doesNotMatch(config, /live_/);
 });
 
+test("static HTML URL policy matches sitemap and canonical URLs", () => {
+  const config = read("wrangler.jsonc");
+  assert.match(config, /"html_handling":\s*"none"/);
+  assert.match(read("sitemap.xml"), /\.html<\/loc>/);
+});
+
 test("checkout requests exactly one unit", () => {
   assert.match(read("checkout-portal/checkout.js"), /items:\[\{priceId,quantity:1\}\]/);
   assert.match(read("PAYMENTS_SETUP.md"), /minimum of `1` and a maximum of `1`/);
+});
+
+test("checkout portal has separate sandbox and production guards", () => {
+  const checkout = read("checkout-portal/checkout.js");
+  assert.match(checkout, /environment === "production"/);
+  assert.match(checkout, /environment === "sandbox"/);
+  assert.match(checkout, /\/\^live_\//);
+  assert.match(checkout, /\/\^test_\//);
+  assert.match(checkout, /Environment\.set\("sandbox"\)/);
 });
 
 test("LedgerLift Plus promises are implemented and license-gated", () => {

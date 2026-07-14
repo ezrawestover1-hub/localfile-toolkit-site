@@ -22,6 +22,7 @@ The Complete Plus Bundle is $39.99 one time. The five Plus products total $66.95
 
 ## Important before launch
 
+- Follow the [production rollout runbook](PRODUCTION_ROLLOUT.md) and do not enable live checkout until `/api/readiness` is green.
 - Configure the single shared `/checkout-portal/` with Paddle sandbox values only; all eleven purchase choices use that portal. The public comparison page is `/pricing.html`.
 - Configure the Phase 1 server-verified licensing backend described in [LICENSING_SETUP.md](LICENSING_SETUP.md) before launch. The current browser demo flag is privacy-friendly but is not strong anti-piracy.
 - Review the public [terms](terms.html), [privacy](privacy.html), [refund](refunds.html), [contact](contact.html), and [support](support.html) pages before launch. Customer support is [localfiletools.support@gmail.com](mailto:localfiletools.support@gmail.com).

@@ -58,14 +58,16 @@
     } catch { return false; }
   }
   function initializeCheckout() {
-    const ready=cfg.checkoutEnabled===true&&cfg.environment==="sandbox"&&/^test_/.test(token)&&/^pri_/.test(priceId)&&window.Paddle;
+    const environment = cfg.environment === "production" || cfg.environment === "sandbox" ? cfg.environment : "";
+    const tokenPattern = environment === "production" ? /^live_/ : environment === "sandbox" ? /^test_/ : null;
+    const ready=cfg.checkoutEnabled===true&&Boolean(tokenPattern?.test(token))&&/^pri_/.test(priceId)&&window.Paddle;
     if(!ready){
       msg.textContent="Checkout is in setup mode. Add your Paddle client-side token and price IDs in paddle-config.js.";
       button.disabled=true;
       return;
     }
     try{
-      if(cfg.environment==="sandbox") window.Paddle.Environment.set("sandbox");
+      if(environment==="sandbox") window.Paddle.Environment.set("sandbox");
       window.Paddle.Initialize({token});
       button.disabled=false;
       msg.textContent="Payment details are handled by Paddle Checkout.";

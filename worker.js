@@ -4,6 +4,7 @@ const WEBHOOK_PROCESSING_LEASE_SECONDS = 60;
 const PRODUCTS = ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"];
 const SUPPORT_EMAIL = "localfiletools.support@gmail.com";
 const rateBuckets = new Map();
+const MAX_RATE_BUCKETS = 10000;
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -352,14 +353,60 @@ async function handlePortalSession(request, env) {
 
 async function allowSubmission(request, env) {
   const key = clientKey(request);
+  const requiresDurableRateLimiter = env.REQUIRE_DURABLE_RATE_LIMITER === "true";
+  if (requiresDurableRateLimiter && !env.RATE_LIMITER?.limit) return false;
   if (env.RATE_LIMITER?.limit) {
-    try { if (!(await env.RATE_LIMITER.limit({ key })).success) return false; } catch { /* Optional binding failure must not expose details. */ }
+    try {
+      if (!(await env.RATE_LIMITER.limit({ key })).success) return false;
+    } catch {
+      if (requiresDurableRateLimiter) return false;
+      // Local development may use the bounded in-memory fallback until the
+      // Cloudflare Rate Limiting binding is configured.
+    }
   }
   const now = Date.now();
+  if (rateBuckets.size >= MAX_RATE_BUCKETS) {
+    for (const [bucketKey, value] of rateBuckets) {
+      if (now - value.startedAt > 10 * 60 * 1000) rateBuckets.delete(bucketKey);
+      if (rateBuckets.size < MAX_RATE_BUCKETS) break;
+    }
+  }
   const bucket = rateBuckets.get(key);
   if (!bucket || now - bucket.startedAt > 10 * 60 * 1000) { rateBuckets.set(key, { startedAt: now, count: 1 }); return true; }
   bucket.count += 1;
   return bucket.count <= 8;
+}
+
+function readinessChecks(env) {
+  const paddlePriceKeys = [
+    "PADDLE_PRICE_LEDGERLIFT_STANDARD", "PADDLE_PRICE_LEDGERLIFT_PLUS",
+    "PADDLE_PRICE_PIXELPORT_STANDARD", "PADDLE_PRICE_PIXELPORT_PLUS",
+    "PADDLE_PRICE_CONTACTCRAFT_STANDARD", "PADDLE_PRICE_CONTACTCRAFT_PLUS",
+    "PADDLE_PRICE_CALENDARFLOW_STANDARD", "PADDLE_PRICE_CALENDARFLOW_PLUS",
+    "PADDLE_PRICE_CAPTIONSHIFT_STANDARD", "PADDLE_PRICE_CAPTIONSHIFT_PLUS",
+    "PADDLE_PRICE_SUITE_BUNDLE"
+  ];
+  const paddleProduction = Boolean(
+    env.PADDLE_API_KEY &&
+    env.PADDLE_WEBHOOK_SECRET &&
+    env.PADDLE_API_BASE_URL &&
+    !String(env.PADDLE_API_BASE_URL).includes("sandbox") &&
+    paddlePriceKeys.every((key) => /^pri_[a-z0-9]+$/i.test(String(env[key] || "")))
+  );
+  return {
+    database: Boolean(env.LICENSE_DB),
+    licenseSigningSecret: Boolean(env.LICENSE_SIGNING_SECRET),
+    paddleProduction: paddleProduction,
+    authenticationEmail: Boolean(env.AUTH_EMAIL_API_URL && env.AUTH_EMAIL_API_KEY && env.AUTH_EMAIL_FROM_ADDRESS),
+    supportEmail: Boolean(env.SUPPORT_EMAIL_API_URL && env.SUPPORT_EMAIL_API_KEY && env.SUPPORT_EMAIL_FROM_ADDRESS && (env.SUPPORT_RECIPIENT_EMAIL || SUPPORT_EMAIL)),
+    durableRateLimiter: Boolean(env.RATE_LIMITER?.limit && env.REQUIRE_DURABLE_RATE_LIMITER === "true")
+  };
+}
+
+function handleReadiness(env) {
+  const checks = readinessChecks(env);
+  const ready = Object.values(checks).every(Boolean);
+  return json({ ready, checks }, ready ? 200 : 503);
 }
 
 async function readJsonObject(request) {
@@ -729,6 +776,7 @@ async function handleVerify(request, env) {
 export async function handleRequest(request, env) {
   const url = new URL(request.url);
   if (request.method === "GET" && url.pathname === "/api/health") return json({ status: "ok" });
+  if (request.method === "GET" && url.pathname === "/api/readiness") return handleReadiness(env);
   if (request.method === "POST" && url.pathname === "/api/account/register") return handleAccountRegister(request, env).catch((error) => { const reason = new Set(["purchase_eligibility_read", "account_user_write", "account_user_read", "account_password_read", "password_hash", "account_password_write", "verification_code_write"]).has(error?.message) ? error.message : "account_register_failed"; console.error("account_register_failed", reason); return json({ ok: false, message: "Account setup is temporarily unavailable. Please try again." }, 503); });
   if (request.method === "POST" && url.pathname === "/api/account/resend-code") return handleResendCode(request, env);
   if (request.method === "POST" && url.pathname === "/api/account/password-reset/request") return handlePasswordResetRequest(request, env);
