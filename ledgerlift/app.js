@@ -1,7 +1,7 @@
 (() => {
   "use strict";
   const $ = (id) => document.getElementById(id);
-  const state = { headers: [], rows: [], tx: [], review: null, cleaner: null, source: false, name: "transactions", amountMode: "signed", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] };
+  const state = { headers: [], rows: [], tx: [], review: null, cleaner: null, mapper: null, accountMapper: null, validator: null, validationReport: null, projectStore: null, destinationLibrary: null, projectId: "", projectName: "", source: false, name: "transactions", amountMode: "signed", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] };
   const input = $("fileInput");
   const drop = $("dropZone");
   const status = $("fileStatus");
@@ -17,7 +17,7 @@
 
   function tier() {
     const mode = new URLSearchParams(location.search).get("mode");
-    if (!window.SuiteGate?.paid()) return "free";
+    if (typeof window.SuiteGate?.paid !== "function" || !window.SuiteGate.paid()) return "free";
     return mode === "plus" ? "plus" : "standard";
   }
 
@@ -39,7 +39,7 @@
     if (!canReplaceFile()) { input.value = ""; return; }
     try {
       const preview = await window.LedgerLiftImporter.importFile(file, { tier: tier() });
-      Object.assign(state, { source: sample, name: displayName(file), importPreview: preview, fileMeta: preview.fileMeta, format: preview.format, delimiter: preview.delimiter, worksheetName: preview.worksheetName || "", worksheetIndex: preview.worksheetIndex || 0, headerRow: preview.headerRow, suggestions: preview.suggestions, importWarnings: preview.warnings, importErrors: preview.blocking, imported: false, review: null, cleaner: null, headers: preview.headers, rows: preview.rows, tx: [], cleaned: false, cleanSummary: null });
+      Object.assign(state, { source: sample, name: displayName(file), projectId: "", projectName: "", importPreview: preview, fileMeta: preview.fileMeta, format: preview.format, delimiter: preview.delimiter, worksheetName: preview.worksheetName || "", worksheetIndex: preview.worksheetIndex || 0, headerRow: preview.headerRow, suggestions: preview.suggestions, importWarnings: preview.warnings, importErrors: preview.blocking, imported: false, review: null, cleaner: null, mapper: null, accountMapper: null, validator: null, validationReport: null, headers: preview.headers, rows: preview.rows, tx: [], cleanSummary: null });
       ["date", "desc", "amount", "debit", "credit"].forEach(options);
       status.textContent = `${file.name} · ${preview.format} · ${Math.max(1, Math.round(file.size / 1024))} KB`;
       work.classList.add("hidden"); $("results").classList.add("hidden");
@@ -76,7 +76,11 @@
     if (preview.blocking.length) { window.SuiteGate.message(preview.blocking[0]); return false; }
     state.review = window.LedgerLiftReviewModel?.create({ headers: preview.headers, rows: preview.rows, rowWarnings: preview.rowWarnings, tier: tier() }) || null;
     state.cleaner = state.review && window.LedgerLiftCleaner?.create({ review: state.review, tier: tier(), suggestedRoles: preview.suggestions?.roles || {} });
-    Object.assign(state, { imported: true, headers: preview.headers, rows: state.review?.getWorkingRows() || preview.rows, tx: [], cleaned: false, cleanSummary: null });
+    state.mapper = state.review && window.LedgerLiftMapper?.create({ review: state.review, cleaner: state.cleaner, tier: tier(), suggestedRoles: preview.suggestions?.roles || {}, templates: window.LedgerLiftMappingTemplates?.create({ tier: tier() }) });
+    state.destinationLibrary = window.LedgerLiftDestinationLibrary?.create({ tier: tier() }) || null;
+    state.accountMapper = state.review && window.LedgerLiftAccountMapper?.create({ review: state.review, mapper: state.mapper, tier: tier(), initialDestinations: state.destinationLibrary?.list?.() || [], templates: window.LedgerLiftAccountMappingTemplates?.create({ tier: tier() }) });
+    state.validator = state.review && window.LedgerLiftValidator?.create({ review: state.review, mapper: state.mapper, accountMapper: state.accountMapper, tier: tier() });
+    Object.assign(state, { imported: true, headers: preview.headers, rows: state.review?.getWorkingRows() || preview.rows, tx: [], validationReport: null, cleaned: false, cleanSummary: null });
     ["date", "desc", "amount", "debit", "credit"].forEach(options);
     applySuggestions(preview);
     status.textContent = `${preview.fileMeta.name} · ${preview.format} · ${preview.rows.length} rows ready`;
@@ -127,21 +131,28 @@
     return state.cleanSummary;
   }
 
-  function analyze() {
+  function validateCurrent() {
     if (!state.cleaned) { window.SuiteGate.message("Clean your rows before validating the mapping."); return; }
-    const mode = $("amountMode")?.value || "signed";
-    state.amountMode = mode;
-    state.tx = state.rows.map((row, index) => {
-      const debit = money(row[$("debit")?.value]), credit = money(row[$("credit")?.value]);
-      let amount = money(row[$("amount").value]);
-      if (mode === "debit-credit" && (Number.isFinite(debit) || Number.isFinite(credit))) amount = (Number.isFinite(credit) ? Math.abs(credit) : 0) - (Number.isFinite(debit) ? Math.abs(debit) : 0);
-      return { index, d: date(row[$("date").value]), a: amount, debit, credit, memo: clean(row[$("desc").value]), category: "Uncategorized", duplicate: false, ok: !!date(row[$("date").value]) && Number.isFinite(amount) && amount !== 0 };
-    });
+    if (state.mapper && !window.LedgerLiftWorkspace?.state?.mapColumnsVisited) { window.SuiteGate.message("Complete Map Columns before validating the mapping."); return; }
+    if (state.mapper && !state.mapper.getValidation().canContinue) { window.SuiteGate.message("Resolve the required Map Columns issues before validating the mapping."); return; }
+    if (state.accountMapper && !window.LedgerLiftWorkspace?.state?.mapAccountsVisited) { window.SuiteGate.message("Complete Map Accounts before validating the mapping."); return; }
+    if (!state.validator) { window.SuiteGate.message("LedgerLift could not initialize local validation for this import."); return; }
+    const report = state.validator.validate();
+    state.validationReport = report;
+    state.amountMode = report.mode;
+    state.tx = report.transactions;
     renderRows();
-    const good = state.tx.filter((transaction) => transaction.ok).length;
-    $("validation").textContent = `${good} of ${state.tx.length} rows are ready for export.`;
+    const good = report.summary.ready;
+    $("validation").textContent = `${good} of ${report.summary.total} rows passed the required checks.`;
+    window.dispatchEvent(new CustomEvent("ledgerlift:validated", { detail: { report } }));
+    window.dispatchEvent(new CustomEvent("ledgerlift:analyzed", { detail: { state, report } }));
+    return report;
+  }
+
+  function analyze() {
+    const report = validateCurrent();
+    if (!report) return;
     $("results").classList.remove("hidden");
-    window.dispatchEvent(new CustomEvent("ledgerlift:analyzed", { detail: { state } }));
   }
 
   function renderRows() {
@@ -166,7 +177,7 @@
 
   function resetImport() {
     input.value = "";
-    Object.assign(state, { headers: [], rows: [], tx: [], review: null, cleaner: null, source: false, name: "transactions", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] });
+    Object.assign(state, { headers: [], rows: [], tx: [], review: null, cleaner: null, mapper: null, accountMapper: null, validator: null, validationReport: null, projectId: "", projectName: "", source: false, name: "transactions", cleaned: false, cleanSummary: null, imported: false, importPreview: null, fileMeta: null, format: "", delimiter: "", worksheetName: "", worksheetIndex: 0, headerRow: 0, suggestions: null, importWarnings: [], importErrors: [] });
     work.classList.add("hidden"); $("results").classList.add("hidden"); status.textContent = "No file selected";
     window.SuiteGate.setActive(false);
     window.dispatchEvent(new CustomEvent("ledgerlift:cleared"));
@@ -184,11 +195,14 @@
   window.addEventListener("ledgerlift:review-changed", (event) => {
     if (!state.review) return;
     state.cleaner?.syncReviewData();
+    state.mapper?.refresh();
+    state.accountMapper?.sync();
     state.rows = state.review.getWorkingRows();
     if (["edit", "restore", "add", "delete", "restore-deleted", "undo", "redo"].includes(event.detail?.type)) {
       state.cleaned = false;
       state.cleanSummary = null;
       state.tx = [];
+      state.validationReport = null;
       $("results").classList.add("hidden");
     }
   });
@@ -196,14 +210,97 @@
     if (!state.cleaner) return;
     state.rows = state.review.getWorkingRows();
     state.cleanSummary = state.cleaner.getSummary();
+    state.mapper?.refresh();
+    state.accountMapper?.sync();
+    state.validationReport = null;
     if (event.detail?.type !== "review-change") state.cleaned = true;
     state.tx = [];
     $("results").classList.add("hidden");
   });
-  window.addEventListener("ledgerlift:review-edited", () => { state.cleaned = false; state.cleanSummary = null; state.tx = []; $("results").classList.add("hidden"); });
+  window.addEventListener("ledgerlift:review-edited", () => { state.cleaned = false; state.cleanSummary = null; state.tx = []; state.validationReport = null; $("results").classList.add("hidden"); });
   $("analyze").addEventListener("click", analyze);
   $("download").addEventListener("click", () => { try { if (window.LedgerLiftWorkspace && !window.LedgerLiftWorkspace.canExport()) { window.SuiteGate.message("Review the preview and resolve every row marked Review before exporting."); return; } if (state.tx.some((transaction) => !transaction.ok)) { window.SuiteGate.message("Resolve every row marked Review before exporting."); return; } if (!state.source && window.SuiteGate.used()) { window.SuiteGate.showUpgrade(); return; } const blob = new Blob([iif()], { type: "text/plain" }), anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob); anchor.download = `${state.name}.iif`; anchor.click(); setTimeout(() => URL.revokeObjectURL(anchor.href), 1000); if (!state.source) window.SuiteGate.markUsed(); window.dispatchEvent(new Event("ledgerlift:exported")); } catch (error) { window.SuiteGate.message(error.message); } });
-  window.LedgerLiftCore = { state, analyze, cleanRows, renderRows, exportIif: iif, getTier: tier, markCleanReady: () => { state.cleaned = true; }, syncReviewRows: () => { if (state.review) state.rows = state.review.getWorkingRows(); } };
+  function setMapping(mapping) {
+    const byRole = mapping?.byRole || {};
+    [["date", byRole.transactionDate || byRole.postedDate], ["desc", byRole.description || byRole.memo || byRole.vendor || byRole.name], ["amount", byRole.amount], ["debit", byRole.debit], ["credit", byRole.credit]].forEach(([id, value]) => {
+      const select = $(id);
+      if (select && value && Array.from(select.options).some((option) => option.value === value)) select.value = value;
+    });
+    state.amountMode = mapping?.amountMode === "debit-credit" ? "debit-credit" : "signed";
+    const amountMode = $("amountMode");
+    if (amountMode) amountMode.value = state.amountMode;
+    state.mapping = mapping;
+  }
+  function setAccountMapping(mapping) {
+    const sourceAccount = mapping?.sourceAccount?.name;
+    if (sourceAccount && $("bank")) $("bank").value = sourceAccount;
+    state.accountMapping = mapping;
+  }
+
+  function projectSnapshot() {
+    const reviewState = state.review?.getState?.() || { headers: state.headers, activeEntries: [], deletedEntries: [], originalOrder: [], currentOrder: [] };
+    const mapperState = state.mapper?.getState?.() || {};
+    const accountState = state.accountMapper?.getState?.() || {};
+    return {
+      schemaVersion: 1,
+      headers: [...state.headers],
+      fileMeta: state.fileMeta ? { name: state.fileMeta.name || "transactions", type: state.fileMeta.type || "", size: Number(state.fileMeta.size) || 0 } : { name: `${state.name || "transactions"}.csv`, type: "", size: 0 },
+      format: state.format, delimiter: state.delimiter, worksheetName: state.worksheetName, worksheetIndex: state.worksheetIndex, headerRow: state.headerRow,
+      importWarnings: (state.importWarnings || []).map((warning) => ({ level: warning.level || "info", message: warning.message || String(warning) })),
+      rowCount: reviewState.totalRows || reviewState.activeEntries?.length || 0,
+      review: { headers: [...(reviewState.headers || state.headers)], activeEntries: reviewState.activeEntries || [], deletedEntries: reviewState.deletedEntries || [], originalOrder: reviewState.originalOrder || [], currentOrder: reviewState.currentOrder || [], deletedOrder: (reviewState.deletedEntries || []).map((entry) => entry.id) },
+      mapping: { columns: (mapperState.columns || []).map((column) => ({ id: column.id, index: column.index, header: column.header, role: column.role, origin: column.origin, confirmed: column.confirmed })), mappings: mapperState.mappings || {}, amountMode: mapperState.amountMode || "unresolved" },
+      accountMapping: { destinations: accountState.destinations || [], sourceAccount: accountState.sourceAccount || { destinationId: "", accountType: "BANK" }, defaults: accountState.defaults || {}, records: (accountState.records || []).map((record) => ({ id: record.id, destinationId: record.destinationId || "", origin: record.origin || "none", confirmed: Boolean(record.confirmed), ignored: Boolean(record.ignored), defaultMapping: Boolean(record.defaultMapping) })) },
+      workflow: { cleaned: Boolean(state.cleaned), cleanSummary: state.cleaner?.getSummary?.() || state.cleanSummary || null, currentStep: Number(window.LedgerLiftWorkspace?.state?.current) || 2 },
+      currentStep: Number(window.LedgerLiftWorkspace?.state?.current) || 2
+    };
+  }
+
+  async function saveProject(name) {
+    if (!state.imported || !state.projectStore) return { ok: false, reason: "Import a file before saving a project." };
+    let result;
+    try { result = await state.projectStore.save(name, projectSnapshot(), state.projectId); } catch { return { ok: false, reason: "LedgerLift could not save this project on the device." }; }
+    if (result.ok) { state.projectId = result.project.id; state.projectName = result.project.name; window.dispatchEvent(new CustomEvent("ledgerlift:project-saved", { detail: { project: result.project } })); }
+    return result;
+  }
+
+  async function listProjects() { try { return await state.projectStore?.list?.() || []; } catch { return []; } }
+
+  async function loadProject(id) {
+    const project = await state.projectStore?.load?.(id);
+    if (!project) return { ok: false, reason: "That saved project could not be found on this device." };
+    const headers = project.headers || project.review?.headers || [];
+    state.review = window.LedgerLiftReviewModel?.create({ headers, rows: [], savedState: project.review, tier: tier() }) || null;
+    state.cleaner = state.review && window.LedgerLiftCleaner?.create({ review: state.review, tier: tier(), suggestedRoles: {} });
+    state.mapper = state.review && window.LedgerLiftMapper?.create({ review: state.review, cleaner: state.cleaner, tier: tier(), suggestedRoles: {}, savedState: project.mapping });
+    state.destinationLibrary = window.LedgerLiftDestinationLibrary?.create({ tier: tier() }) || null;
+    state.accountMapper = state.review && window.LedgerLiftAccountMapper?.create({ review: state.review, mapper: state.mapper, tier: tier(), initialDestinations: state.destinationLibrary?.list?.() || [], savedState: project.accountMapping, templates: window.LedgerLiftAccountMappingTemplates?.create({ tier: tier() }) });
+    state.validator = state.review && window.LedgerLiftValidator?.create({ review: state.review, mapper: state.mapper, accountMapper: state.accountMapper, tier: tier() });
+    Object.assign(state, { imported: true, source: false, projectId: project.id, projectName: project.name, name: project.name, fileMeta: project.fileMeta || { name: `${project.name}.csv` }, format: project.format || "", delimiter: project.delimiter || "", worksheetName: project.worksheetName || "", worksheetIndex: Number(project.worksheetIndex) || 0, headerRow: Number(project.headerRow) || 0, importWarnings: project.importWarnings || [], importErrors: [], importPreview: null, suggestions: null, headers, rows: state.review?.getWorkingRows?.() || [], tx: [], validationReport: null, cleaned: Boolean(project.workflow?.cleaned), cleanSummary: project.workflow?.cleanSummary || null });
+    ["date", "desc", "amount", "debit", "credit"].forEach(options);
+    window.SuiteGate.update(false);
+    window.dispatchEvent(new CustomEvent("ledgerlift:project-loaded", { detail: { project: { id: project.id, name: project.name, rowCount: project.rowCount, format: project.format, worksheetName: project.worksheetName, currentStep: project.currentStep }, workflow: project.workflow || {} } }));
+    return { ok: true, project: { id: project.id, name: project.name, rowCount: project.rowCount } };
+  }
+
+  async function deleteProject(id) { let result; try { result = await state.projectStore?.remove?.(id); } catch { result = { ok: false, reason: "LedgerLift could not remove this project." }; } if (result?.ok) window.dispatchEvent(new CustomEvent("ledgerlift:project-deleted", { detail: { id } })); return result || { ok: false, reason: "Saved projects are unavailable." }; }
+
+  window.addEventListener("ledgerlift:account-mapping-changed", () => { const destinations = state.accountMapper?.getState?.().destinations; if (destinations?.length || state.destinationLibrary?.limit) state.destinationLibrary?.replace?.(destinations || []); });
+  const mapperScript = document.createElement("script");
+  mapperScript.src = "mapper.js?v=8f5e2b2";
+  const templateScript = document.createElement("script");
+  templateScript.src = "mapping-templates.js?v=8f5e2b2";
+  const accountTemplateScript = document.createElement("script");
+  accountTemplateScript.src = "account-mapping-templates.js?v=8f5e2b3";
+  const accountMapperScript = document.createElement("script");
+  accountMapperScript.src = "account-mapper.js?v=8f5e2b3";
+  const destinationLibraryScript = document.createElement("script");
+  destinationLibraryScript.src = "destination-library.js?v=8f5e2b5";
+  const validatorScript = document.createElement("script");
+  validatorScript.src = "validator.js?v=8f5e2b4";
+  const projectStoreScript = document.createElement("script");
+  projectStoreScript.src = "project-store.js?v=8f5e2b5";
+  window.LedgerLiftCore = { state, analyze, validate: validateCurrent, cleanRows, renderRows, exportIif: iif, getTier: tier, setMapping, setAccountMapping, saveProject, listProjects, loadProject, deleteProject, markCleanReady: () => { state.cleaned = true; }, markMapColumnsReady: (mapping) => { setMapping(mapping); }, markMapAccountsReady: (mapping) => { setAccountMapping(mapping); }, syncReviewRows: () => { if (state.review) state.rows = state.review.getWorkingRows(); } };
   const importerScript = document.createElement("script");
   importerScript.src = "importer.js?v=8f5e2b1";
   importerScript.onload = () => {
@@ -212,7 +309,7 @@
     reviewScript.onload = () => {
       const cleanerScript = document.createElement("script");
       cleanerScript.src = "cleaner.js?v=8f5e2b1";
-      cleanerScript.onload = () => { const workspaceScript = document.createElement("script"); workspaceScript.src = "workspace.js?v=8f5e2b1"; document.head.append(workspaceScript); };
+      cleanerScript.onload = () => { mapperScript.onload = () => { templateScript.onload = () => { accountTemplateScript.onload = () => { destinationLibraryScript.onload = () => { accountMapperScript.onload = () => { validatorScript.onload = () => { projectStoreScript.onload = () => { state.projectStore = window.LedgerLiftProjectStore?.create({ tier: tier() }) || null; const workspaceScript = document.createElement("script"); workspaceScript.src = "workspace.js?v=8f5e2b5"; document.head.append(workspaceScript); }; document.head.append(projectStoreScript); }; document.head.append(validatorScript); }; document.head.append(accountMapperScript); }; document.head.append(destinationLibraryScript); }; document.head.append(accountTemplateScript); }; document.head.append(templateScript); }; document.head.append(mapperScript); };
       document.head.append(cleanerScript);
     };
     document.head.append(reviewScript);

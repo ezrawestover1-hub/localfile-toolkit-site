@@ -26,7 +26,7 @@
     return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date.getTime() : NaN;
   };
 
-  function createReviewModel({ headers = [], rows = [], rowWarnings = [], tier = "free", historyLimit } = {}) {
+  function createReviewModel({ headers = [], rows = [], rowWarnings = [], tier = "free", historyLimit, savedState = null } = {}) {
     const columns = headers.map((header) => String(header));
     const limit = Math.max(10, Number(historyLimit) || HISTORY_LIMITS[tier] || HISTORY_LIMITS.free);
     let nextId = 1;
@@ -58,6 +58,21 @@
       activeOrder.push(id);
       originalOrder.push(id);
     });
+
+    function hydrate(snapshot) {
+      if (!snapshot?.activeEntries?.length && !snapshot?.deletedEntries?.length) return;
+      entries.clear(); activeOrder = []; deletedOrder = []; originalOrder.length = 0; selectedIds.clear(); deletedSelectedIds.clear();
+      const all = [...(snapshot.activeEntries || []), ...(snapshot.deletedEntries || [])];
+      const seen = new Set();
+      all.forEach((entry) => { if (!entry?.id || seen.has(entry.id)) return; seen.add(entry.id); entries.set(entry.id, cloneEntry(entry)); });
+      const activeIds = new Set((snapshot.activeEntries || []).map((entry) => entry.id));
+      const deletedIds = new Set((snapshot.deletedEntries || []).map((entry) => entry.id));
+      activeOrder = (snapshot.currentOrder || [...activeIds]).filter((id) => activeIds.has(id) && entries.has(id));
+      deletedOrder = (snapshot.deletedOrder || [...deletedIds]).filter((id) => deletedIds.has(id) && entries.has(id));
+      originalOrder.push(...(snapshot.originalOrder || [...entries.keys()]).filter((id) => entries.has(id)));
+      nextId = Math.max(0, ...[...entries.keys()].map((id) => Number(String(id).replace(/^row-/, "")) || 0)) + 1;
+    }
+    hydrate(savedState);
 
     function capture() {
       return {
