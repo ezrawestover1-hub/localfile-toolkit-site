@@ -3,6 +3,7 @@
   "compatibility_date": "2026-07-10",
   "main": "worker.js",
   "vars": {
+    "REQUIRE_DURABLE_RATE_LIMITER": "true",
     "PADDLE_API_BASE_URL": "https://sandbox-api.paddle.com",
     "AUTH_EMAIL_API_URL": "https://api.resend.com/emails",
     "AUTH_EMAIL_FROM_ADDRESS": "LocalFile Toolkit <noreply@localfiletoolkit.com>",
@@ -20,9 +21,19 @@
   },
   "assets": {
     "directory": ".",
-    "html_handling": "auto-trailing-slash",
+    "html_handling": "none",
     "not_found_handling": "none"
   },
+  "ratelimits": [
+    {
+      "name": "RATE_LIMITER",
+      "namespace_id": "20260713",
+      "simple": {
+        "limit": 8,
+        "period": 60
+      }
+    }
+  ],
   "d1_databases": [
     {
       "binding": "LICENSE_DB",
