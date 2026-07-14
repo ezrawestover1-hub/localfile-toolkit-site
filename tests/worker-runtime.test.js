@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { handleRequest } from "../worker.js";
 
-test("the Worker serves the homepage when the root asset route falls through", async () => {
+test("the Worker serves index assets when directory routes fall through", async () => {
   const requestedPaths = [];
   const env = {
     ASSETS: {
@@ -14,8 +14,11 @@ test("the Worker serves the homepage when the root asset route falls through", a
   };
 
   const response = await handleRequest(new Request("https://example.test/"), env);
+  const accountResponse = await handleRequest(new Request("https://example.test/account/"), env);
 
   assert.equal(response.status, 200);
   assert.equal(await response.text(), "homepage");
-  assert.deepEqual(requestedPaths, ["/index.html"]);
+  assert.equal(accountResponse.status, 200);
+  assert.equal(await accountResponse.text(), "homepage");
+  assert.deepEqual(requestedPaths, ["/index.html", "/account/index.html"]);
 });
