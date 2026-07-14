@@ -282,7 +282,7 @@ test("SEO foundations are present and sitemap excludes private routes", () => {
 test("every public product and format page has complete SEO metadata", () => {
   const sitemap = read("sitemap.xml");
   const sitemapUrls = [...sitemap.matchAll(/<loc>(https:\/\/localfiletoolkit\.com\/[^<]+)<\/loc>/g)].map((match) => match[1]);
-  const pages = sitemapUrls.filter((url) => /https:\/\/localfiletoolkit\.com\/(ledgerlift|pixelport|contactcraft|calendarflow|captionshift)\//.test(url));
+  const pages = sitemapUrls.filter((url) => /https:\/\/localfiletoolkit\.com\/(ledgerlift|pixelport|contactcraft|calendarflow|captionshift)\//.test(url) && !/https:\/\/localfiletoolkit\.com\/ledgerlift\/guides\//.test(url));
   const titles = new Set();
   const descriptions = new Set();
   const getMeta = (content, attribute, value) => content.match(new RegExp(`<meta[^>]+${attribute}=["']${value}["'][^>]+content=["']([^"']+)["']`, "i"))?.[1]
@@ -394,6 +394,49 @@ test("LedgerHarbor high-intent guides have distinct depth and FAQ parity", () =>
     const visibleQuestions = [...content.matchAll(/<summary>([^<]+)<\/summary>/gi)].map((match) => match[1].trim());
     assert.deepEqual(structuredQuestions, visibleQuestions, `${file} FAQ questions match visible summaries`);
   });
+});
+
+test("LedgerHarbor education cluster is indexable, linked, and honest", () => {
+  const guides = [
+    "csv-to-iif-column-mapping-guide.html",
+    "signed-amount-vs-debit-credit.html",
+    "prepare-bank-csv-for-iif.html",
+    "common-csv-formatting-errors.html",
+    "iif-export-review-checklist.html"
+  ];
+  const titles = new Set();
+  const descriptions = new Set();
+  const guideRoutes = new Set(guides);
+  guides.forEach((name) => {
+    const file = `ledgerlift/guides/${name}`;
+    const content = read(file);
+    const title = content.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
+    const description = content.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i)?.[1];
+    assert.ok(title && description, `${file} metadata`);
+    titles.add(title); descriptions.add(description);
+    assert.match(content, new RegExp(`<link[^>]+rel="canonical"[^>]+https://localfiletoolkit\\.com/ledgerlift/guides/${name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}`), `${file} canonical`);
+    assert.match(content, /name="robots" content="index,follow"/i, `${file} robots`);
+    assert.equal((content.match(/<h1\b/gi) || []).length, 1, `${file} one H1`);
+    assert.match(content, /property="og:title"/i, `${file} Open Graph title`);
+    assert.match(content, /property="og:description"/i, `${file} Open Graph description`);
+    assert.match(content, /property="og:url"/i, `${file} Open Graph URL`);
+    assert.match(content, /name="twitter:title"/i, `${file} Twitter title`);
+    assert.match(content, /name="twitter:description"/i, `${file} Twitter description`);
+    assert.match(content, /name="twitter:card"/i, `${file} Twitter card`);
+    assert.match(content, /"@type":"BreadcrumbList"/, `${file} BreadcrumbList`);
+    assert.match(content, /href="\.\.\/index\.html#converter"|href="\.\.\/[^\"]+to-iif\.html"/, `${file} relevant workflow link`);
+    const related = [...content.matchAll(/href="([^"]+\.html)"/g)].map((match) => match[1]).filter((href) => guideRoutes.has(href));
+    assert.ok(new Set(related).size >= 2, `${file} related guide links`);
+    assert.match(content, /<h2[^>]*>[^<]*(?:limitations?|review guidance)[^<]*<\/h2>/i, `${file} limitations or review guidance`);
+    assert.doesNotMatch(content, /<meta[^>]+name="keywords"/i, `${file} no meta keywords`);
+    assert.doesNotMatch(`${title} ${description}`, /universal compatibility|perfect preservation|guaranteed (?:results|imports?)|five-star|\brating\b|\btestimonial\b/i, `${file} no prohibited promotional claims`);
+  });
+  assert.equal(titles.size, guides.length);
+  assert.equal(descriptions.size, guides.length);
+  const sitemap = read("sitemap.xml");
+  guides.forEach((name) => assert.match(sitemap, new RegExp(`https://localfiletoolkit\\.com/ledgerlift/guides/${name}`), `${name} sitemap`));
+  assert.match(sitemap, /https:\/\/localfiletoolkit\.com\/ledgerlift\/guides\//, "guide area sitemap");
+  ["account/", "checkout-portal/", "api/", "license/", "purchase-success"].forEach((route) => assert.doesNotMatch(sitemap, new RegExp(route.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")), `${route} excluded from sitemap`));
 });
 
 test("PixelPort SEO pages have unique metadata, format guidance, structured data, and sitemap coverage", () => {
