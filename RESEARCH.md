@@ -2,8 +2,8 @@
 
 This lineup was selected to balance one broad search category (image conversion) with four high-intent migration/export problems that can be handled locally in a browser.
 
-- LedgerLift: CSV to IIF for basic QuickBooks Desktop bank transactions.
-- PixelPort: common raster image conversion and resizing.
+- LedgerHarbor: CSV to IIF for basic QuickBooks Desktop bank transactions.
+- PixelRefinery: common raster image conversion and resizing.
 - ContactCraft: vCard/VCF contact exports and CSV spreadsheets.
 - CalendarFlow: iCalendar/ICS event exports and CSV spreadsheets.
 - CaptionShift: common web/video subtitle text formats.

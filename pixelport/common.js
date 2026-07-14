@@ -88,9 +88,9 @@
   }
 
   function tierLabel() {
-    if (tierSource === "bundle") return "INCLUDED WITH BUNDLE · PixelPort Plus access";
-    if (tier === "plus") return "PLUS · PixelPort Plus workspace";
-    if (tier === "standard") return "STANDARD · PixelPort Standard workspace";
+    if (tierSource === "bundle") return "INCLUDED WITH BUNDLE · PixelRefinery Plus access";
+    if (tier === "plus") return "PLUS · PixelRefinery Plus workspace";
+    if (tier === "standard") return "STANDARD · PixelRefinery Standard workspace";
     return "FREE · 1 image per conversion · 20 MB max · 1 completed export per browser installation";
   }
 
@@ -123,8 +123,8 @@
     if (freeCalloutCopy) freeCalloutCopy.lastChild.textContent = " Use the converter above to load, preview, and export one real image before choosing a paid plan.";
     if (pricingCopy) pricingCopy.textContent = "Your first complete image export is free. Paid plans begin only when you need another image.";
     if (freeProof) { freeProof.querySelector("strong")?.replaceChildren(document.createTextNode("One complete image free")); freeProof.querySelector("small")?.replaceChildren(document.createTextNode("Test the actual conversion before paying.")); }
-    if (upgradeTitle) upgradeTitle.textContent = "Your free PixelPort image allowance has been used";
-    if (upgradeCopy) upgradeCopy.textContent = "Keep converting with PixelPort Standard, or review PixelPort Plus and the complete bundle when you deliberately choose an upgrade.";
+    if (upgradeTitle) upgradeTitle.textContent = "Your free PixelRefinery image allowance has been used";
+    if (upgradeCopy) upgradeCopy.textContent = "Keep converting with PixelRefinery Standard, or review PixelRefinery Plus and the complete bundle when you deliberately choose an upgrade.";
   }
 
   function used() { try { return localStorage.getItem(key) === "used"; } catch { return false; } }
@@ -174,13 +174,13 @@
         const description = card.querySelector(".muted"), list = card.querySelector("ul"), button = card.querySelector("[data-checkout]");
         if (description) description.textContent = "Batch conversion, reusable presets, controlled filenames, custom backgrounds, and web-size optimization.";
         if (list) { list.replaceChildren(...["Everything in Standard", "Batch image queue", "Reusable presets", "Background, filename, and optimization controls"].map(text => { const item = document.createElement("li"); item.textContent = text; return item; })); }
-        if (button) button.textContent = "Get PixelPort Plus";
+        if (button) button.textContent = "Get PixelRefinery Plus";
       });
       document.querySelectorAll(".compare tr").forEach(row => {
         const label = row.querySelector("th")?.textContent || "";
         if (/Local processing|Core conversion and export|Reusable presets|Advanced workflow tools/.test(label)) { const cells = row.querySelectorAll("td"); if (cells[1]) cells[1].textContent = "Yes"; if (cells[2]) cells[2].textContent = "Yes"; }
       });
-      document.querySelectorAll(".faq details").forEach(detail => { if (detail.querySelector("summary")?.textContent.includes("subscription")) { const answer = detail.querySelector("p"); if (answer) answer.textContent = "No. It is a one-time license with no recurring subscription or automatic renewal. PixelPort Plus includes batch conversion, reusable presets, background and filename controls, and web optimization."; } });
+      document.querySelectorAll(".faq details").forEach(detail => { if (detail.querySelector("summary")?.textContent.includes("subscription")) { const answer = detail.querySelector("p"); if (answer) answer.textContent = "No. It is a one-time license with no recurring subscription or automatic renewal. PixelRefinery Plus includes batch conversion, reusable presets, background and filename controls, and web optimization."; } });
       return;
     }
     document.querySelectorAll("#plus-plan").forEach(card => {
@@ -204,7 +204,7 @@
     document.querySelectorAll(".faq details").forEach(detail => {
       if (detail.querySelector("summary")?.textContent.includes("subscription")) {
         const answer = detail.querySelector("p");
-        if (answer) answer.textContent = "No. It is a one-time license with no recurring subscription or automatic renewal. PixelPort Plus includes batch conversion, reusable presets, background and filename controls, and web optimization.";
+        if (answer) answer.textContent = "No. It is a one-time license with no recurring subscription or automatic renewal. PixelRefinery Plus includes batch conversion, reusable presets, background and filename controls, and web optimization.";
       }
     });
   }

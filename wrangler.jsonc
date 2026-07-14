@@ -4,6 +4,9 @@
   "main": "worker.js",
   "vars": {
     "REQUIRE_DURABLE_RATE_LIMITER": "true",
+    "PADDLE_CHECKOUT_ENVIRONMENT": "sandbox",
+    "PADDLE_CHECKOUT_ENABLED": "false",
+    "PADDLE_CLIENT_TOKEN": "test_e1fd568107eae84a07b7a054c97",
     "PADDLE_API_BASE_URL": "https://sandbox-api.paddle.com",
     "AUTH_EMAIL_API_URL": "https://api.resend.com/emails",
     "AUTH_EMAIL_FROM_ADDRESS": "LocalFile Toolkit <noreply@localfiletoolkit.com>",
@@ -22,6 +25,7 @@
   "assets": {
     "directory": ".",
     "binding": "ASSETS",
+    "run_worker_first": ["/checkout-portal/paddle-config.js"],
     "html_handling": "none",
     "not_found_handling": "none"
   },
@@ -42,5 +46,57 @@
       "database_id": "27539e48-ad0c-4441-b552-e94b5f448db1",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+  "env": {
+    "production": {
+      "name": "localfile-toolkit-site-production",
+      "vars": {
+        "REQUIRE_DURABLE_RATE_LIMITER": "true",
+        "PADDLE_CHECKOUT_ENVIRONMENT": "production",
+        "PADDLE_CHECKOUT_ENABLED": "true",
+        "PADDLE_API_BASE_URL": "https://api.paddle.com",
+        "PADDLE_ENFORCE_WEBHOOK_IPS": "true",
+        "AUTH_EMAIL_API_URL": "https://api.resend.com/emails",
+        "AUTH_EMAIL_FROM_ADDRESS": "LocalFile Toolkit <noreply@localfiletoolkit.com>",
+        "SUPPORT_EMAIL_API_URL": "https://api.resend.com/emails",
+        "SUPPORT_EMAIL_FROM_ADDRESS": "LocalFile Toolkit <noreply@localfiletoolkit.com>",
+        "PADDLE_PRICE_LEDGERLIFT_STANDARD": "pri_01kxfnrxw6j4cw31s0442h7bpg",
+        "PADDLE_PRICE_LEDGERLIFT_PLUS": "pri_01kxfnry30e4230zrx2znnh1t7",
+        "PADDLE_PRICE_PIXELPORT_STANDARD": "pri_01kxfnrydctbw9j7hhcvqpa96d",
+        "PADDLE_PRICE_PIXELPORT_PLUS": "pri_01kxfnryh6kqbx5hxzz7ps7vgm",
+        "PADDLE_PRICE_CONTACTCRAFT_STANDARD": "pri_01kxfnryv6b99nt0kc10syjra4",
+        "PADDLE_PRICE_CONTACTCRAFT_PLUS": "pri_01kxfnryz9vgp5qgcqjd62czx3",
+        "PADDLE_PRICE_CALENDARFLOW_STANDARD": "pri_01kxfnrz8qrkxv7n5ets43bfq0",
+        "PADDLE_PRICE_CALENDARFLOW_PLUS": "pri_01kxfnrzcsyfy7f25cg8kmvn0y",
+        "PADDLE_PRICE_CAPTIONSHIFT_STANDARD": "pri_01kxfnrzpsrqbb0kmrpjekf1wa",
+        "PADDLE_PRICE_CAPTIONSHIFT_PLUS": "pri_01kxfnrzv1jrbpd2dz74e9pfzx",
+        "PADDLE_PRICE_SUITE_BUNDLE": "pri_01kxfns04rqqa968rf1j7z1nrj"
+      },
+      "d1_databases": [
+        {
+          "binding": "LICENSE_DB",
+          "database_name": "localfile-toolkit-licenses-production",
+          "database_id": "5c9fbc68-b4cd-41bb-9bd1-11781fcfcf76",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "assets": {
+        "directory": ".",
+        "binding": "ASSETS",
+        "run_worker_first": ["/checkout-portal/paddle-config.js"],
+        "html_handling": "none",
+        "not_found_handling": "none"
+      },
+      "ratelimits": [
+        {
+          "name": "RATE_LIMITER",
+          "namespace_id": "20260713",
+          "simple": {
+            "limit": 8,
+            "period": 60
+          }
+        }
+      ]
+    }
+  }
 }

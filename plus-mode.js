@@ -2,8 +2,8 @@
   "use strict";
   const product = document.body.dataset.product;
   const products = {
-    ledgerlift: { name: "LedgerLift", description: "Advanced CSV-to-IIF workflows with reusable profiles, categorization, duplicate review, and reports." },
-    pixelport: { name: "PixelPort", description: "Batch image conversion with reusable presets, controlled filenames, custom backgrounds, and web optimization." },
+    ledgerlift: { name: "LedgerHarbor", description: "Advanced CSV-to-IIF workflows with reusable profiles, categorization, duplicate review, and reports." },
+    pixelport: { name: "PixelRefinery", description: "Batch image conversion with reusable presets, controlled filenames, custom backgrounds, and web optimization." },
     contactcraft: { name: "ContactCraft", description: "Duplicate review, merge tools, field cleanup, output mapping, and validation reporting for contact files." },
     calendarflow: { name: "CalendarFlow", description: "Calendar merging, filtering, recurrence normalization, saved presets, and validation reporting." },
     captionshift: { name: "CaptionShift", description: "Batch subtitle conversion with timing presets, cleanup tools, and validation reporting." }
