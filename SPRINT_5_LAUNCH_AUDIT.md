@@ -1,6 +1,6 @@
 # Sprint 5 launch audit
 
-Status: **Production configuration deployed; controlled rollout pending end-to-end live payment verification**
+Status: **Repository/staging audit complete; production verification and controlled rollout remain pending**
 
 Date: 2026-07-13
 
@@ -23,14 +23,17 @@ on Cloudflare, email, Paddle, and legal configuration outside this repository.
   390px mobile widths.
 - Product-specific entitlement, bundle, webhook, revocation, retry, and route
   gating tests pass.
-- Local checkout remains sandbox-safe; production checkout is configured with the live catalog and client token.
+- Local checkout remains sandbox-safe; production live-catalog configuration is
+  declared in the deployment configuration but still requires verification on
+  the final production domain.
 
 ## Current production blocker
 
-No code or configuration blocker is currently reported by `/api/readiness`. The
-remaining launch risk is operational: no real live payment and webhook fulfillment
-has been completed in this rollout, so the first transaction should be monitored
-through Paddle notification logs, Worker logs, and D1 entitlement state.
+The production `/api/readiness` result has not been treated as verified in this
+repository audit. The remaining launch risk includes the domain, bindings,
+secrets, email, legal configuration, and live payment/webhook fulfillment. The
+first transaction must be monitored through Paddle notification logs, Worker logs,
+and D1 entitlement state after the production readiness checks are green.
 
 ## Required owner actions before launch
 
