@@ -279,6 +279,47 @@ test("SEO foundations are present and sitemap excludes private routes", () => {
   const sitemap = read("sitemap.xml"); assert.doesNotMatch(sitemap, /\/api\/|checkout-portal|license|purchase-success|tests|migrations/); assert.match(read("robots.txt"), /Sitemap: https:\/\/localfiletoolkit\.com\/sitemap\.xml/);
 });
 
+test("every public product and format page has complete SEO metadata", () => {
+  const sitemap = read("sitemap.xml");
+  const sitemapUrls = [...sitemap.matchAll(/<loc>(https:\/\/localfiletoolkit\.com\/[^<]+)<\/loc>/g)].map((match) => match[1]);
+  const pages = sitemapUrls.filter((url) => /https:\/\/localfiletoolkit\.com\/(ledgerlift|pixelport|contactcraft|calendarflow|captionshift)\//.test(url));
+  const titles = new Set();
+  const descriptions = new Set();
+  const getMeta = (content, attribute, value) => content.match(new RegExp(`<meta[^>]+${attribute}=["']${value}["'][^>]+content=["']([^"']+)["']`, "i"))?.[1]
+    || content.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+${attribute}=["']${value}["']`, "i"))?.[1] || "";
+  pages.forEach((url) => {
+    const pathname = new URL(url).pathname;
+    const file = pathname.endsWith("/") ? `${pathname.slice(1)}index.html` : pathname.slice(1);
+    const content = read(file);
+    const title = content.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() || "";
+    const description = getMeta(content, "name", "description");
+    const canonical = content.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i)?.[1]
+      || content.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["']canonical["']/i)?.[1] || "";
+    assert.ok(title, `${file} title`);
+    assert.ok(description, `${file} description`);
+    assert.equal(canonical, url, `${file} canonical`);
+    assert.equal(getMeta(content, "name", "robots"), "index,follow", `${file} robots`);
+    ["og:title", "og:description", "og:url", "og:type"].forEach((property) => assert.ok(getMeta(content, "property", property), `${file} ${property}`));
+    ["twitter:title", "twitter:description", "twitter:card"].forEach((name) => assert.ok(getMeta(content, "name", name), `${file} ${name}`));
+    assert.equal((content.match(/<h1\b/gi) || []).length, 1, `${file} one primary H1`);
+    assert.doesNotMatch(content, /<meta[^>]+name=["']keywords["']/i, `${file} has no keywords meta tag`);
+    const jsonScripts = [...content.matchAll(/<script type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi)];
+    assert.ok(jsonScripts.length, `${file} structured data`);
+    const graph = jsonScripts.flatMap((match) => { const data = JSON.parse(match[1]); return data["@graph"] || [data]; });
+    assert.ok(graph.some((item) => item["@type"] === "SoftwareApplication"), `${file} SoftwareApplication`);
+    assert.ok(graph.some((item) => item["@type"] === "BreadcrumbList"), `${file} BreadcrumbList`);
+    assert.ok(graph.some((item) => item["@type"] === "FAQPage"), `${file} FAQPage`);
+    titles.add(title); descriptions.add(description);
+  });
+  const formatPages = pages.filter((url) => !url.endsWith("/"));
+  assert.equal(new Set(formatPages.map((url) => {
+    const pathname = new URL(url).pathname; const file = pathname.slice(1); const content = read(file); return content.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim();
+  })).size, formatPages.length, "format landing titles are unique");
+  assert.equal(new Set(formatPages.map((url) => {
+    const content = read(new URL(url).pathname.slice(1)); return getMeta(content, "name", "description");
+  })).size, formatPages.length, "format landing descriptions are unique");
+});
+
 test("product pages and legal subpages have SEO descriptions", () => {
   ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"].forEach((product) => {
     fs.readdirSync(path.join(root, product)).filter((name) => name.endsWith(".html")).forEach((name) => {
