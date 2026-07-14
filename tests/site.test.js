@@ -370,6 +370,32 @@ test("LedgerLift SEO pages have unique metadata, structured data, headings, and 
   assert.match(read("sitemap.xml"), /ledgerlift\/(bank-csv-to-iif|debit-credit-csv-to-iif|create-iif-from-spreadsheet)\.html/);
 });
 
+test("LedgerHarbor high-intent guides have distinct depth and FAQ parity", () => {
+  const guides = [
+    ["ledgerlift/csv-to-iif-converter.html", "signed-amount CSV mapping"],
+    ["ledgerlift/bank-csv-to-iif.html", "bank-export CSV preparation"],
+    ["ledgerlift/debit-credit-csv-to-iif.html", "separate debit-and-credit mapping"],
+    ["ledgerlift/create-iif-from-spreadsheet.html", "spreadsheet-to-IIF preparation"]
+  ];
+  const relatedPages = ["csv-to-iif-converter.html", "bank-csv-to-iif.html", "debit-credit-csv-to-iif.html", "create-iif-from-spreadsheet.html"];
+  guides.forEach(([file, phrase]) => {
+    const content = read(file);
+    assert.match(content, new RegExp(phrase), `${file} distinct workflow phrase`);
+    assert.match(content, /href="index\.html#converter"/, `${file} working converter link`);
+    const relatedCount = relatedPages.filter((route) => route !== path.basename(file) && content.includes(`href="${route}"`)).length;
+    assert.ok(relatedCount >= 2, `${file} related LedgerHarbor links`);
+    assert.match(content, /<h2[^>]*>[^<]*(?:limitation|compatibility)[^<]*<\/h2>/i, `${file} visible limitations section`);
+
+    const json = [...content.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)]
+      .map((match) => JSON.parse(match[1])).flatMap((data) => data["@graph"] || [data]);
+    const faq = json.find((item) => item["@type"] === "FAQPage");
+    assert.ok(faq, `${file} FAQ structured data`);
+    const structuredQuestions = faq.mainEntity.map((item) => item.name);
+    const visibleQuestions = [...content.matchAll(/<summary>([^<]+)<\/summary>/gi)].map((match) => match[1].trim());
+    assert.deepEqual(structuredQuestions, visibleQuestions, `${file} FAQ questions match visible summaries`);
+  });
+});
+
 test("PixelPort SEO pages have unique metadata, format guidance, structured data, and sitemap coverage", () => {
   const pages = ["pixelport/index.html", "pixelport/png-to-jpg-converter.html", "pixelport/jpg-to-png-converter.html", "pixelport/webp-to-jpg-converter.html", "pixelport/webp-to-png-converter.html", "pixelport/png-to-webp-converter.html", "pixelport/avif-to-jpg-converter.html", "pixelport/avif-to-png-converter.html", "pixelport/private-image-converter.html"];
   const titles = new Set(); const descriptions = new Set();
