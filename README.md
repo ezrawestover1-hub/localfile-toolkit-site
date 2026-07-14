@@ -27,6 +27,17 @@ Five static, privacy-first converter website prototypes:
 
 The converters include strict CSP and hosting header files, no analytics, no remote scripts and connect-src 'none'. File contents are processed locally. Hosting providers may still keep normal HTTP request logs.
 
+## Local verification
+
+Install Node.js 18 or newer, then run:
+
+```bash
+npm run build
+npm test
+```
+
+The build command checks JavaScript syntax and verifies that local HTML assets exist. It does not deploy or require production credentials.
+
 
 ## Payment integration
 
