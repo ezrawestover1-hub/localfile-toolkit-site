@@ -1,6 +1,6 @@
 # Paddle payment setup
 
-The suite is prepared for Paddle Checkout, but it cannot take real money until you create your own Paddle account and insert your public configuration values.
+The suite uses a shared Paddle Checkout portal. Local development defaults to sandbox; the production Worker reads its live client token and price IDs from Worker configuration and secrets.
 
 ## Why Paddle
 
@@ -12,8 +12,8 @@ Create these one-time products/prices in Paddle:
 
 | Product | Standard | Plus |
 |---|---:|---:|
-| LedgerLift | $19.99 | $24.99 |
-| PixelPort | $2.99 | $5.99 |
+| LedgerHarbor | $19.99 | $24.99 |
+| PixelRefinery | $2.99 | $5.99 |
 | ContactCraft | $9.99 | $12.99 |
 | CalendarFlow | $9.99 | $12.99 |
 | CaptionShift | $6.99 | $9.99 |
@@ -22,7 +22,7 @@ Create one additional one-time price:
 
 - Complete Plus Bundle — $39.99 one time; five separate Plus products total $66.95, saving $26.96 (approximately 40% off).
 
-Copy the resulting `pri_...` identifiers into `checkout-portal/paddle-config.js`.
+Configure the resulting `pri_...` identifiers as Worker environment values. The browser receives them only from `/checkout-portal/paddle-config.js`, which is generated at request time by the Worker.
 
 ## One-unit purchase limit
 
@@ -50,7 +50,7 @@ The official public comparison page is `/pricing.html`. It links to the same sha
 
 Create a Paddle client-side token and paste it into `checkout-portal/paddle-config.js`. Client-side tokens are intended for frontend code. Never put a Paddle API key, webhook secret, password, or private signing key into the website files.
 
-Keep `environment: "sandbox"` and a `test_...` token during this verification phase. Keep `checkoutEnabled: false` while fulfillment and launch review are incomplete. Do not switch to production or use a `live_...` token.
+For local development, keep `environment: "sandbox"`, a `test_...` token, and `checkoutEnabled: false`. Production uses `environment: "production"`, a live client token, and live price IDs from Worker configuration; never commit those values to frontend files.
 
 ## Payment methods
 
@@ -73,12 +73,16 @@ Each product is a separate homepage and link, while sharing one domain and check
 
 A successful browser redirect is not proof of payment. Before automatically unlocking paid features:
 
-1. Create a Paddle webhook destination for `transaction.completed`.
+1. Create a Paddle webhook destination for `transaction.completed`, `adjustment.created`, and `adjustment.updated`.
 2. Verify every `Paddle-Signature` against the raw request body and the webhook secret. Fulfillment events move through `processing`, `failed`, and `fulfilled`; only `fulfilled` events are acknowledged as duplicates.
 3. Reject stale timestamps and duplicate event IDs.
 4. Map the completed Paddle price ID to the purchased product and plan.
 5. Issue a server-signed entitlement or license only after the D1 fulfillment batch succeeds, and keep the event retryable when any D1 or Paddle customer lookup fails.
 6. Never store the webhook secret, API key, or license-signing private key in frontend files.
+
+The Worker keeps a durable purchase guard for each active customer/product/plan combination. A second completed transaction is acknowledged so Paddle does not retry it, but it is recorded as `duplicate_purchase` and does not issue another entitlement or activation code. A customer can purchase that plan again only after the original entitlement is revoked by a confirmed adjustment.
+
+Approved full refunds, chargebacks, chargeback warnings, and credits revoke the related entitlement, activation code, and active device tokens. A partial adjustment revokes the affected line item because the product has no fractional access tier. Pending or rejected refunds do not revoke access. Supported Paddle reversal events restore only access revoked for the matching adjustment action. These handlers are idempotent and safe to replay from Paddle notification logs.
 
 The included success page deliberately does not unlock anything. This prevents people from obtaining paid access by visiting a success URL manually.
 

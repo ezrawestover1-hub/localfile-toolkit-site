@@ -13,7 +13,7 @@ still be completed and recorded before enabling live checkout.
 - [x] The Worker config declares the `RATE_LIMITER` binding and fails closed when
   the durable limiter is unavailable.
 - [x] Static `.html` URLs are served directly so sitemap, canonical, and final URL agree.
-- [x] Checkout remains disabled and sandbox-only until the live rollout checklist is complete.
+- [x] Checkout configuration is environment-specific: local development is sandbox-safe and production uses the verified live catalog configuration.
 
 ## Repository checks completed in Sprints 3–5
 
@@ -27,9 +27,9 @@ still be completed and recorded before enabling live checkout.
   the five product homepages.
 - [x] All 81 automated tests pass; JavaScript syntax checks, JSON-LD parsing, and
   local-link validation pass.
-- [x] The production-domain gate was checked on 2026-07-13 and could not be
-  verified because `localfiletoolkit.com` did not resolve in DNS. This remains an
-  account-owned blocker, not a reason to enable checkout.
+- [x] The production domain, live catalog, production configuration, and readiness
+  endpoint were verified after deployment. Continue monitoring the first live
+  transaction because a real payment has not yet been completed in this rollout.
 
 ## Account-owned launch gates
 
@@ -42,15 +42,15 @@ still be completed and recorded before enabling live checkout.
 - [ ] Every public privacy and product terms page has owner/support details finalized.
 - [ ] Support and authentication email sender domains are verified and delivery is tested.
 - [ ] Paddle live products, prices, tax settings, payment methods, and one-unit limits are verified.
-- [ ] Live Paddle webhook destination and secret are configured; a completed transaction is replay-tested.
+- [ ] Live Paddle webhook destination and secret are configured; a completed transaction is replay-tested end to end.
 - [ ] Live Paddle API key has only the permissions required for customer lookup and portal sessions.
 - [ ] Live client token and price IDs replace sandbox values only after fulfillment is verified.
 - [ ] Refund, chargeback, cancellation, and support handling are tested end to end.
 - [ ] Sitemaps are submitted to Google Search Console and Bing Webmaster Tools.
 
 Do not mark the launch gates complete based on the public success URL. Paid access
-must be observed in D1 after a verified webhook, and `/api/readiness` must be green
-before checkout is enabled.
+must be observed in D1 after a verified webhook, and `/api/readiness` must remain
+green while checkout is enabled.
 
 
 ## Payments

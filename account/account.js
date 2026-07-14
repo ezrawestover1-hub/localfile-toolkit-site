@@ -3,8 +3,8 @@ import { restoreEntitlements } from "/license.js";
 const message = document.querySelector("#account-message");
 const productsRoot = document.querySelector("#products");
 const productMeta = {
-  ledgerlift: { name: "LedgerLift", feature: "Private CSV-to-IIF conversion with Plus profiles, categorization, duplicate review, and reports.", home: "/ledgerlift/index.html" },
-  pixelport: { name: "PixelPort", feature: "Private image conversion, batch processing, and Plus export controls.", home: "/pixelport/index.html" },
+  ledgerlift: { name: "LedgerHarbor", feature: "Private CSV-to-IIF conversion with Plus profiles, categorization, duplicate review, and reports.", home: "/ledgerlift/index.html" },
+  pixelport: { name: "PixelRefinery", feature: "Private image conversion, batch processing, and Plus export controls.", home: "/pixelport/index.html" },
   contactcraft: { name: "ContactCraft", feature: "Clean contact conversion with Plus normalization and export tools.", home: "/contactcraft/index.html" },
   calendarflow: { name: "CalendarFlow", feature: "Calendar conversion with Plus batch workflows and flexible export controls.", home: "/calendarflow/index.html" },
   captionshift: { name: "CaptionShift", feature: "Subtitle conversion with Plus batch processing and format workflows.", home: "/captionshift/index.html" }

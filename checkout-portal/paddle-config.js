@@ -1,8 +1,8 @@
 // Public Paddle configuration. Client-side tokens and price IDs are designed to be publishable.
 // Never place a Paddle API key or webhook secret in this file.
 window.LOCALFILE_PADDLE = Object.freeze({
-  environment: "sandbox", // change to "production" after live approval
-  checkoutEnabled: false, // Keep checkout disabled after the supervised sandbox verification pass.
+  environment: "sandbox", // Local fallback; the Worker supplies production config at runtime.
+  checkoutEnabled: false, // Safe local default; production is controlled by Worker variables.
   clientToken: "test_e1fd568107eae84a07b7a054c97", // Sandbox client-side token; safe for Paddle.js, never use an API key here.
   prices: Object.freeze({
     ledgerlift: Object.freeze({ standard: "pri_01kxbnrr880w3zyzznnfhc153h", plus: "pri_01kxbnrrjv6b6fr4m5p55pg75v" }),

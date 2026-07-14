@@ -1,6 +1,6 @@
 # Sprint 5 launch audit
 
-Status: **Not ready for production checkout**
+Status: **Production configuration deployed; controlled rollout pending end-to-end live payment verification**
 
 Date: 2026-07-13
 
@@ -16,21 +16,21 @@ on Cloudflare, email, Paddle, and legal configuration outside this repository.
 - 1,316 local links were checked with no missing targets.
 - All 30 dedicated SEO landing routes have a title, description, canonical URL,
   share image, and exactly one H1.
-- LedgerLift, PixelPort, ContactCraft, CalendarFlow, and CaptionShift each
+- LedgerHarbor, PixelRefinery, ContactCraft, CalendarFlow, and CaptionShift each
   completed a real sample conversion and download in the browser without
   console errors.
 - The five product homepages have no horizontal overflow at 1440px desktop or
   390px mobile widths.
 - Product-specific entitlement, bundle, webhook, revocation, retry, and route
   gating tests pass.
-- Checkout remains sandbox-only and disabled.
+- Local checkout remains sandbox-safe; production checkout is configured with the live catalog and client token.
 
 ## Current production blocker
 
-On 2026-07-13, `localfiletoolkit.com` did not resolve in DNS from the launch
-environment. Until the domain is connected to the Worker through Cloudflare
-Custom Domains, production HTTP, HTTPS, `/api/readiness`, sitemap delivery, and
-checkout-domain approval cannot be verified.
+No code or configuration blocker is currently reported by `/api/readiness`. The
+remaining launch risk is operational: no real live payment and webhook fulfillment
+has been completed in this rollout, so the first transaction should be monitored
+through Paddle notification logs, Worker logs, and D1 entitlement state.
 
 ## Required owner actions before launch
 
@@ -47,10 +47,11 @@ Complete these in order:
    refund, tax, and support language.
 5. Configure and sandbox-test the eleven individual prices plus the bundle;
    then configure the live Paddle webhook, API key, client token, and price IDs.
-6. Run controlled Standard and bundle purchases, confirm product-specific D1
+6. Run controlled Standard and bundle purchases when funds and approval are
+   available, confirm product-specific D1
    entitlements after signed webhooks, and replay duplicate and retry cases.
-7. Only after all gates are green, change the shared checkout portal to live
-   production mode and deploy.
+7. Keep the shared checkout portal in live production mode only while the live
+   webhook, readiness, and monitoring checks remain green.
 8. Submit the final sitemap to Google Search Console and Bing Webmaster Tools.
 
 See [PRODUCTION_ROLLOUT.md](PRODUCTION_ROLLOUT.md) for the detailed operator

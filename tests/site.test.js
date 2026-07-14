@@ -25,6 +25,24 @@ test("pricing page sends every choice to the one shared portal", () => {
   assert.match(pricing, /account-access\.js/);
 });
 
+test("public product names are updated without changing internal product keys", () => {
+  const pricingConfig = read("pricing-config.js");
+  const iconConfig = read("assets/product-icons/config.js");
+  const pricing = read("pricing.html");
+  const checkout = read("checkout-portal/checkout.js");
+  assert.match(pricingConfig, /name: "LedgerHarbor"/);
+  assert.match(pricingConfig, /name: "PixelRefinery"/);
+  assert.match(iconConfig, /ledgerlift: Object\.freeze\(\{ name: "LedgerHarbor"/);
+  assert.match(iconConfig, /pixelport: Object\.freeze\(\{ name: "PixelRefinery"/);
+  assert.match(pricing, /LedgerHarbor/);
+  assert.match(pricing, /PixelRefinery/);
+  assert.doesNotMatch(pricing, /LedgerLift|PixelPort/);
+  assert.match(checkout, /ledgerlift:\{name:"LedgerHarbor"/);
+  assert.match(checkout, /pixelport:\{name:"PixelRefinery"/);
+  assert.match(checkout, /This purchase unlocks LedgerHarbor only/);
+  assert.match(checkout, /This purchase unlocks PixelRefinery only/);
+});
+
 test("paid users receive access actions without exposing a second bundle purchase", () => {
   const access = read("account-access.js");
   assert.match(access, /api\/account\/me/);
@@ -145,10 +163,10 @@ test("LedgerLift ownership is product-specific and routes owned users into a qui
   assert.match(read("plus-mode.js"), /hasBundle/);
   assert.match(read("standard-mode.js"), /hasBundle/);
   assert.match(read("LEDGERLIFT_PRODUCT_MATRIX.md"), /Free \/ unpaid/);
-  assert.match(read("LEDGERLIFT_PRODUCT_MATRIX.md"), /LedgerLift Standard/);
-  assert.match(read("LEDGERLIFT_PRODUCT_MATRIX.md"), /LedgerLift Plus/);
+  assert.match(read("LEDGERLIFT_PRODUCT_MATRIX.md"), /LedgerHarbor Standard/);
+  assert.match(read("LEDGERLIFT_PRODUCT_MATRIX.md"), /LedgerHarbor Plus/);
   assert.match(read("LEDGERLIFT_PRODUCT_MATRIX.md"), /not inferred from owning five individual products/);
-  assert.match(read("checkout-portal/checkout.js"), /This purchase unlocks LedgerLift only/);
+  assert.match(read("checkout-portal/checkout.js"), /This purchase unlocks LedgerHarbor only/);
   assert.match(read("checkout-portal/success.js"), /handoffAuthenticatedBuyer/);
   assert.match(read("checkout-portal/purchase-success.html"), /connect-src 'self'/);
   assert.match(read("_headers"), /\/ledgerlift\/\*[\s\S]*connect-src 'self'/);
@@ -173,15 +191,15 @@ test("PixelPort ownership is product-specific and routes owned users into distin
   assert.match(app, /mayOpenRealDocument/);
   assert.match(plus, /canUsePlus\("pixelport"\)/);
   assert.match(plus, /Batch image queue/);
-  assert.match(checkout, /This purchase unlocks PixelPort only/);
-  assert.match(checkout, /PixelPort Standard only; other products remain separate/);
-  assert.match(checkout, /Batch image queue and reusable presets \(PixelPort Plus\)/);
+  assert.match(checkout, /This purchase unlocks PixelRefinery only/);
+  assert.match(checkout, /PixelRefinery Standard only; other products remain separate/);
+  assert.match(checkout, /Batch image queue and reusable presets \(PixelRefinery Plus\)/);
   assert.match(read("plus-mode.js"), /source: capabilities\.bundle/);
   assert.match(read("_headers"), /\/pixelport\/\*[\s\S]*connect-src 'self'/);
   assert.match(read("pixelport/_headers"), /connect-src 'self'/);
   assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /Free \/ unpaid/);
-  assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /PixelPort Standard/);
-  assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /PixelPort Plus/);
+  assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /PixelRefinery Standard/);
+  assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /PixelRefinery Plus/);
   assert.match(read("PIXELPORT_PRODUCT_MATRIX.md"), /not inferred from owning five individual products/);
 });
 
@@ -332,7 +350,7 @@ test("PixelPort SEO pages have unique metadata, format guidance, structured data
   });
   assert.equal(titles.size, pages.length);
   assert.equal(descriptions.size, pages.length);
-  assert.match(read("pixelport/index.html"), /<title>Private Image Converter for PNG, JPG, WebP and AVIF \| PixelPort<\/title>/);
+  assert.match(read("pixelport/index.html"), /<title>Private Image Converter for PNG, JPG, WebP and AVIF \| PixelRefinery<\/title>/);
   assert.match(read("pixelport/index.html"), /<h1>Convert Images Without Uploading Them<\/h1>/);
   const routes = pages.slice(1).map((file) => file.replace("pixelport/", ""));
   routes.forEach((route) => assert.ok(fs.existsSync(path.join(root, "pixelport", route)), route));
@@ -461,13 +479,17 @@ test("approved product icon assets and canonical mappings are complete", () => {
   publicFiles.forEach((file) => assert.doesNotMatch(read(file), /file:\/\/|\/Users\//));
 });
 
-test("Paddle configuration is sandbox-only for verification", () => {
+test("Paddle static fallback is sandbox-safe and production config is runtime-driven", () => {
   const config = read("checkout-portal/paddle-config.js");
   assert.match(config, /environment: "sandbox"/);
   assert.match(config, /checkoutEnabled: false/);
   assert.match(config, /clientToken: "test_[a-z\d]+"/);
   assert.match(config, /pri_[a-z\d]{26}/);
   assert.doesNotMatch(config, /live_/);
+  const worker = read("worker.js");
+  assert.match(worker, /paddleConfigResponse\(env\)/);
+  assert.match(worker, /PADDLE_CHECKOUT_ENVIRONMENT/);
+  assert.match(worker, /PADDLE_CLIENT_TOKEN/);
 });
 
 test("static HTML URL policy matches sitemap and canonical URLs", () => {
@@ -624,17 +646,20 @@ test("account setup stages passwords until email verification", () => {
   assert.match(read("worker.js"), /account_password_history/);
   assert.doesNotMatch(read("worker.js"), /That account already exists\. Sign in instead/);
   assert.match(read("migrations/0006_password_setup_history.sql"), /account_password_history/);
+  assert.match(read("migrations/0007_auth_hardening.sql"), /attempt_count/);
+  assert.match(read("migrations/0007_auth_hardening.sql"), /processing_token/);
+  assert.match(read("worker.js"), /pbkdf2-sha256/);
   assert.match(read("worker.js"), /pending_user_id/);
   assert.match(read("worker.js"), /Request a new code and try again/);
-  assert.match(read("worker.js"), /SELECT user_id FROM account_pending_passwords/);
-  assert.match(read("worker.js"), /purpose IN \('reset','signup'\)/);
-  assert.match(read("worker.js"), /purpose IN \('signup','reset'\)/);
-  assert.match(read("worker.js"), /verification code remains available/);
+  assert.match(read("worker.js"), /SELECT password_hash,password_salt,iterations,algorithm FROM account_pending_passwords/);
+  assert.match(read("worker.js"), /latestVerificationCode\(env, user\.id, "reset"\)/);
+  assert.match(read("worker.js"), /latestVerificationCode\(env, user\.id, "signup"\)/);
+  assert.match(read("worker.js"), /processing_token/);
   assert.match(read("worker.js"), /ON CONFLICT\(user_id\) DO UPDATE SET password_hash/);
-  assert.match(read("worker.js"), /reset_password_write_failed/);
+  assert.match(read("worker.js"), /password_reused/);
   assert.match(read("worker.js"), /reset_code_consume_failed/);
-  assert.match(read("worker.js"), /Password reset successfully\. Please sign in/);
-  assert.match(read("account/reset.js"), /result\.diagnostic/);
+  assert.match(read("worker.js"), /Password reset successfully/);
+  assert.doesNotMatch(read("account/reset.js"), /result\.diagnostic/);
   assert.match(read("worker.js"), /createAccountSessionJson/);
   assert.match(read("account/reset.js"), /result\.redirect/);
   assert.match(read("account/login.js"), /result\.redirect/);

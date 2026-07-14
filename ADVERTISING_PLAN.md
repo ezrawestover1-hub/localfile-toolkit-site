@@ -28,8 +28,8 @@ product match the intent.
 
 | Campaign | Primary landing pages | Initial intent |
 |---|---|---|
-| LedgerLift | `ledgerlift/csv-to-iif-converter.html`, `bank-csv-to-iif.html`, `debit-credit-csv-to-iif.html` | CSV to IIF, bank CSV to IIF, debit/credit CSV to IIF |
-| PixelPort | `pixelport/png-to-jpg-converter.html`, `jpg-to-png-converter.html`, `webp-to-png-converter.html`, `private-image-converter.html` | Exact image format conversion without uploading |
+| LedgerHarbor | `ledgerlift/csv-to-iif-converter.html`, `bank-csv-to-iif.html`, `debit-credit-csv-to-iif.html` | CSV to IIF, bank CSV to IIF, debit/credit CSV to IIF |
+| PixelRefinery | `pixelport/png-to-jpg-converter.html`, `jpg-to-png-converter.html`, `webp-to-png-converter.html`, `private-image-converter.html` | Exact image format conversion without uploading |
 | ContactCraft | `contactcraft/vcf-to-csv-converter.html`, `csv-to-vcard-converter.html`, `open-vcf-in-excel.html` | Contact files to spreadsheets and vCard conversion |
 | CalendarFlow | `calendarflow/ics-to-csv-converter.html`, `csv-to-ics-converter.html`, `open-ics-in-excel.html` | Calendar events to spreadsheets and back |
 | CaptionShift | `captionshift/srt-to-vtt-converter.html`, `vtt-to-srt-converter.html`, `ass-to-srt-converter.html` | Exact subtitle-format conversion |
@@ -42,7 +42,7 @@ and first heading should describe the same conversion.
 These claims match the current implementation and should remain paired with
 the corresponding landing page.
 
-### LedgerLift
+### LedgerHarbor
 
 - Headline: `CSV to IIF Converter`
 - Headline: `Private Bank CSV Mapping`
@@ -50,7 +50,7 @@ the corresponding landing page.
 - Description: `Map dates, descriptions, and signed amounts locally. Preview and validate rows before creating an IIF file.`
 - Description: `Separate debit and credit columns are explained clearly. Review limitations before importing.`
 
-### PixelPort
+### PixelRefinery
 
 - Headline: `Private PNG to JPG`
 - Headline: `Convert Images Locally`
@@ -94,7 +94,7 @@ Do not claim universal compatibility, perfect preservation, batch processing,
 translation, transcription, synchronization repair, or upload-based processing
 unless that capability is later implemented and tested for the advertised plan.
 
-For LedgerLift, keep third-party compatibility wording factual and lower on the
+For LedgerHarbor, keep third-party compatibility wording factual and lower on the
 page. Do not use third-party logos or imply endorsement.
 
 ## Measurement without converter tracking

@@ -1,15 +1,42 @@
-const SUPPORTED_EVENTS = new Set(["transaction.completed"]);
+const SUPPORTED_EVENTS = new Set(["transaction.completed", "adjustment.created", "adjustment.updated"]);
+const ADJUSTMENT_ACTIONS = new Set(["credit", "refund", "chargeback", "chargeback_warning", "chargeback_reverse", "credit_reverse", "chargeback_warning_reverse"]);
+const REVOKING_ADJUSTMENT_ACTIONS = new Set(["credit", "refund", "chargeback", "chargeback_warning"]);
+const RESTORING_ADJUSTMENT_ACTIONS = new Set(["chargeback_reverse", "credit_reverse", "chargeback_warning_reverse"]);
 const MAX_SIGNATURE_AGE_SECONDS = 300;
 const WEBHOOK_PROCESSING_LEASE_SECONDS = 60;
 const PRODUCTS = ["ledgerlift", "pixelport", "contactcraft", "calendarflow", "captionshift"];
 const SUPPORT_EMAIL = "localfiletools.support@gmail.com";
+const PADDLE_IPS_URL = "https://api.paddle.com/ips";
+const PADDLE_IP_CACHE_TTL_MS = 10 * 60 * 1000;
 const rateBuckets = new Map();
 const MAX_RATE_BUCKETS = 10000;
+let paddleIpCache = { expiresAt: 0, cidrs: [] };
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
 });
+
+function paddleConfigResponse(env) {
+  const environment = env.PADDLE_CHECKOUT_ENVIRONMENT === "production" ? "production" : "sandbox";
+  const checkoutEnabled = String(env.PADDLE_CHECKOUT_ENABLED || "").toLowerCase() === "true";
+  const config = {
+    environment,
+    checkoutEnabled,
+    clientToken: String(env.PADDLE_CLIENT_TOKEN || "").trim(),
+    prices: {
+      ledgerlift: { standard: env.PADDLE_PRICE_LEDGERLIFT_STANDARD || "", plus: env.PADDLE_PRICE_LEDGERLIFT_PLUS || "" },
+      pixelport: { standard: env.PADDLE_PRICE_PIXELPORT_STANDARD || "", plus: env.PADDLE_PRICE_PIXELPORT_PLUS || "" },
+      contactcraft: { standard: env.PADDLE_PRICE_CONTACTCRAFT_STANDARD || "", plus: env.PADDLE_PRICE_CONTACTCRAFT_PLUS || "" },
+      calendarflow: { standard: env.PADDLE_PRICE_CALENDARFLOW_STANDARD || "", plus: env.PADDLE_PRICE_CALENDARFLOW_PLUS || "" },
+      captionshift: { standard: env.PADDLE_PRICE_CAPTIONSHIFT_STANDARD || "", plus: env.PADDLE_PRICE_CAPTIONSHIFT_PLUS || "" },
+      suite: { bundle: env.PADDLE_PRICE_SUITE_BUNDLE || "" }
+    }
+  };
+  return new Response(`window.LOCALFILE_PADDLE = Object.freeze(${JSON.stringify(config)});`, {
+    headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store" }
+  });
+}
 
 const nowIso = () => new Date().toISOString();
 const id = (prefix) => `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
@@ -20,8 +47,29 @@ const clientKey = (request) => request.headers.get("CF-Connecting-IP") || reques
 const ACCOUNT_COOKIE = "__Host-lft_account_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 const SESSION_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
-const PASSWORD_ITERATIONS = 2000;
+const PASSWORD_ALGORITHM = "pbkdf2-sha256";
+const LEGACY_PASSWORD_ALGORITHM = "hmac-sha256";
+const PASSWORD_PBKDF2_ITERATIONS = 310000;
 const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MAX_LENGTH = 256;
+const PASSWORD_HISTORY_LIMIT = 5;
+const VERIFICATION_CODE_TTL_SECONDS = 15 * 60;
+const VERIFICATION_CODE_MAX_ATTEMPTS = 5;
+const VERIFICATION_CODE_PROCESSING_LEASE_SECONDS = 120;
+const COMMON_PASSWORDS = new Set([
+  "password", "password1", "password123", "12345678", "123456789", "1234567890",
+  "qwertyui", "qwerty123", "letmein", "welcome1", "iloveyou", "admin123",
+  "localfile", "localfiletoolkit"
+]);
+
+class AuthFailure extends Error {
+  constructor(code, status = 503, message = "Authentication could not be completed.") {
+    super(code);
+    this.code = code;
+    this.status = status;
+    this.publicMessage = message;
+  }
+}
 
 export function summarizeEntitlements(items) {
   const active = Array.isArray(items) ? items.filter((item) => item?.status === undefined || item.status === "active") : [];
@@ -89,17 +137,23 @@ function randomVerificationCode() {
   return String(value).padStart(6, "0");
 }
 
-async function passwordHash(password, salt, iterations = PASSWORD_ITERATIONS) {
-  const key = await crypto.subtle.importKey("raw", salt.buffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+async function passwordHash(password, salt, iterations = PASSWORD_PBKDF2_ITERATIONS, algorithm = PASSWORD_ALGORITHM) {
+  if (algorithm === PASSWORD_ALGORITHM) {
+    const key = await crypto.subtle.importKey("raw", utf8(password), { name: "PBKDF2" }, false, ["deriveBits"]);
+    return new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations, hash: "SHA-256" }, key, 256));
+  }
+  const key = await crypto.subtle.importKey("raw", salt, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   let state = utf8(password);
   for (let index = 0; index < iterations; index += 1) state = new Uint8Array(await crypto.subtle.sign("HMAC", key, state));
   return state;
 }
 
 function constantTimeEqual(left, right) {
-  if (left.length !== right.length) return false;
-  let difference = 0;
-  for (let index = 0; index < left.length; index += 1) difference |= left[index] ^ right[index];
+  const leftBytes = typeof left === "string" ? utf8(left) : left;
+  const rightBytes = typeof right === "string" ? utf8(right) : right;
+  const length = Math.max(leftBytes.length, rightBytes.length);
+  let difference = leftBytes.length ^ rightBytes.length;
+  for (let index = 0; index < length; index += 1) difference |= (leftBytes[index] || 0) ^ (rightBytes[index] || 0);
   return difference === 0;
 }
 
@@ -123,29 +177,72 @@ async function sendVerificationCode(env, email, code) {
 
 async function issueVerificationCode(env, userId, email, purpose) {
   const code = randomVerificationCode();
-  await env.LICENSE_DB.prepare("INSERT INTO account_verification_codes (id,user_id,code_hash,purpose,expires_at,used_at,created_at) VALUES (?,?,?,?,?,?,?)").bind(id("verify"), userId, await sha256(code), purpose, new Date(Date.now() + 15 * 60 * 1000).toISOString(), null, nowIso()).run();
+  const createdAt = nowIso();
+  const expiresAt = new Date(Date.now() + VERIFICATION_CODE_TTL_SECONDS * 1000).toISOString();
+  await env.LICENSE_DB.batch([
+    env.LICENSE_DB.prepare("UPDATE account_verification_codes SET used_at = ?, processing_token = NULL, processing_started_at = NULL WHERE user_id = ? AND purpose = ? AND used_at IS NULL AND processing_token IS NULL").bind(createdAt, userId, purpose),
+    env.LICENSE_DB.prepare("INSERT INTO account_verification_codes (id,user_id,code_hash,purpose,expires_at,used_at,created_at,attempt_count,processing_token,processing_started_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id("verify"), userId, await sha256(code), purpose, expiresAt, null, createdAt, 0, null, null)
+  ]);
   return sendVerificationCode(env, email, code);
 }
 
-async function stagePassword(env, userId, password, createdAt) {
-  const salt = new Uint8Array(16);
-  crypto.getRandomValues(salt);
-  const hash = bytesToBase64Url(await passwordHash(password, salt));
-  await env.LICENSE_DB.prepare("INSERT INTO account_pending_passwords (user_id,password_hash,password_salt,iterations,created_at) VALUES (?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, iterations = excluded.iterations, created_at = excluded.created_at").bind(userId, hash, bytesToBase64Url(salt), PASSWORD_ITERATIONS, createdAt).run();
-  await env.LICENSE_DB.prepare("INSERT INTO account_passwords (user_id,password_hash,password_salt,iterations,verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id) DO NOTHING").bind(userId, hash, bytesToBase64Url(salt), PASSWORD_ITERATIONS, null, createdAt, createdAt).run();
+function passwordValidationMessage(password) {
+  if (typeof password !== "string" || password.length < PASSWORD_MIN_LENGTH) return `Use a password of at least ${PASSWORD_MIN_LENGTH} characters.`;
+  if (password.length > PASSWORD_MAX_LENGTH) return `Use a password of no more than ${PASSWORD_MAX_LENGTH} characters.`;
+  if (!/\S/.test(password)) return "Use a password that includes a non-space character.";
+  if (COMMON_PASSWORDS.has(password.normalize("NFKC").toLowerCase())) return "Choose a less common password.";
+  return "";
 }
 
-async function activateStagedPassword(env, userId, now) {
-  const pending = await env.LICENSE_DB.prepare("SELECT password_hash,password_salt,iterations FROM account_pending_passwords WHERE user_id = ?").bind(userId).first();
-  if (!pending) throw new Error("pending_password_missing");
-  const current = await env.LICENSE_DB.prepare("SELECT password_hash,password_salt,iterations FROM account_passwords WHERE user_id = ?").bind(userId).first();
-  if (current?.password_hash) {
-    try {
-      await env.LICENSE_DB.prepare("INSERT INTO account_password_history (id,user_id,password_hash,password_salt,iterations,created_at) VALUES (?,?,?,?,?,?)").bind(id("pwdhist"), userId, current.password_hash, current.password_salt, current.iterations, now).run();
-    } catch { console.error("password_history_write_failed"); }
+async function buildPasswordRecord(password, createdAt) {
+  const salt = new Uint8Array(16);
+  try { crypto.getRandomValues(salt); } catch { throw new AuthFailure("password_randomness_failed"); }
+  let hash;
+  try { hash = await passwordHash(password, salt, PASSWORD_PBKDF2_ITERATIONS, PASSWORD_ALGORITHM); } catch { throw new AuthFailure("password_hash_failed"); }
+  return { password_hash: bytesToBase64Url(hash), password_salt: bytesToBase64Url(salt), iterations: PASSWORD_PBKDF2_ITERATIONS, algorithm: PASSWORD_ALGORITHM, created_at: createdAt };
+}
+
+async function verifyStoredPassword(password, record) {
+  if (!record?.password_hash || !record.password_salt) return false;
+  const algorithm = record.algorithm === PASSWORD_ALGORITHM ? PASSWORD_ALGORITHM : LEGACY_PASSWORD_ALGORITHM;
+  const defaultIterations = algorithm === PASSWORD_ALGORITHM ? PASSWORD_PBKDF2_ITERATIONS : 2000;
+  const iterations = Math.min(1000000, Math.max(1, Number(record.iterations) || defaultIterations));
+  try {
+    const candidate = await passwordHash(password, base64UrlToBytes(record.password_salt), iterations, algorithm);
+    return constantTimeEqual(candidate, base64UrlToBytes(record.password_hash));
+  } catch {
+    return false;
   }
-  await env.LICENSE_DB.prepare("INSERT INTO account_passwords (user_id,password_hash,password_salt,iterations,verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, iterations = excluded.iterations, verified_at = excluded.verified_at, updated_at = excluded.updated_at").bind(userId, pending.password_hash, pending.password_salt, pending.iterations, now, now, now).run();
-  await env.LICENSE_DB.prepare("DELETE FROM account_pending_passwords WHERE user_id = ?").bind(userId).run();
+}
+
+async function passwordReused(env, userId, password) {
+  const current = await env.LICENSE_DB.prepare("SELECT password_hash,password_salt,iterations,algorithm FROM account_passwords WHERE user_id = ?").bind(userId).first();
+  if (await verifyStoredPassword(password, current)) return true;
+  const history = await env.LICENSE_DB.prepare("SELECT password_hash,password_salt,iterations,algorithm FROM account_password_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?").bind(userId, PASSWORD_HISTORY_LIMIT).all();
+  for (const record of history?.results || []) if (await verifyStoredPassword(password, record)) return true;
+  return false;
+}
+
+async function stagePassword(env, userId, password, createdAt) {
+  if (await passwordReused(env, userId, password)) throw new AuthFailure("password_reused", 400, "Choose a password you have not used recently.");
+  const record = await buildPasswordRecord(password, createdAt);
+  await env.LICENSE_DB.prepare("INSERT INTO account_pending_passwords (user_id,password_hash,password_salt,iterations,algorithm,created_at) VALUES (?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, iterations = excluded.iterations, algorithm = excluded.algorithm, created_at = excluded.created_at").bind(userId, record.password_hash, record.password_salt, record.iterations, record.algorithm, createdAt).run();
+}
+
+async function activateStagedPassword(env, userId, now, finalizeStatement = null) {
+  const pending = await env.LICENSE_DB.prepare("SELECT password_hash,password_salt,iterations,algorithm FROM account_pending_passwords WHERE user_id = ?").bind(userId).first();
+  if (!pending) throw new AuthFailure("pending_password_missing", 400, "This verification request is no longer active. Request a new code.");
+  const current = await env.LICENSE_DB.prepare("SELECT password_hash,password_salt,iterations,algorithm FROM account_passwords WHERE user_id = ?").bind(userId).first();
+  const statements = [];
+  if (current?.password_hash) {
+    statements.push(env.LICENSE_DB.prepare("INSERT INTO account_password_history (id,user_id,password_hash,password_salt,iterations,algorithm,created_at) VALUES (?,?,?,?,?,?,?)").bind(id("pwdhist"), userId, current.password_hash, current.password_salt, current.iterations, current.algorithm || LEGACY_PASSWORD_ALGORITHM, now));
+  }
+  statements.push(env.LICENSE_DB.prepare("INSERT INTO account_passwords (user_id,password_hash,password_salt,iterations,algorithm,verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, iterations = excluded.iterations, algorithm = excluded.algorithm, verified_at = excluded.verified_at, updated_at = excluded.updated_at").bind(userId, pending.password_hash, pending.password_salt, pending.iterations, pending.algorithm || PASSWORD_ALGORITHM, now, now, now));
+  statements.push(env.LICENSE_DB.prepare("DELETE FROM account_pending_passwords WHERE user_id = ?").bind(userId));
+  if (finalizeStatement) statements.push(finalizeStatement);
+  const result = await env.LICENSE_DB.batch(statements);
+  if (finalizeStatement && !result?.at(-1)?.meta?.changes) throw new AuthFailure("verification_code_consume_failed");
+  return result;
 }
 
 async function purchaseEligibility(env, email) {
@@ -161,7 +258,8 @@ async function handleAccountRegister(request, env) {
   const body = await readJsonObject(request);
   const email = normalizeEmail(body?.email);
   const password = String(body?.password || "");
-  if (!validEmail(email) || password.length < PASSWORD_MIN_LENGTH || password.length > 256) return json({ ok: false, message: `Use a valid email and a password of at least ${PASSWORD_MIN_LENGTH} characters.` }, 400);
+  const passwordMessage = passwordValidationMessage(password);
+  if (!validEmail(email) || passwordMessage) return json({ ok: false, message: passwordMessage || "Use a valid email address." }, 400);
   const purchase = await purchaseEligibility(env, email);
   if (!purchase?.id) return json({ ok: false, error: "purchase_required", message: "Complete a LocalFile Toolkit purchase before creating an account.", purchase_url: "/pricing.html" }, 402);
   const createdAt = nowIso();
@@ -170,9 +268,10 @@ async function handleAccountRegister(request, env) {
   let user;
   try { user = await env.LICENSE_DB.prepare("SELECT id FROM account_users WHERE normalized_email = ?").bind(email).first(); } catch { throw new Error("account_user_read"); }
   if (!user?.id) return json({ ok: false, message: "We could not create the account right now." }, 503);
-  let existing;
-  try { existing = await env.LICENSE_DB.prepare("SELECT verified_at FROM account_passwords WHERE user_id = ?").bind(user.id).first(); } catch { throw new Error("account_password_read"); }
-  try { await stagePassword(env, user.id, password, createdAt); } catch { throw new Error("account_password_write"); }
+  try { await stagePassword(env, user.id, password, createdAt); } catch (error) {
+    if (error instanceof AuthFailure && error.status < 500) return json({ ok: false, error: error.code, message: error.publicMessage }, error.status);
+    throw new Error("account_password_write");
+  }
   let delivery;
   try { delivery = await issueVerificationCode(env, user.id, email, "signup"); } catch { throw new Error("verification_code_write"); }
   if (!delivery.ok) return json({ ok: false, message: delivery.setup ? "Email delivery is not configured yet." : "We could not send the verification email right now." }, delivery.setup ? 503 : 502);
@@ -212,49 +311,80 @@ async function handlePasswordResetRequest(request, env) {
   return json({ ok: true, message: "If an account matches, a password reset code has been sent." }, 202);
 }
 
+async function latestVerificationCode(env, userId, purpose) {
+  return env.LICENSE_DB.prepare("SELECT id,user_id,code_hash,expires_at,used_at,attempt_count,processing_token,processing_started_at FROM account_verification_codes WHERE user_id = ? AND purpose = ? ORDER BY created_at DESC LIMIT 1").bind(userId, purpose).first();
+}
+
+async function recordInvalidVerificationAttempt(env, row) {
+  const now = nowIso();
+  const shouldLock = Number(row.attempt_count || 0) + 1 >= VERIFICATION_CODE_MAX_ATTEMPTS;
+  const result = await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET attempt_count = attempt_count + 1, used_at = CASE WHEN attempt_count + 1 >= ? THEN ? ELSE used_at END WHERE id = ? AND used_at IS NULL AND processing_token IS NULL AND expires_at > ?").bind(VERIFICATION_CODE_MAX_ATTEMPTS, now, row.id, now).run();
+  return Boolean(result?.meta?.changes) && shouldLock;
+}
+
+async function claimVerificationCode(env, row, code) {
+  const now = nowIso();
+  if (!row || row.used_at || !row.expires_at || new Date(row.expires_at).getTime() <= Date.now() || Number(row.attempt_count || 0) >= VERIFICATION_CODE_MAX_ATTEMPTS) return { ok: false, reason: "invalid" };
+  const candidateHash = await sha256(code);
+  if (!constantTimeEqual(candidateHash, row.code_hash)) {
+    let maxed = false;
+    try { maxed = await recordInvalidVerificationAttempt(env, row); } catch { /* Keep the public response generic. */ }
+    return { ok: false, reason: maxed ? "attempts_exceeded" : "invalid" };
+  }
+  const processingToken = id("codeproc");
+  const claimed = await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET processing_token = ?, processing_started_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ? AND attempt_count < ? AND (processing_token IS NULL OR processing_started_at IS NULL OR processing_started_at < ?)").bind(processingToken, now, row.id, now, VERIFICATION_CODE_MAX_ATTEMPTS, new Date(Date.now() - VERIFICATION_CODE_PROCESSING_LEASE_SECONDS * 1000).toISOString()).run();
+  return claimed?.meta?.changes ? { ok: true, processingToken } : { ok: false, reason: "busy" };
+}
+
+function finalizeVerificationCode(env, row, processingToken, now) {
+  return env.LICENSE_DB.prepare("UPDATE account_verification_codes SET used_at = ?, processing_token = NULL, processing_started_at = NULL WHERE id = ? AND processing_token = ? AND used_at IS NULL AND expires_at > ?").bind(now, row.id, processingToken, now);
+}
+
+async function releaseVerificationCode(env, row, processingToken) {
+  try {
+    await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET processing_token = NULL, processing_started_at = NULL WHERE id = ? AND processing_token = ? AND used_at IS NULL").bind(row.id, processingToken).run();
+  } catch {
+    // A lease expiry remains a safe retry path if cleanup is temporarily unavailable.
+  }
+}
+
+function verificationErrorResponse(result) {
+  if (result.reason === "busy") return json({ ok: false, error: "code_processing", message: "This code is already being processed. Try again in a moment." }, 409);
+  if (result.reason === "attempts_exceeded") return json({ ok: false, error: "too_many_code_attempts", message: "Too many attempts. Request a new code." }, 429);
+  return json({ ok: false, error: "invalid_code", message: "That code is invalid or expired." }, 400);
+}
+
 async function handlePasswordResetComplete(request, env) {
   if (!(await allowSubmission(request, env))) return json({ ok: false, message: "Too many requests. Please try again later." }, 429);
   const body = await readJsonObject(request);
   const email = normalizeEmail(body?.email);
   const code = String(body?.code || "").trim();
   const password = String(body?.password || "");
-  if (!validEmail(email) || !/^\d{6}$/.test(code) || password.length < PASSWORD_MIN_LENGTH || password.length > 256) return json({ ok: false, message: `Enter the code and a password of at least ${PASSWORD_MIN_LENGTH} characters.` }, 400);
-  const user = await env.LICENSE_DB.prepare("SELECT u.id,p.verified_at FROM account_users u LEFT JOIN account_passwords p ON p.user_id = u.id WHERE u.normalized_email = ?").bind(email).first();
-  const row = user?.id ? await env.LICENSE_DB.prepare("SELECT id,user_id,expires_at,used_at FROM account_verification_codes WHERE user_id = ? AND purpose IN ('reset','signup') AND code_hash = ? ORDER BY created_at DESC LIMIT 1").bind(user.id, await sha256(code)).first() : null;
-  if (row?.used_at && user?.verified_at) return createAccountSessionJson(env, row.user_id);
-  if (!row || row.used_at || new Date(row.expires_at).getTime() <= Date.now()) return json({ ok: false, message: "That code is invalid or expired." }, 400);
+  const passwordMessage = passwordValidationMessage(password);
+  if (!validEmail(email) || !/^\d{6}$/.test(code) || passwordMessage) return json({ ok: false, message: passwordMessage || "Enter the six-digit code from your email." }, 400);
+  const user = await env.LICENSE_DB.prepare("SELECT id FROM account_users WHERE normalized_email = ?").bind(email).first();
+  const row = user?.id ? await latestVerificationCode(env, user.id, "reset") : null;
+  const claim = await claimVerificationCode(env, row, code);
+  if (!claim.ok) return verificationErrorResponse(claim);
   try {
     const now = nowIso();
-    const salt = new Uint8Array(16);
-    try { crypto.getRandomValues(salt); } catch { throw new Error("reset_randomness_failed"); }
-    let hash;
-    try { hash = bytesToBase64Url(await passwordHash(password, salt)); } catch { throw new Error("reset_hash_failed"); }
-    let current;
-    try { current = await env.LICENSE_DB.prepare("SELECT password_hash,password_salt,iterations FROM account_passwords WHERE user_id = ?").bind(row.user_id).first(); } catch { throw new Error("reset_current_password_read_failed"); }
+    if (await passwordReused(env, row.user_id, password)) throw new AuthFailure("password_reused", 400, "Choose a password you have not used recently.");
+    const record = await buildPasswordRecord(password, now);
+    const current = await env.LICENSE_DB.prepare("SELECT password_hash,password_salt,iterations,algorithm FROM account_passwords WHERE user_id = ?").bind(row.user_id).first();
+    const statements = [];
     if (current?.password_hash) {
-      try {
-        await env.LICENSE_DB.prepare("INSERT INTO account_password_history (id,user_id,password_hash,password_salt,iterations,created_at) VALUES (?,?,?,?,?,?)").bind(id("pwdhist"), row.user_id, current.password_hash, current.password_salt, current.iterations, now).run();
-      } catch { console.error("password_history_write_failed"); }
+      statements.push(env.LICENSE_DB.prepare("INSERT INTO account_password_history (id,user_id,password_hash,password_salt,iterations,algorithm,created_at) VALUES (?,?,?,?,?,?,?)").bind(id("pwdhist"), row.user_id, current.password_hash, current.password_salt, current.iterations, current.algorithm || LEGACY_PASSWORD_ALGORITHM, now));
     }
-    try { await env.LICENSE_DB.prepare("INSERT INTO account_passwords (user_id,password_hash,password_salt,iterations,verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, iterations = excluded.iterations, verified_at = excluded.verified_at, updated_at = excluded.updated_at").bind(row.user_id, hash, bytesToBase64Url(salt), PASSWORD_ITERATIONS, now, now, now).run(); } catch { throw new Error("reset_password_write_failed"); }
-    let consumed;
-    try { consumed = await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?").bind(now, row.id, now).run(); } catch { throw new Error("reset_code_consume_failed"); }
-    try {
-      if (!consumed?.meta?.changes) return createAccountSession(env, row.user_id, request);
-      return createAccountSession(env, row.user_id, request);
-    } catch {
-      return json({ ok: true, message: "Password reset successfully. Please sign in with your new password." }, 200);
-    }
+    statements.push(env.LICENSE_DB.prepare("INSERT INTO account_passwords (user_id,password_hash,password_salt,iterations,algorithm,verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, iterations = excluded.iterations, algorithm = excluded.algorithm, verified_at = excluded.verified_at, updated_at = excluded.updated_at").bind(row.user_id, record.password_hash, record.password_salt, record.iterations, record.algorithm, now, now, now));
+    statements.push(finalizeVerificationCode(env, row, claim.processingToken, now));
+    const batchResult = await env.LICENSE_DB.batch(statements);
+    if (!batchResult?.at(-1)?.meta?.changes) throw new AuthFailure("reset_code_consume_failed");
+    return createAccountSessionJson(env, row.user_id, "Password reset successfully.");
   } catch (error) {
-    const knownReasons = new Set(["reset_randomness_failed", "reset_hash_failed", "reset_current_password_read_failed", "reset_password_write_failed", "reset_code_consume_failed"]);
-    const reason = knownReasons.has(error?.message) ? error.message : "password_reset_completion_failed";
-    console.error("account_password_reset_failed", reason);
-    const message = reason === "reset_password_write_failed"
-      ? "We could not save the new password. Your verification code remains available; please try again."
-      : reason === "reset_code_consume_failed"
-        ? "Your password was not fully confirmed. Your verification code remains available; please try again."
-      : "We could not finish the password reset. Your verification code remains available; please try again.";
-    return json({ ok: false, message, diagnostic: reason }, 503);
+    await releaseVerificationCode(env, row, claim.processingToken);
+    if (error instanceof AuthFailure && error.status < 500) return json({ ok: false, error: error.code, message: error.publicMessage }, error.status);
+    console.error("account_password_reset_failed", error instanceof AuthFailure ? error.code : "password_reset_completion_failed");
+    return json({ ok: false, message: "We could not finish the password reset. Request a new code and try again." }, 503);
   }
 }
 
@@ -263,10 +393,16 @@ async function handleAccountLogin(request, env) {
   const body = await readJsonObject(request);
   const email = normalizeEmail(body?.email);
   const password = String(body?.password || "");
-  const record = validEmail(email) ? await env.LICENSE_DB.prepare("SELECT u.id,p.password_hash,p.password_salt,p.iterations,p.verified_at FROM account_users u JOIN account_passwords p ON p.user_id = u.id WHERE u.normalized_email = ?").bind(email).first() : null;
+  const record = validEmail(email) ? await env.LICENSE_DB.prepare("SELECT u.id,p.password_hash,p.password_salt,p.iterations,p.algorithm,p.verified_at FROM account_users u JOIN account_passwords p ON p.user_id = u.id WHERE u.normalized_email = ?").bind(email).first() : null;
   let valid = false;
-  if (record?.password_hash && record.password_salt && record.verified_at) valid = constantTimeEqual(await passwordHash(password, base64UrlToBytes(record.password_salt), Number(record.iterations)), base64UrlToBytes(record.password_hash));
+  if (record?.password_hash && record.password_salt && record.verified_at) valid = await verifyStoredPassword(password, record);
   if (!valid) return json({ ok: false, message: "Incorrect email or password." }, 401);
+  if (record.algorithm !== PASSWORD_ALGORITHM || Number(record.iterations) !== PASSWORD_PBKDF2_ITERATIONS) {
+    try {
+      const upgraded = await buildPasswordRecord(password, nowIso());
+      await env.LICENSE_DB.prepare("UPDATE account_passwords SET password_hash = ?, password_salt = ?, iterations = ?, algorithm = ?, updated_at = ? WHERE user_id = ? AND password_hash = ?").bind(upgraded.password_hash, upgraded.password_salt, upgraded.iterations, upgraded.algorithm, upgraded.created_at, record.id, record.password_hash).run();
+    } catch { console.error("password_rehash_failed"); }
+  }
   return createAccountSessionJson(env, record.id, "Signed in successfully.");
 }
 
@@ -276,19 +412,18 @@ async function handleAccountVerifyCode(request, env) {
   const email = normalizeEmail(body?.email);
   const code = String(body?.code || "").trim();
   if (!validEmail(email) || !/^\d{6}$/.test(code)) return json({ ok: false, message: "Enter the six-digit code from your email." }, 400);
-  const user = await env.LICENSE_DB.prepare("SELECT u.id,p.verified_at FROM account_users u LEFT JOIN account_passwords p ON p.user_id = u.id WHERE u.normalized_email = ?").bind(email).first();
-  const row = user?.id ? await env.LICENSE_DB.prepare("SELECT id,user_id,expires_at,used_at FROM account_verification_codes WHERE user_id = ? AND purpose IN ('signup','reset') AND code_hash = ? ORDER BY created_at DESC LIMIT 1").bind(user.id, await sha256(code)).first() : null;
-  if (row?.used_at && user?.verified_at) return createAccountSession(env, row.user_id, request);
-  if (!row || row.used_at || new Date(row.expires_at).getTime() <= Date.now()) return json({ ok: false, message: "That code is invalid or expired." }, 400);
+  const user = await env.LICENSE_DB.prepare("SELECT id FROM account_users WHERE normalized_email = ?").bind(email).first();
+  const row = user?.id ? await latestVerificationCode(env, user.id, "signup") : null;
+  const claim = await claimVerificationCode(env, row, code);
+  if (!claim.ok) return verificationErrorResponse(claim);
   try {
     const now = nowIso();
-    const pending = await env.LICENSE_DB.prepare("SELECT user_id FROM account_pending_passwords WHERE user_id = ?").bind(row.user_id).first();
-    if (pending) await activateStagedPassword(env, row.user_id, now);
-    const consumed = await env.LICENSE_DB.prepare("UPDATE account_verification_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?").bind(now, row.id, now).run();
-    if (!consumed?.meta?.changes) return createAccountSessionJson(env, row.user_id);
-    return createAccountSessionJson(env, row.user_id);
+    await activateStagedPassword(env, row.user_id, now, finalizeVerificationCode(env, row, claim.processingToken, now));
+    return createAccountSessionJson(env, row.user_id, "Account verified successfully.");
   } catch (error) {
-    console.error("account_verify_failed", error?.message === "pending_password_missing" ? "pending_password_missing" : "verification_completion_failed");
+    await releaseVerificationCode(env, row, claim.processingToken);
+    if (error instanceof AuthFailure && error.status < 500) return json({ ok: false, error: error.code, message: error.publicMessage }, error.status);
+    console.error("account_verify_failed", error instanceof AuthFailure ? error.code : "verification_completion_failed");
     return json({ ok: false, message: "We could not complete verification. Request a new code and try again." }, 503);
   }
 }
@@ -446,7 +581,7 @@ async function handleContact(request, env) {
   if (body.honeypot) return new Response(null, { status: 204 });
   const fields = { name: cleanText(body.name, 120), email: normalizeEmail(body.email), topic: cleanText(body.topic, 80), product: cleanText(body.product, 80), subject: cleanText(body.subject, 180), message: cleanText(body.message, 5000), transaction_id: cleanText(body.transaction_id, 140) };
   const topics = new Set(["General question", "Technical support", "Purchase or billing", "License activation", "Privacy question", "Refund request", "Other"]);
-  const products = new Set(["LocalFile Toolkit", "LedgerLift", "PixelPort", "ContactCraft", "CalendarFlow", "CaptionShift", "Five-product bundle"]);
+  const products = new Set(["LocalFile Toolkit", "LedgerHarbor", "PixelRefinery", "ContactCraft", "CalendarFlow", "CaptionShift", "Five-product bundle", "LedgerLift", "PixelPort"]);
   if (!fields.name || !validEmail(fields.email) || !topics.has(fields.topic) || !products.has(fields.product) || !fields.subject || !fields.message || body.consent !== true) return json({ ok: false, message: "Please check the form and try again." }, 400);
   const result = await sendSupportEmail(env, "[LocalFile Toolkit Contact] " + fields.subject, fields);
   return deliveryResponse(result);
@@ -459,7 +594,7 @@ async function handleRefundRequest(request, env) {
   if (!body || !hasOnlyKeys(body, allowed)) return json({ ok: false, message: "Please check the form and try again." }, 400);
   if (body.honeypot) return new Response(null, { status: 204 });
   const fields = { name: cleanText(body.name, 120), email: normalizeEmail(body.email), transaction_id: cleanText(body.transaction_id, 140), product: cleanText(body.product, 80), plan: cleanText(body.plan, 80), purchase_date: cleanText(body.purchase_date, 40), reason: cleanText(body.reason, 160), details: cleanText(body.details, 5000) };
-  const products = new Set(["LedgerLift", "PixelPort", "ContactCraft", "CalendarFlow", "CaptionShift", "Five-product bundle"]);
+  const products = new Set(["LedgerHarbor", "PixelRefinery", "ContactCraft", "CalendarFlow", "CaptionShift", "Five-product bundle", "LedgerLift", "PixelPort"]);
   const plans = new Set(["Standard", "Plus", "Five-product bundle"]);
   if (!fields.name || !validEmail(fields.email) || !fields.transaction_id || !products.has(fields.product) || !plans.has(fields.plan) || !/^\d{4}-\d{2}-\d{2}$/.test(fields.purchase_date) || !fields.reason || !fields.details || body.accurate !== true) return json({ ok: false, message: "Please check the form and try again." }, 400);
   const result = await sendSupportEmail(env, "[LocalFile Toolkit Refund Request] " + fields.reason, fields);
@@ -537,8 +672,39 @@ function priceMap(env) {
   ].filter(([price]) => price && !String(price).includes("replace")));
 }
 
+function transactionLineItems(data) {
+  const detailed = Array.isArray(data?.details?.line_items) ? data.details.line_items : [];
+  return detailed.length ? detailed : (Array.isArray(data?.items) ? data.items : []);
+}
+
 function lineItemPriceIds(data) {
-  return [...new Set((Array.isArray(data?.items) ? data.items : []).map((item) => item?.price?.id || item?.price_id).filter(Boolean))];
+  return [...new Set(transactionLineItems(data).map((item) => item?.price?.id || item?.price_id).filter(Boolean))];
+}
+
+function lineItemId(item) {
+  const value = item?.id || item?.item_id || item?.transaction_item_id;
+  return value ? String(value) : null;
+}
+
+function grantKey(product, plan) {
+  return `${product}:${plan}`;
+}
+
+function grantItemIds(data, grants, env) {
+  const map = priceMap(env);
+  const itemIds = new Map();
+  for (const item of transactionLineItems(data)) {
+    const priceId = item?.price?.id || item?.price_id;
+    const mapped = map.get(priceId);
+    const itemId = lineItemId(item);
+    if (!mapped || !itemId) continue;
+    if (mapped[1] === "bundle") {
+      for (const grant of grants) itemIds.set(grantKey(grant[0], grant[1]), itemId);
+    } else {
+      itemIds.set(grantKey(mapped[0], mapped[1]), itemId);
+    }
+  }
+  return itemIds;
 }
 
 function entitlementsForPrices(priceIds, env) {
@@ -554,6 +720,60 @@ function entitlementsForPrices(priceIds, env) {
   return products.filter((grant, index, grants) => grants.findIndex((candidate) => candidate[0] === grant[0] && candidate[1] === grant[1]) === index);
 }
 
+function webhookTransactionId(event) {
+  const value = event?.event_type === "transaction.completed" ? event?.data?.id : event?.data?.transaction_id;
+  return value ? String(value) : "";
+}
+
+function adjustmentItemIds(data) {
+  if (data?.type === "full") return null;
+  const ids = (Array.isArray(data?.items) ? data.items : [])
+    .filter((item) => item?.type === "full" || item?.type === "partial")
+    .map((item) => item?.item_id || item?.id)
+    .filter(Boolean)
+    .map(String);
+  return ids;
+}
+
+function parseAdjustmentItemIds(value) {
+  if (value === null || value === undefined || value === "") return null;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.map(String) : null;
+  } catch {
+    return [];
+  }
+}
+
+function adjustmentAppliesToItem(adjustment, paddleItemId) {
+  const itemIds = parseAdjustmentItemIds(adjustment.item_ids);
+  if (itemIds === null) return true;
+  return Boolean(paddleItemId && itemIds.includes(String(paddleItemId)));
+}
+
+function adjustmentTargets(rows, adjustment) {
+  const itemIds = parseAdjustmentItemIds(adjustment.item_ids);
+  if (itemIds === null) return rows;
+  const allItemsMissing = rows.length > 0 && rows.every((row) => !row.paddle_item_id);
+  const legacySingleLineFallback = itemIds.length === 1 && allItemsMissing;
+  return rows.filter((row) => adjustmentAppliesToItem(adjustment, row.paddle_item_id) || (legacySingleLineFallback && !row.paddle_item_id));
+}
+
+function reverseBaseAction(action) {
+  return action === "chargeback_reverse" ? "chargeback" : action === "credit_reverse" ? "credit" : "chargeback_warning";
+}
+
+function adjustmentDecision(data) {
+  const action = String(data?.action || "");
+  const status = String(data?.status || "");
+  if (!ADJUSTMENT_ACTIONS.has(action)) throw new WebhookFailure("unsupported_adjustment", 422, false);
+  if (RESTORING_ADJUSTMENT_ACTIONS.has(action)) return { effect: "restore", reasons: [reverseBaseAction(action)] };
+  if (status === "reversed" && REVOKING_ADJUSTMENT_ACTIONS.has(action)) return { effect: "restore", reasons: [action] };
+  if (status === "rejected" || status === "pending_approval") return { effect: "ignore", reasons: [] };
+  if (REVOKING_ADJUSTMENT_ACTIONS.has(action) && status === "approved") return { effect: "revoke", reasons: [action] };
+  return { effect: "ignore", reasons: [] };
+}
+
 function activationCode() {
   const random = new Uint8Array(18);
   crypto.getRandomValues(random);
@@ -567,6 +787,41 @@ class WebhookFailure extends Error {
     this.status = status;
     this.retryable = retryable;
   }
+}
+
+function validIpv4(value) {
+  const parts = String(value || "").split(".");
+  return parts.length === 4 && parts.every((part) => /^(0|[1-9]\d{0,2})$/.test(part) && Number(part) >= 0 && Number(part) <= 255);
+}
+
+async function paddleIpv4Cidrs() {
+  if (paddleIpCache.expiresAt > Date.now() && paddleIpCache.cidrs.length) return paddleIpCache.cidrs;
+  let response;
+  try {
+    response = await fetch(PADDLE_IPS_URL, { headers: { accept: "application/json" } });
+  } catch {
+    throw new WebhookFailure("paddle_ip_list_unavailable");
+  }
+  if (!response.ok) throw new WebhookFailure("paddle_ip_list_unavailable");
+  let payload;
+  try { payload = await response.json(); } catch { throw new WebhookFailure("paddle_ip_list_unavailable"); }
+  const cidrs = Array.isArray(payload?.data?.ipv4_cidrs)
+    ? payload.data.ipv4_cidrs.filter((value) => {
+      const [address, bits] = String(value).split("/");
+      return bits === "32" && validIpv4(address);
+    })
+    : [];
+  if (!cidrs.length) throw new WebhookFailure("paddle_ip_list_unavailable");
+  paddleIpCache = { expiresAt: Date.now() + PADDLE_IP_CACHE_TTL_MS, cidrs };
+  return cidrs;
+}
+
+async function enforcePaddleWebhookIp(request, env) {
+  if (env.PADDLE_ENFORCE_WEBHOOK_IPS !== "true") return;
+  const sourceIp = request.headers.get("CF-Connecting-IP")?.trim();
+  if (!validIpv4(sourceIp)) throw new WebhookFailure("paddle_ip_not_allowed", 403, false);
+  const cidrs = await paddleIpv4Cidrs();
+  if (!cidrs.includes(`${sourceIp}/32`)) throw new WebhookFailure("paddle_ip_not_allowed", 403, false);
 }
 
 async function paddleCustomerEmail(customerId, env) {
@@ -600,12 +855,12 @@ async function registerWebhookEvent(env, event, transactionId, payloadHash, proc
   }
   let existing;
   try {
-    existing = await env.LICENSE_DB.prepare("SELECT status,processing_token,processing_started_at FROM paddle_events WHERE event_id = ?").bind(event.event_id).first();
+    existing = await env.LICENSE_DB.prepare("SELECT status,outcome,processing_token,processing_started_at FROM paddle_events WHERE event_id = ?").bind(event.event_id).first();
   } catch {
     throw new WebhookFailure("event_lookup_failed");
   }
   if (!existing) throw new WebhookFailure("event_lookup_failed");
-  if (existing.status === "fulfilled") return { duplicate: true };
+  if (existing.status === "fulfilled") return { duplicate: true, outcome: existing.outcome || "fulfilled" };
   if (!inserted) {
     const activeProcessing = existing.status === "processing" && existing.processing_token && existing.processing_started_at && Date.now() - new Date(existing.processing_started_at).getTime() < WEBHOOK_PROCESSING_LEASE_SECONDS * 1000;
     if (activeProcessing && existing.processing_token !== processingToken) return { busy: true };
@@ -627,6 +882,77 @@ async function markWebhookFailed(env, eventId, processingToken, errorCode) {
   }
 }
 
+async function upsertPaddleAdjustment(env, event, processedAt, decision) {
+  const data = event.data;
+  const itemIds = adjustmentItemIds(data);
+  const itemIdsJson = itemIds === null ? null : JSON.stringify(itemIds);
+  try {
+    await env.LICENSE_DB.prepare("INSERT INTO paddle_adjustments (adjustment_id,transaction_id,customer_id,action,adjustment_type,status,effect,item_ids,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(adjustment_id) DO UPDATE SET transaction_id = excluded.transaction_id, customer_id = excluded.customer_id, action = excluded.action, adjustment_type = excluded.adjustment_type, status = excluded.status, effect = excluded.effect, item_ids = excluded.item_ids, updated_at = excluded.updated_at").bind(String(data.id), String(data.transaction_id), String(data.customer_id), String(data.action), data.type || null, String(data.status || ""), decision.effect, itemIdsJson, data.created_at || processedAt, processedAt).run();
+    for (const priorAction of decision.reasons) {
+      await env.LICENSE_DB.prepare("UPDATE paddle_adjustments SET status = 'reversed', effect = 'restore', updated_at = ? WHERE transaction_id = ? AND action = ? AND effect = 'revoke' AND adjustment_id != ?").bind(processedAt, String(data.transaction_id), priorAction, String(data.id)).run();
+    }
+  } catch {
+    throw new WebhookFailure("adjustment_state_write_failed");
+  }
+}
+
+async function loadPaddleAdjustments(env, transactionId) {
+  try {
+    const result = await env.LICENSE_DB.prepare("SELECT action,status,effect,item_ids FROM paddle_adjustments WHERE transaction_id = ?").bind(transactionId).all();
+    return result?.results || [];
+  } catch {
+    throw new WebhookFailure("adjustment_state_read_failed");
+  }
+}
+
+async function applyPaddleAdjustment(env, event, processedAt) {
+  const decision = adjustmentDecision(event.data);
+  const transactionId = String(event.data.transaction_id);
+  await upsertPaddleAdjustment(env, event, processedAt, decision);
+  if (decision.effect === "ignore") return { outcome: "ignored_adjustment", revoked: 0, restored: 0 };
+  let result;
+  try {
+    result = await env.LICENSE_DB.prepare("SELECT id,product_key,plan_key,paddle_item_id,status,revocation_reason FROM entitlements WHERE transaction_id = ?").bind(transactionId).all();
+  } catch {
+    throw new WebhookFailure("adjustment_entitlement_lookup_failed");
+  }
+  const rows = result?.results || [];
+  const adjustmentTarget = { item_ids: JSON.stringify(adjustmentItemIds(event.data)) };
+  const targets = adjustmentTargets(rows, adjustmentTarget);
+  if (decision.effect !== "ignore" && rows.length === 0) throw new WebhookFailure("adjustment_entitlements_pending");
+  if (decision.effect === "revoke" && rows.some((row) => row.status === "active") && !targets.some((row) => row.status === "active")) throw new WebhookFailure("adjustment_target_not_found");
+  const statements = [];
+  if (decision.effect === "revoke") {
+    const revokeTargets = targets.filter((item) => item.status === "active");
+    for (const row of revokeTargets) {
+      statements.push(env.LICENSE_DB.prepare("UPDATE entitlements SET status = 'revoked', revoked_at = ?, revocation_reason = ?, updated_at = ? WHERE id = ? AND status = 'active'").bind(processedAt, String(event.data.action), processedAt, row.id));
+      statements.push(env.LICENSE_DB.prepare("UPDATE entitlement_purchase_guards SET status = 'revoked', updated_at = ? WHERE transaction_id = ? AND product_key = ? AND plan_key = ? AND status = 'active'").bind(processedAt, transactionId, row.product_key, row.plan_key));
+      statements.push(env.LICENSE_DB.prepare("UPDATE activation_codes SET revoked_at = ? WHERE entitlement_id = ?").bind(processedAt, row.id));
+      statements.push(env.LICENSE_DB.prepare("UPDATE activations SET revoked_at = ? WHERE entitlement_id = ? AND revoked_at IS NULL").bind(processedAt, row.id));
+    }
+    try {
+      if (statements.length) await env.LICENSE_DB.batch(statements);
+    } catch {
+      throw new WebhookFailure("adjustment_revoke_failed");
+    }
+    return { outcome: "revoked", revoked: revokeTargets.length, restored: 0 };
+  }
+  const reasons = new Set(decision.reasons);
+  const restoreTargets = targets.filter((item) => item.status === "revoked" && reasons.has(item.revocation_reason));
+  for (const row of restoreTargets) {
+    statements.push(env.LICENSE_DB.prepare("UPDATE entitlements SET status = 'active', revoked_at = NULL, revocation_reason = NULL, updated_at = ? WHERE id = ? AND status = 'revoked'").bind(processedAt, row.id));
+    statements.push(env.LICENSE_DB.prepare("UPDATE entitlement_purchase_guards SET status = 'active', updated_at = ? WHERE transaction_id = ? AND product_key = ? AND plan_key = ?").bind(processedAt, transactionId, row.product_key, row.plan_key));
+    statements.push(env.LICENSE_DB.prepare("UPDATE activation_codes SET revoked_at = NULL WHERE entitlement_id = ?").bind(row.id));
+    statements.push(env.LICENSE_DB.prepare("UPDATE activations SET revoked_at = NULL WHERE entitlement_id = ?").bind(row.id));
+  }
+  try {
+    if (statements.length) await env.LICENSE_DB.batch(statements);
+  } catch {
+    throw new WebhookFailure("adjustment_restore_failed");
+  }
+  return { outcome: "restored", revoked: 0, restored: restoreTargets.length };
+}
+
 async function fulfillWebhook(env, event, grants, email, transactionId, processedAt) {
   let customer;
   try {
@@ -645,22 +971,60 @@ async function fulfillWebhook(env, event, grants, email, transactionId, processe
   }
   const actualCustomer = await env.LICENSE_DB.prepare("SELECT id FROM customers WHERE paddle_customer_id = ?").bind(String(event.data.customer_id)).first();
   if (!actualCustomer?.id) throw new WebhookFailure("customer_write_failed");
+  const adjustments = await loadPaddleAdjustments(env, transactionId);
   const entitlementRows = [];
-  for (const [product, plan] of grants) {
-    const existing = await env.LICENSE_DB.prepare("SELECT id FROM entitlements WHERE transaction_id = ? AND product_key = ? AND plan_key = ?").bind(transactionId, product, plan).first();
-    if (existing?.id) entitlementRows.push({ id: existing.id, product, plan, newCode: false });
-    else entitlementRows.push({ id: id("ent"), product, plan, newCode: true });
+  let duplicatePurchase = false;
+  let blockedByAdjustment = false;
+  const itemIds = grantItemIds(event.data, grants, env);
+  const orderedGrants = grants.slice().sort((left, right) => Number(left[0] === "suite") - Number(right[0] === "suite"));
+  for (const [product, plan] of orderedGrants) {
+    if (product === "suite" && plan === "bundle" && !entitlementRows.some((row) => row.product !== "suite" && row.newCode && row.eligible)) {
+      if (blockedByAdjustment) blockedByAdjustment = true;
+      else duplicatePurchase = true;
+      continue;
+    }
+    const existing = await env.LICENSE_DB.prepare("SELECT id,status FROM entitlements WHERE transaction_id = ? AND product_key = ? AND plan_key = ?").bind(transactionId, product, plan).first();
+    if (existing?.id) {
+      entitlementRows.push({ id: existing.id, product, plan, newCode: false, eligible: existing.status === "active" });
+      continue;
+    }
+    const paddleItemId = itemIds.get(grantKey(product, plan));
+    if (adjustments.some((adjustment) => adjustment.effect === "revoke" && adjustmentAppliesToItem(adjustment, paddleItemId))) {
+      blockedByAdjustment = true;
+      continue;
+    }
+    try {
+      await env.LICENSE_DB.prepare("INSERT OR IGNORE INTO entitlement_purchase_guards (id,customer_id,product_key,plan_key,transaction_id,entitlement_id,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(id("guard"), actualCustomer.id, product, plan, transactionId, null, "active", processedAt, processedAt).run();
+    } catch {
+      throw new WebhookFailure("purchase_guard_write_failed");
+    }
+    let guard;
+    try {
+      guard = await env.LICENSE_DB.prepare("SELECT transaction_id,status FROM entitlement_purchase_guards WHERE customer_id = ? AND product_key = ? AND plan_key = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(actualCustomer.id, product, plan).first();
+    } catch {
+      throw new WebhookFailure("purchase_guard_lookup_failed");
+    }
+    if (!guard || guard.transaction_id !== transactionId) {
+      duplicatePurchase = true;
+      continue;
+    }
+    entitlementRows.push({ id: id("ent"), product, plan, newCode: true, eligible: true, paddleItemId });
   }
-  const entitlementWrites = entitlementRows.filter((row) => row.newCode).map((row) => env.LICENSE_DB.prepare("INSERT OR IGNORE INTO entitlements (id,customer_id,transaction_id,product_key,plan_key,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)").bind(row.id, actualCustomer.id, transactionId, row.product, row.plan, "active", processedAt, processedAt));
+  const entitlementWrites = entitlementRows.filter((row) => row.newCode && row.eligible).map((row) => env.LICENSE_DB.prepare("INSERT OR IGNORE INTO entitlements (id,customer_id,transaction_id,product_key,plan_key,paddle_item_id,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(row.id, actualCustomer.id, transactionId, row.product, row.plan, row.paddleItemId || null, "active", processedAt, processedAt));
   try {
     if (entitlementWrites.length) await env.LICENSE_DB.batch(entitlementWrites);
   } catch {
     throw new WebhookFailure("entitlement_write_failed");
   }
   const codes = [];
-  for (const row of entitlementRows) {
+  for (const row of entitlementRows.filter((item) => item.eligible)) {
     const entitlement = await env.LICENSE_DB.prepare("SELECT id FROM entitlements WHERE transaction_id = ? AND product_key = ? AND plan_key = ?").bind(transactionId, row.product, row.plan).first();
     if (!entitlement?.id) throw new WebhookFailure("entitlement_write_failed");
+    try {
+      await env.LICENSE_DB.prepare("UPDATE entitlement_purchase_guards SET entitlement_id = ?, updated_at = ? WHERE transaction_id = ? AND product_key = ? AND plan_key = ? AND status = 'active'").bind(entitlement.id, processedAt, transactionId, row.product, row.plan).run();
+    } catch {
+      throw new WebhookFailure("purchase_guard_link_failed");
+    }
     const existingCode = await env.LICENSE_DB.prepare("SELECT id FROM activation_codes WHERE entitlement_id = ?").bind(entitlement.id).first();
     if (existingCode) continue;
     const code = activationCode();
@@ -673,25 +1037,32 @@ async function fulfillWebhook(env, event, grants, email, transactionId, processe
     const confirmed = await env.LICENSE_DB.prepare("SELECT id FROM activation_codes WHERE entitlement_id = ?").bind(entitlement.id).first();
     if (confirmed?.id === codeId) codes.push(code);
   }
-  return { fulfilled: grants.length, codes };
+  return { fulfilled: entitlementRows.filter((row) => row.newCode && row.eligible).length, codes, duplicatePurchase, blockedByAdjustment };
 }
 
 async function handleWebhook(request, env) {
   const raw = await request.text();
   const { timestamp, hash } = parsePaddleSignature(request.headers.get("Paddle-Signature"));
   if (!Number.isFinite(timestamp) || Math.abs(Math.floor(Date.now() / 1000) - timestamp) > MAX_SIGNATURE_AGE_SECONDS || !(await verifyHmac(env.PADDLE_WEBHOOK_SECRET, `${timestamp}:${raw}`, hash))) return json({ error: "invalid_signature" }, 400);
+  try { await enforcePaddleWebhookIp(request, env); } catch (error) { return webhookErrorResponse(error instanceof WebhookFailure ? error : new WebhookFailure("paddle_ip_list_unavailable")); }
   let event;
   try { event = JSON.parse(raw); } catch { return json({ error: "invalid_json" }, 400); }
   if (!event.event_id || !SUPPORTED_EVENTS.has(event.event_type)) return json({ accepted: false }, 202);
-  const priceIds = lineItemPriceIds(event.data);
-  if (!priceIds.length) return json({ error: "unsupported_price" }, 422);
-  let grants;
-  try { grants = entitlementsForPrices(priceIds, env); } catch { return json({ error: "unsupported_price" }, 422); }
-  if (!grants.length) return json({ error: "unsupported_price" }, 422);
-  if (!event.data?.id || !event.data?.customer_id) return json({ error: "invalid_transaction" }, 422);
+  const isTransaction = event.event_type === "transaction.completed";
+  let grants = [];
+  if (isTransaction) {
+    const priceIds = lineItemPriceIds(event.data);
+    if (!priceIds.length) return json({ error: "unsupported_price" }, 422);
+    try { grants = entitlementsForPrices(priceIds, env); } catch { return json({ error: "unsupported_price" }, 422); }
+    if (!grants.length) return json({ error: "unsupported_price" }, 422);
+    if (!event.data?.id || !event.data?.customer_id) return json({ error: "invalid_transaction" }, 422);
+  } else {
+    if (!event.data?.id || !event.data?.transaction_id || !event.data?.customer_id) return json({ error: "invalid_adjustment" }, 422);
+    try { adjustmentDecision(event.data); } catch (error) { return webhookErrorResponse(error instanceof WebhookFailure ? error : new WebhookFailure("unsupported_adjustment", 422, false)); }
+  }
   const processedAt = nowIso();
   const payloadHash = await sha256(raw);
-  const transactionId = String(event.data.id);
+  const transactionId = webhookTransactionId(event);
   const processingToken = id("proc");
   let registration;
   try {
@@ -699,21 +1070,40 @@ async function handleWebhook(request, env) {
   } catch (error) {
     return webhookErrorResponse(error);
   }
-  if (registration.duplicate) return json({ accepted: true, duplicate: true });
-  if (registration.busy) return json({ error: "fulfillment_in_progress" }, 409);
-  let email = normalizeEmail(event.data?.customer?.email || event.data?.customer_email);
-  if (!validEmail(email)) {
-    try { email = await paddleCustomerEmail(String(event.data.customer_id), env); } catch (error) {
-      const failure = error instanceof WebhookFailure ? error : new WebhookFailure("customer_lookup_failed");
-      await markWebhookFailed(env, event.event_id, processingToken, failure.code);
-      return webhookErrorResponse(failure);
+  if (registration.duplicate) {
+    if (event.event_type !== "adjustment.updated") return json({ accepted: true, duplicate: true, outcome: registration.outcome });
+    try {
+      const result = await applyPaddleAdjustment(env, event, processedAt);
+      const response = { accepted: true, duplicate: true, outcome: result.outcome };
+      if (result.revoked) response.revoked = result.revoked;
+      if (result.restored) response.restored = result.restored;
+      return json(response);
+    } catch (error) {
+      return webhookErrorResponse(error);
     }
   }
+  if (registration.busy) return json({ error: "fulfillment_in_progress" }, 409);
   try {
-    const result = await fulfillWebhook(env, event, grants, email, transactionId, processedAt);
-    const finalized = await env.LICENSE_DB.prepare("UPDATE paddle_events SET status = 'fulfilled', processing_token = NULL, processing_started_at = NULL, last_error = NULL, processed_at = ? WHERE event_id = ? AND processing_token = ?").bind(nowIso(), event.event_id, processingToken).run();
+    let result;
+    if (isTransaction) {
+      let email = normalizeEmail(event.data?.customer?.email || event.data?.customer_email);
+      if (!validEmail(email)) {
+        try { email = await paddleCustomerEmail(String(event.data.customer_id), env); } catch (error) {
+          throw error instanceof WebhookFailure ? error : new WebhookFailure("customer_lookup_failed");
+        }
+      }
+      result = await fulfillWebhook(env, event, grants, email, transactionId, processedAt);
+    } else {
+      result = await applyPaddleAdjustment(env, event, processedAt);
+    }
+    const outcome = result.outcome || (result.blockedByAdjustment ? "blocked_by_adjustment" : result.duplicatePurchase ? "duplicate_purchase" : "fulfilled");
+    const finalized = await env.LICENSE_DB.prepare("UPDATE paddle_events SET status = 'fulfilled', processing_token = NULL, processing_started_at = NULL, last_error = NULL, outcome = ?, processed_at = ? WHERE event_id = ? AND processing_token = ?").bind(outcome, nowIso(), event.event_id, processingToken).run();
     if (!finalized?.meta?.changes) throw new WebhookFailure("event_finalize_failed");
     const response = { accepted: true, fulfilled: result.fulfilled };
+    if (result.duplicatePurchase) response.duplicate_purchase = true;
+    if (result.blockedByAdjustment) response.blocked_by_adjustment = true;
+    if (result.revoked) response.revoked = result.revoked;
+    if (result.restored) response.restored = result.restored;
     if (env.DEVELOPMENT === "true") response.development_activation_codes = result.codes;
     return json(response);
   } catch (error) {
@@ -729,7 +1119,7 @@ async function handleClaim(request, env) {
   const installationId = String(body?.installation_id || "").trim();
   if (!code || installationId.length < 16 || installationId.length > 256) return json({ error: "invalid_request" }, 400);
   const codeHash = await sha256(code);
-  const row = await env.LICENSE_DB.prepare("SELECT ac.id, ac.entitlement_id, e.product_key, e.plan_key, e.status FROM activation_codes ac JOIN entitlements e ON e.id = ac.entitlement_id WHERE ac.code_hash = ?").bind(codeHash).first();
+  const row = await env.LICENSE_DB.prepare("SELECT ac.id, ac.entitlement_id, e.product_key, e.plan_key, e.status FROM activation_codes ac JOIN entitlements e ON e.id = ac.entitlement_id WHERE ac.code_hash = ? AND ac.revoked_at IS NULL").bind(codeHash).first();
   if (!row || row.status !== "active") return json({ error: "invalid_activation_code" }, 400);
   const createdAt = nowIso();
   const tokenId = id("tok");
@@ -788,6 +1178,7 @@ export async function handleRequest(request, env) {
   if (request.method === "POST" && url.pathname === "/api/account/portal") return handlePortalSession(request, env);
   if ((request.method === "GET" || request.method === "POST") && url.pathname === "/api/account/logout") return handleLogout(request, env);
   if (request.method === "POST" && url.pathname === "/api/paddle/webhook") return handleWebhook(request, env);
+  if (request.method === "GET" && url.pathname === "/checkout-portal/paddle-config.js") return paddleConfigResponse(env);
   if (request.method === "POST" && url.pathname === "/api/license/claim") return handleClaim(request, env);
   if (request.method === "POST" && url.pathname === "/api/license/restore/request") return handleRestore(request, env);
   if (request.method === "POST" && url.pathname === "/api/license/verify") return handleVerify(request, env);

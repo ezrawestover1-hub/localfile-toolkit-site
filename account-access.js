@@ -1,6 +1,60 @@
 (() => {
   "use strict";
-  const products = Object.freeze({ ledgerlift: "LedgerLift", pixelport: "PixelPort", contactcraft: "ContactCraft", calendarflow: "CalendarFlow", captionshift: "CaptionShift" });
+  const products = Object.freeze({ ledgerlift: "LedgerHarbor", pixelport: "PixelRefinery", contactcraft: "ContactCraft", calendarflow: "CalendarFlow", captionshift: "CaptionShift" });
+  const legacyPublicNames = Object.freeze({
+    LedgerLift: products.ledgerlift,
+    LedgerConverzn: products.ledgerlift,
+    LedgerHarbor: products.ledgerlift,
+    PixelPort: products.pixelport,
+    PicsPort: products.pixelport,
+    PixelTailor: products.pixelport,
+    PixelRefinery: products.pixelport
+  });
+  let applyingPublicBranding = false;
+
+  function replaceLegacyPublicName(value) {
+    if (typeof value !== "string") return value;
+    return value
+      .replace(/\bLedgerLift\b/g, legacyPublicNames.LedgerLift)
+      .replace(/\bLedgerConverzn\b/g, legacyPublicNames.LedgerConverzn)
+      .replace(/\bLedgerHarbor\b/g, legacyPublicNames.LedgerHarbor)
+      .replace(/\bPixelPort\b/g, legacyPublicNames.PixelPort)
+      .replace(/\bPicsPort\b/g, legacyPublicNames.PicsPort)
+      .replace(/\bPixelTailor\b/g, legacyPublicNames.PixelTailor)
+      .replace(/\bPixelRefinery\b/g, legacyPublicNames.PixelRefinery);
+  }
+
+  function applyPublicBranding(root = document) {
+    if (applyingPublicBranding) return;
+    applyingPublicBranding = true;
+    try {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      const textNodes = [];
+      let node;
+      while ((node = walker.nextNode())) {
+        if (!node.parentElement?.closest("script,style,noscript,textarea")) textNodes.push(node);
+      }
+      textNodes.forEach((textNode) => {
+        const next = replaceLegacyPublicName(textNode.nodeValue);
+        if (next !== textNode.nodeValue) textNode.nodeValue = next;
+      });
+      const nextTitle = replaceLegacyPublicName(document.title);
+      if (nextTitle !== document.title) document.title = nextTitle;
+      document.querySelectorAll("meta[content], [alt], [aria-label], [title]").forEach((element) => {
+        ["content", "alt", "aria-label", "title"].forEach((attribute) => {
+          if (!element.hasAttribute(attribute)) return;
+          const next = replaceLegacyPublicName(element.getAttribute(attribute));
+          if (next !== element.getAttribute(attribute)) element.setAttribute(attribute, next);
+        });
+      });
+    } finally {
+      applyingPublicBranding = false;
+    }
+  }
+
+  window.LOCALFILE_PUBLIC_NAMES = Object.freeze({ ...products });
+  applyPublicBranding();
+  new MutationObserver(() => applyPublicBranding()).observe(document.documentElement, { subtree: true, childList: true, characterData: true });
   const productHome = (product) => `/${product}/index.html`;
   const standardHome = (product) => `${productHome(product)}?mode=standard`;
   const plusHome = (product) => `${productHome(product)}?mode=plus`;
@@ -181,7 +235,7 @@
         if (bundleKicker) bundleKicker.textContent = "Your complete suite";
         if (bundleHeading) bundleHeading.textContent = "Full Plus access is active.";
         if (bundleStrong) bundleStrong.textContent = "5 products ready";
-        if (bundleCopy) bundleCopy.textContent = "LedgerLift, PixelPort, ContactCraft, CalendarFlow, and CaptionShift are all connected to your account. No second purchase is needed.";
+        if (bundleCopy) bundleCopy.textContent = "LedgerHarbor, PixelRefinery, ContactCraft, CalendarFlow, and CaptionShift are all connected to your account. No second purchase is needed.";
         if (bundleLink) { bundleLink.textContent = "Access other products"; bundleLink.href = "/account/"; }
       }
       return;
