@@ -30,15 +30,15 @@
     const historyLimit = HISTORY_LIMITS[tier] || HISTORY_LIMITS.free;
     let lastReport = null;
 
-    function columns() { return mapper?.getState?.().columns || []; }
-    function columnFor(...roles) { return columns().find((column) => roles.includes(column.role) && !["unmapped", "ignore"].includes(column.role)); }
-    function valueFor(entry, ...roles) { const column = columnFor(...roles); return { column, value: column ? text(entry.values[column.header]) : "" }; }
     function addIssue(issues, severity, code, message, column = "") { issues.push({ severity, code, message, column }); }
     function duplicateKey(transaction) { return `${transaction.d || ""}|${Number.isFinite(transaction.a) ? transaction.a.toFixed(2) : ""}|${normalized(transaction.memo)}`; }
 
     function validate() {
       const mapperValidation = mapper?.getValidation?.() || { mode: "signed", canContinue: false, blocking: [] };
       const mode = mapperValidation.mode || "signed";
+      const mappedColumns = mapper?.getState?.().columns || [];
+      const columnFor = (...roles) => mappedColumns.find((column) => roles.includes(column.role) && !["unmapped", "ignore"].includes(column.role));
+      const valueFor = (entry, ...roles) => { const column = columnFor(...roles); return { column, value: column ? text(entry.values[column.header]) : "" }; };
       const assignments = accountMapper?.rowAssignments?.() || {};
       const entries = review?.activeEntries?.() || [];
       const transactions = [];

@@ -19,7 +19,7 @@ function walk(directory) {
 
 function localReference(value, htmlFile) {
   const clean = value.split(/[?#]/, 1)[0];
-  if (!clean || clean.startsWith("#") || /^(?:data|blob|mailto|javascript):/i.test(clean) || /^https?:\/\//i.test(clean)) return null;
+  if (!clean || clean.startsWith("#") || /^(?:data|blob|mailto|javascript):/i.test(clean) || /^https?:\/\//i.test(clean) || /^\/?api(?:\/|$)/i.test(clean)) return null;
   let decoded;
   try { decoded = decodeURIComponent(clean); } catch { return null; }
   return decoded.startsWith("/") ? resolve(root, `.${decoded}`) : resolve(htmlFile, "..", decoded);
@@ -45,7 +45,10 @@ for (const file of htmlFiles) {
 }
 
 function statSafe(file) {
-  try { return statSync(file).isFile(); } catch { return false; }
+  try {
+    const stats = statSync(file);
+    return stats.isFile() || (stats.isDirectory() && statSafe(join(file, "index.html")));
+  } catch { return false; }
 }
 
 if (failures.length) {

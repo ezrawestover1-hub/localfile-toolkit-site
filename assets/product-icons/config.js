@@ -1,0 +1,7 @@
+window.PRODUCT_ICONS = Object.freeze({
+  ledgerlift: Object.freeze({ name: "LedgerLift", icon: "/assets/product-icons/ledgerlift/icon-512.png", favicon16: "/assets/product-icons/ledgerlift/favicon-16.png", favicon32: "/assets/product-icons/ledgerlift/favicon-32.png", appleTouch: "/assets/product-icons/ledgerlift/apple-touch-icon.png" }),
+  pixelport: Object.freeze({ name: "PixelPort", icon: "/assets/product-icons/pixelport/icon-512.png", favicon16: "/assets/product-icons/pixelport/favicon-16.png", favicon32: "/assets/product-icons/pixelport/favicon-32.png", appleTouch: "/assets/product-icons/pixelport/apple-touch-icon.png" }),
+  contactcraft: Object.freeze({ name: "ContactCraft", icon: "/assets/product-icons/contactcraft/icon-512.png", favicon16: "/assets/product-icons/contactcraft/favicon-16.png", favicon32: "/assets/product-icons/contactcraft/favicon-32.png", appleTouch: "/assets/product-icons/contactcraft/apple-touch-icon.png" }),
+  calendarflow: Object.freeze({ name: "CalendarFlow", icon: "/assets/product-icons/calendarflow/icon-512.png", favicon16: "/assets/product-icons/calendarflow/favicon-16.png", favicon32: "/assets/product-icons/calendarflow/favicon-32.png", appleTouch: "/assets/product-icons/calendarflow/apple-touch-icon.png" }),
+  captionshift: Object.freeze({ name: "CaptionShift", icon: "/assets/product-icons/captionshift/icon-512.png", favicon16: "/assets/product-icons/captionshift/favicon-16.png", favicon32: "/assets/product-icons/captionshift/favicon-32.png", appleTouch: "/assets/product-icons/captionshift/apple-touch-icon.png" })
+});

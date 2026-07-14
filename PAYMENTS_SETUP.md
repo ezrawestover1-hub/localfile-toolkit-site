@@ -12,23 +12,45 @@ Create these one-time products/prices in Paddle:
 
 | Product | Standard | Plus |
 |---|---:|---:|
-| LedgerLift | $9.99 | $11.99 |
-| PixelPort | $9.99 | $11.99 |
-| ContactCraft | $9.99 | $11.99 |
-| CalendarFlow | $9.99 | $11.99 |
-| CaptionShift | $9.99 | $11.99 |
+| LedgerLift | $19.99 | $24.99 |
+| PixelPort | $2.99 | $5.99 |
+| ContactCraft | $9.99 | $12.99 |
+| CalendarFlow | $9.99 | $12.99 |
+| CaptionShift | $6.99 | $9.99 |
 
 Create one additional one-time price:
 
-- LocalFile Tools Plus Bundle — $39.99
+- Complete Plus Bundle — $39.99 one time; five separate Plus products total $66.95, saving $26.96 (approximately 40% off).
 
 Copy the resulting `pri_...` identifiers into `checkout-portal/paddle-config.js`.
+
+## One-unit purchase limit
+
+Set every one-time Paddle price quantity range to a minimum of `1` and a maximum of `1`. The shared checkout also sends `quantity: 1` explicitly. This prevents a customer from buying multiple units of the same price in one checkout. It does not prevent a customer from starting separate checkouts, so production fulfillment must deduplicate completed transactions before issuing an entitlement.
+
+## One shared checkout portal
+
+There is one payment surface at `/checkout-portal/`. Every product and plan routes there with explicit query parameters:
+
+- `/checkout-portal/index.html?product=ledgerlift&plan=standard`
+- `/checkout-portal/index.html?product=ledgerlift&plan=plus`
+- `/checkout-portal/index.html?product=pixelport&plan=standard`
+- `/checkout-portal/index.html?product=pixelport&plan=plus`
+- `/checkout-portal/index.html?product=contactcraft&plan=standard`
+- `/checkout-portal/index.html?product=contactcraft&plan=plus`
+- `/checkout-portal/index.html?product=calendarflow&plan=standard`
+- `/checkout-portal/index.html?product=calendarflow&plan=plus`
+- `/checkout-portal/index.html?product=captionshift&plan=standard`
+- `/checkout-portal/index.html?product=captionshift&plan=plus`
+- `/checkout-portal/index.html?product=suite&plan=bundle`
+
+The official public comparison page is `/pricing.html`. It links to the same shared portal and identifies the exact product, plan, one-time price, and current feature status before checkout.
 
 ## Client-side token
 
 Create a Paddle client-side token and paste it into `checkout-portal/paddle-config.js`. Client-side tokens are intended for frontend code. Never put a Paddle API key, webhook secret, password, or private signing key into the website files.
 
-Start with `environment: "sandbox"` and a `test_...` token. After your seller account, website, products, prices, and domain are approved, switch to `environment: "production"` and a `live_...` token.
+Keep `environment: "sandbox"` and a `test_...` token during this verification phase. Keep `checkoutEnabled: false` while fulfillment and launch review are incomplete. Do not switch to production or use a `live_...` token.
 
 ## Payment methods
 
@@ -52,13 +74,19 @@ Each product is a separate homepage and link, while sharing one domain and check
 A successful browser redirect is not proof of payment. Before automatically unlocking paid features:
 
 1. Create a Paddle webhook destination for `transaction.completed`.
-2. Verify every `Paddle-Signature` against the raw request body and the webhook secret.
+2. Verify every `Paddle-Signature` against the raw request body and the webhook secret. Fulfillment events move through `processing`, `failed`, and `fulfilled`; only `fulfilled` events are acknowledged as duplicates.
 3. Reject stale timestamps and duplicate event IDs.
 4. Map the completed Paddle price ID to the purchased product and plan.
-5. Issue a server-signed entitlement or license.
+5. Issue a server-signed entitlement or license only after the D1 fulfillment batch succeeds, and keep the event retryable when any D1 or Paddle customer lookup fails.
 6. Never store the webhook secret, API key, or license-signing private key in frontend files.
 
 The included success page deliberately does not unlock anything. This prevents people from obtaining paid access by visiting a success URL manually.
+
+## Public verification pages
+
+The public verification surface is `/pricing.html`, `/terms.html`, `/privacy.html`, `/refunds.html`, `/refund-request.html`, `/contact.html`, and `/support.html`. Customer support is [localfiletools.support@gmail.com](mailto:localfiletools.support@gmail.com). `/checkout-portal/purchase-success.html` is a confirmation page only; it does not grant access.
+
+Support and refund forms are delivered by the existing Worker and are documented in `SUPPORT_EMAIL_SETUP.md`. Until a provider is configured and tested, they show setup mode and a direct mail fallback; they do not falsely report delivery.
 
 ## Privacy boundary
 

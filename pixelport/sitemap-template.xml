@@ -6,4 +6,7 @@
   <url><loc>https://YOUR-DOMAIN.example/webp-to-jpg-converter.html</loc></url>
   <url><loc>https://YOUR-DOMAIN.example/png-to-webp-converter.html</loc></url>
   <url><loc>https://YOUR-DOMAIN.example/avif-to-jpg-converter.html</loc></url>
+  <url><loc>https://YOUR-DOMAIN.example/webp-to-png-converter.html</loc></url>
+  <url><loc>https://YOUR-DOMAIN.example/avif-to-png-converter.html</loc></url>
+  <url><loc>https://YOUR-DOMAIN.example/private-image-converter.html</loc></url>
 </urlset>

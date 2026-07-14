@@ -2,4 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://YOUR-DOMAIN.example/</loc></url>
   <url><loc>https://YOUR-DOMAIN.example/csv-to-iif-converter.html</loc></url>
+  <url><loc>https://YOUR-DOMAIN.example/bank-csv-to-iif.html</loc></url>
+  <url><loc>https://YOUR-DOMAIN.example/debit-credit-csv-to-iif.html</loc></url>
+  <url><loc>https://YOUR-DOMAIN.example/create-iif-from-spreadsheet.html</loc></url>
 </urlset>

@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /license/
+Disallow: /checkout-portal/purchase-success.html
+Sitemap: https://localfiletoolkit.com/sitemap.xml

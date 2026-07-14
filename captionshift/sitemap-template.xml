@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://YOUR-DOMAIN.example/</loc></url>
-  <url><loc>https://YOUR-DOMAIN.example/srt-to-vtt-converter.html</loc></url>
-  <url><loc>https://YOUR-DOMAIN.example/vtt-to-srt-converter.html</loc></url>
-  <url><loc>https://YOUR-DOMAIN.example/ass-to-srt-converter.html</loc></url>
-  <url><loc>https://YOUR-DOMAIN.example/sbv-to-srt-converter.html</loc></url>
+  <url><loc>https://YOUR-DOMAIN.example/captionshift/srt-to-vtt-converter.html</loc></url>
+  <url><loc>https://YOUR-DOMAIN.example/captionshift/vtt-to-srt-converter.html</loc></url>
+  <url><loc>https://YOUR-DOMAIN.example/captionshift/sbv-to-srt-converter.html</loc></url>
+  <url><loc>https://YOUR-DOMAIN.example/captionshift/ass-to-srt-converter.html</loc></url>
+  <url><loc>https://YOUR-DOMAIN.example/captionshift/subtitle-format-converter.html</loc></url>
+  <url><loc>https://YOUR-DOMAIN.example/captionshift/private-subtitle-converter.html</loc></url>
 </urlset>
