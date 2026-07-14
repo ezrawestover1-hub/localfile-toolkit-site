@@ -53,7 +53,7 @@
       "vars": {
         "REQUIRE_DURABLE_RATE_LIMITER": "true",
         "PADDLE_CHECKOUT_ENVIRONMENT": "production",
-        "PADDLE_CHECKOUT_ENABLED": "false",
+        "PADDLE_CHECKOUT_ENABLED": "true",
         "PADDLE_API_BASE_URL": "https://api.paddle.com",
         "PADDLE_ENFORCE_WEBHOOK_IPS": "true",
         "AUTH_EMAIL_API_URL": "https://api.resend.com/emails",
