@@ -812,6 +812,8 @@ test("account setup stages passwords until email verification", () => {
   assert.match(read("migrations/0007_auth_hardening.sql"), /attempt_count/);
   assert.match(read("migrations/0007_auth_hardening.sql"), /processing_token/);
   assert.match(read("worker.js"), /pbkdf2-sha256/);
+  const pbkdf2Iterations = Number(read("worker.js").match(/const PASSWORD_PBKDF2_ITERATIONS = (\d+);/)?.[1]);
+  assert.equal(pbkdf2Iterations, 100000, "password setup must stay within Cloudflare Workers' PBKDF2 limit");
   assert.match(read("worker.js"), /pending_user_id/);
   assert.match(read("worker.js"), /Request a new code and try again/);
   assert.match(read("worker.js"), /SELECT password_hash,password_salt,iterations,algorithm FROM account_pending_passwords/);
