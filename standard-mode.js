@@ -139,7 +139,7 @@
     document.body.classList.add("standard-authorized");
     document.body.classList.remove("standard-locked");
     document.body.dataset.standardAccessState = "authorized";
-    document.title = `${meta.name} Standard — LocalFile Tools`;
+    document.title = `${meta.name} Standard — LocalFile Toolkit`;
     addHandoff();
     prepareCore();
     window.dispatchEvent(new CustomEvent("standard-mode:ready", { detail: { product } }));
@@ -150,7 +150,7 @@
     document.body.classList.remove("standard-authorized");
     document.body.dataset.standardAccessState = state;
     window.SuiteGate?.setPaidAccess(false);
-    document.title = `${meta.name} Standard — LocalFile Tools`;
+    document.title = `${meta.name} Standard — LocalFile Toolkit`;
     addGate(state);
   }
 

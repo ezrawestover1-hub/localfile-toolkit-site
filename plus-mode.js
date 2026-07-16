@@ -145,7 +145,7 @@
     document.body.classList.add("plus-authorized");
     document.body.classList.remove("plus-locked");
     document.body.dataset.plusAccessState = "authorized";
-    document.title = `${meta.name} Plus — LocalFile Tools`;
+    document.title = `${meta.name} Plus — LocalFile Toolkit`;
     addHandoff();
     prepareCore();
     window.dispatchEvent(new CustomEvent("plus-mode:ready", { detail: { product, source } }));
@@ -156,7 +156,7 @@
     document.body.classList.remove("plus-authorized");
     document.body.dataset.plusAccessState = state;
     window.SuiteGate?.setPaidAccess(false);
-    document.title = `${meta.name} Plus — LocalFile Tools`;
+    document.title = `${meta.name} Plus — LocalFile Toolkit`;
     addGate(state);
   }
 
