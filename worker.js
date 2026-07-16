@@ -104,10 +104,14 @@ function setAccountCookie(response, token, maxAge = SESSION_MAX_AGE) {
 }
 
 function accountRedirect(url) {
-  const response = Response.redirect(url, 303);
-  response.headers.set("Cache-Control", "no-store");
-  response.headers.set("Referrer-Policy", "no-referrer");
-  return response;
+  return new Response(null, {
+    status: 303,
+    headers: {
+      Location: url,
+      "Cache-Control": "no-store",
+      "Referrer-Policy": "no-referrer"
+    }
+  });
 }
 
 async function accountUser(request, env) {

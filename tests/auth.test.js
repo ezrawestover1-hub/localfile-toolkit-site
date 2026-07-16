@@ -149,6 +149,16 @@ function authRequest(path, body) {
   return new Request(`https://example.test${path}`, { method: "POST", headers: { "content-type": "application/json", "x-forwarded-for": `203.0.113.${(requestNumber % 250) + 1}` }, body: JSON.stringify(body) });
 }
 
+test("logout clears the session cookie with a mutable no-store redirect", async () => {
+  const env = envWithCode();
+  const request = new Request("https://example.test/api/account/logout", { headers: { "x-forwarded-for": "203.0.113.250" } });
+  const response = await handleRequest(request, env);
+  assert.equal(response.status, 303);
+  assert.equal(response.headers.get("location"), "https://example.test/account/login.html");
+  assert.match(response.headers.get("set-cookie") || "", /Max-Age=0/);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+});
+
 test("reset codes are single-use and cannot create a second session when replayed", async () => {
   const env = envWithCode();
   const body = { email, code: "123456", password: "NewSecurePass!2" };
