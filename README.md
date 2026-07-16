@@ -1,4 +1,4 @@
-# LocalFile Tools
+# LocalFile Toolkit
 
 Five static, privacy-first converter website prototypes:
 

@@ -1,4 +1,4 @@
-# LocalFile Tools structure
+# LocalFile Toolkit structure
 
 The recommended deployment is one domain with five product portals:
 
