@@ -271,6 +271,15 @@ test("support contact, form disclosures, and setup documentation are public-safe
   assert.doesNotMatch(read("refund-request.js"), /API_KEY|SUPPORT_EMAIL_API/);
 });
 
+test("support hub gives customers clear help paths without requesting private files", () => {
+  const support = read("support.html");
+  ["contact.html", "account/", "refund-request.html", "pricing.html", "privacy.html", "terms.html"].forEach((href) => assert.match(support, new RegExp(`href="${href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`), `support link ${href}`));
+  ["LedgerHarbor", "PixelRefinery", "ContactCraft", "CalendarFlow", "CaptionShift"].forEach((name) => assert.match(support, new RegExp(name)));
+  assert.match(support, /Paddle transaction ID|receipt ID/);
+  assert.match(support, /Do not submit card numbers, passwords, government IDs, health information, confidential business files/);
+  assert.doesNotMatch(support, /upload your file|attach your source file|send your confidential source file/i);
+});
+
 test("client-shareable portfolio and its live demo are published with working showcase links", () => {
   const portfolio = read("portfolio.html");
   assert.match(portfolio, /Ezra Westover - Web Builder Portfolio/);
