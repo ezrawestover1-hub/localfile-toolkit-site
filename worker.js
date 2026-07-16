@@ -49,7 +49,10 @@ const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 const SESSION_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 const PASSWORD_ALGORITHM = "pbkdf2-sha256";
 const LEGACY_PASSWORD_ALGORITHM = "hmac-sha256";
-const PASSWORD_PBKDF2_ITERATIONS = 310000;
+// Cloudflare Workers' Web Crypto runtime supports PBKDF2 iteration counts up to
+// 100,000. Keep this at that supported ceiling: a higher value causes password
+// setup to fail before a verification code can be issued.
+const PASSWORD_PBKDF2_ITERATIONS = 100000;
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_MAX_LENGTH = 256;
 const PASSWORD_HISTORY_LIMIT = 5;

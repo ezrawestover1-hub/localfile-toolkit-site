@@ -7,7 +7,7 @@ if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
 const email = "ezra@example.com";
 const userId = "user_1";
-const pbkdf2Iterations = 310000;
+const pbkdf2Iterations = 100000;
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -45,6 +45,7 @@ class AuthDb {
   prepare(sql) { return new AuthStatement(this, sql); }
 
   first(sql, args) {
+    if (sql.includes("SELECT c.id FROM customers c JOIN entitlements")) return { id: "customer_1" };
     if (sql.includes("SELECT id FROM account_users WHERE normalized_email")) return this.users.find((row) => row.normalized_email === args[0]) || null;
     if (sql.includes("SELECT u.id,p.password_hash")) {
       const user = this.users.find((row) => row.normalized_email === args[0]);
@@ -169,6 +170,17 @@ test("signup verification codes are single-use and cannot be replayed", async ()
   const replay = await handleRequest(authRequest("/api/account/verify-code", body), env);
   assert.equal(replay.status, 400);
   assert.equal(env.LICENSE_DB.sessions.length, 1);
+});
+
+test("account registration stages a password within Cloudflare Workers' supported PBKDF2 limit", async () => {
+  const db = new AuthDb();
+  const env = { LICENSE_DB: db, ASSETS: { fetch: async () => new Response("static") } };
+  const response = await handleRequest(authRequest("/api/account/register", { email, password: "NewSecurePass!2" }), env);
+  // Email is intentionally unconfigured in this isolated test. Password setup
+  // must still complete before the delivery layer reports that configuration.
+  assert.equal(response.status, 503);
+  assert.equal(db.pending.get(userId)?.algorithm, "pbkdf2-sha256");
+  assert.equal(db.pending.get(userId)?.iterations, pbkdf2Iterations);
 });
 
 test("verification codes stop accepting guesses after five failed attempts", async () => {

@@ -14,7 +14,7 @@ The suite now has one email-and-password account at `/account/login.html` and a 
    - `AUTH_EMAIL_API_KEY`
    - `AUTH_EMAIL_FROM_ADDRESS`
 
-   New accounts receive a six-digit verification code by email. Passwords must be at least 8 characters, are stored only as salted PBKDF2-HMAC-SHA-256 hashes in the Worker, and are never emailed or stored in plaintext. Existing legacy HMAC records are upgraded after a successful sign-in. Recent password history is checked so a reset cannot immediately reuse a previous password.
+   New accounts receive a six-digit verification code by email. Passwords must be at least 8 characters, are stored only as salted PBKDF2-HMAC-SHA-256 hashes in the Worker, and are never emailed or stored in plaintext. The PBKDF2 work factor is set to Cloudflare Workers' supported maximum of 100,000 iterations; do not raise it above that runtime limit without changing the password-hashing implementation. Existing legacy HMAC records are upgraded after a successful sign-in. Recent password history is checked so a reset cannot immediately reuse a previous password.
 
    Verification and reset codes are single-use. Sending a newer code invalidates the previous unused code, each code is limited to five failed attempts, and a short processing lease prevents concurrent requests from completing the same code twice. Replaying a used code returns an invalid-code response and cannot create a session or change a password.
 
