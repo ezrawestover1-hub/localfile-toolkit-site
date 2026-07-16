@@ -66,6 +66,8 @@ class AuthDb {
   }
 
   run(sql, args) {
+    const placeholderCount = (sql.match(/\?/g) || []).length;
+    if (placeholderCount !== args.length) throw new Error(`SQL placeholder mismatch: expected ${placeholderCount}, received ${args.length}`);
     if (sql.startsWith("UPDATE account_verification_codes SET attempt_count")) {
       const row = this.codes.find((item) => item.id === args[2]);
       if (!row || row.used_at || row.processing_token || new Date(row.expires_at).getTime() <= Date.now()) return { meta: { changes: 0 } };
