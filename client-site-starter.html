@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A flexible starter website template for client projects."
+    />
+    <title>Client Site Starter Demo · Ezra Westover</title>
+    <link rel="canonical" href="https://localfiletoolkit.com/client-site-starter.html" />
+    <meta name="robots" content="noindex,nofollow" />
+
+    <style>
+      /* ================================================================
+         CLIENT BRAND SETTINGS
+         Change these values first for each new client.
+      ================================================================= */
+      :root {
+        --color-page: #f7f7f2;
+        --color-surface: #ffffff;
+        --color-ink: #17211b;
+        --color-muted: #657067;
+        --color-line: #dce3dc;
+        --color-accent: #2f6f55;
+        --color-accent-dark: #20513d;
+        --color-accent-soft: #dfeee5;
+        --color-hero: #183b30;
+        --color-hero-ink: #f4f8f1;
+        --font-body: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        --font-display: Georgia, "Times New Roman", serif;
+        --radius-small: 0.6rem;
+        --radius-large: 1.4rem;
+        --shadow-soft: 0 1.5rem 4rem rgba(23, 33, 27, 0.08);
+        --content-width: 72rem;
+        --section-space: clamp(4.5rem, 9vw, 8rem);
+      }
+
+      /* Optional background image. Replace the URL with a client asset,
+         or leave it empty to use the color/gradient background below. */
+      .hero {
+        --hero-image: none;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background: var(--color-page);
+        color: var(--color-ink);
+        font-family: var(--font-body);
+        line-height: 1.6;
+      }
+
+      body.menu-open {
+        overflow: hidden;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      img {
+        display: block;
+        max-width: 100%;
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      button,
+      a {
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      :focus-visible {
+        outline: 3px solid #f0ad4e;
+        outline-offset: 4px;
+      }
+
+      .container {
+        width: min(calc(100% - 2.5rem), var(--content-width));
+        margin-inline: auto;
+      }
+
+      .skip-link {
+        position: fixed;
+        z-index: 100;
+        top: 1rem;
+        left: 1rem;
+        transform: translateY(-150%);
+        padding: 0.7rem 1rem;
+        background: var(--color-ink);
+        color: white;
+        border-radius: var(--radius-small);
+      }
+
+      .skip-link:focus {
+        transform: translateY(0);
+      }
+
+      /* ================================================================
+         HEADER
+      ================================================================= */
+      .site-header {
+        position: absolute;
+        z-index: 10;
+        inset: 0 0 auto;
+        color: var(--color-hero-ink);
+      }
+
+      .header-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 5.5rem;
+        gap: 2rem;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: inherit;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        text-decoration: none;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 2rem;
+        height: 2rem;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--color-accent-soft);
+        color: var(--color-accent-dark);
+        font-size: 0.8rem;
+        font-weight: 900;
+      }
+
+      .site-nav ul {
+        display: flex;
+        align-items: center;
+        gap: clamp(1rem, 3vw, 2.25rem);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        font-size: 0.95rem;
+      }
+
+      .site-nav a {
+        opacity: 0.86;
+        text-decoration: none;
+      }
+
+      .site-nav a:hover {
+        opacity: 1;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .menu-toggle {
+        display: none;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+      }
+
+      /* ================================================================
+         REUSABLE COMPONENTS
+      ================================================================= */
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.9rem;
+        padding: 0.7rem 1.1rem;
+        border: 1px solid transparent;
+        border-radius: 999px;
+        background: var(--color-accent);
+        color: white;
+        cursor: pointer;
+        font-size: 0.95rem;
+        font-weight: 750;
+        text-decoration: none;
+        transition: transform 180ms ease, background 180ms ease;
+      }
+
+      .button:hover {
+        transform: translateY(-2px);
+        background: var(--color-accent-dark);
+      }
+
+      .button--light {
+        background: var(--color-hero-ink);
+        color: var(--color-hero);
+      }
+
+      .button--outline {
+        border-color: currentColor;
+        background: transparent;
+        color: inherit;
+      }
+
+      .eyebrow {
+        margin: 0 0 0.8rem;
+        color: var(--color-accent);
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+
+      .section-heading {
+        max-width: 42rem;
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: clamp(2.1rem, 5vw, 4rem);
+        font-weight: 400;
+        letter-spacing: -0.045em;
+        line-height: 1.02;
+      }
+
+      .section-intro {
+        max-width: 38rem;
+        margin: 1.25rem 0 0;
+        color: var(--color-muted);
+        font-size: 1.08rem;
+      }
+
+      /* ================================================================
+         HERO / BACKGROUND FUNCTIONING
+         The background layers stay readable when a photo is added:
+         image -> darkening gradient -> content.
+      ================================================================= */
+      .hero {
+        position: relative;
+        isolation: isolate;
+        min-height: min(48rem, 92vh);
+        overflow: hidden;
+        background:
+          linear-gradient(105deg, rgba(16, 42, 33, 0.94), rgba(24, 59, 48, 0.62)),
+          var(--hero-image),
+          var(--color-hero);
+        background-position: center;
+        background-size: cover;
+        color: var(--color-hero-ink);
+      }
+
+      .hero::after {
+        position: absolute;
+        z-index: -1;
+        right: -8rem;
+        bottom: -13rem;
+        width: 32rem;
+        height: 32rem;
+        border: 1px solid rgba(244, 248, 241, 0.13);
+        border-radius: 50%;
+        box-shadow: 0 0 0 3rem rgba(244, 248, 241, 0.035),
+          0 0 0 7rem rgba(244, 248, 241, 0.02);
+        content: "";
+      }
+
+      .hero-inner {
+        display: grid;
+        align-content: center;
+        min-height: min(48rem, 92vh);
+        padding-block: 8rem 5rem;
+      }
+
+      .hero-copy {
+        max-width: 46rem;
+      }
+
+      .hero h1 {
+        max-width: 48rem;
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: clamp(3.5rem, 9vw, 7.4rem);
+        font-weight: 400;
+        letter-spacing: -0.07em;
+        line-height: 0.91;
+      }
+
+      .hero p {
+        max-width: 34rem;
+        margin: 1.7rem 0 0;
+        color: rgba(244, 248, 241, 0.8);
+        font-size: clamp(1rem, 2vw, 1.2rem);
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.8rem;
+        margin-top: 2rem;
+      }
+
+      /* ================================================================
+         CONTENT SECTIONS
+      ================================================================= */
+      .section {
+        padding-block: var(--section-space);
+      }
+
+      .section--surface {
+        background: var(--color-surface);
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+        gap: clamp(2.5rem, 8vw, 8rem);
+        align-items: start;
+      }
+
+      .feature-list {
+        display: grid;
+        gap: 0;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        border-top: 1px solid var(--color-line);
+      }
+
+      .feature-list li {
+        display: grid;
+        grid-template-columns: 3rem 1fr;
+        gap: 1rem;
+        padding: 1.4rem 0;
+        border-bottom: 1px solid var(--color-line);
+      }
+
+      .feature-number {
+        color: var(--color-accent);
+        font-size: 0.85rem;
+        font-weight: 800;
+      }
+
+      .feature-list h3,
+      .feature-list p {
+        margin: 0;
+      }
+
+      .feature-list h3 {
+        font-size: 1.1rem;
+      }
+
+      .feature-list p {
+        margin-top: 0.35rem;
+        color: var(--color-muted);
+      }
+
+      .process-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1px;
+        margin-top: 3rem;
+        background: var(--color-line);
+        border: 1px solid var(--color-line);
+      }
+
+      .process-card {
+        min-height: 15rem;
+        padding: clamp(1.4rem, 3vw, 2.25rem);
+        background: var(--color-surface);
+      }
+
+      .process-card span {
+        color: var(--color-accent);
+        font-weight: 800;
+      }
+
+      .process-card h3 {
+        margin: 3rem 0 0.5rem;
+        font-family: var(--font-display);
+        font-size: 1.7rem;
+        font-weight: 400;
+        line-height: 1.05;
+      }
+
+      .process-card p {
+        margin: 0;
+        color: var(--color-muted);
+      }
+
+      .quote {
+        max-width: 54rem;
+        margin: 0 auto;
+        text-align: center;
+      }
+
+      .quote blockquote {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: clamp(2rem, 5vw, 4.25rem);
+        letter-spacing: -0.05em;
+        line-height: 1.02;
+      }
+
+      .quote cite {
+        display: block;
+        margin-top: 1.5rem;
+        color: var(--color-muted);
+        font-size: 0.95rem;
+        font-style: normal;
+      }
+
+      /* ================================================================
+         CONTACT FORM
+      ================================================================= */
+      .contact-grid {
+        display: grid;
+        grid-template-columns: 0.8fr 1.2fr;
+        gap: clamp(2rem, 8vw, 7rem);
+        align-items: start;
+      }
+
+      .contact-details {
+        display: grid;
+        gap: 1.2rem;
+        margin-top: 2rem;
+      }
+
+      .contact-details a {
+        color: var(--color-accent-dark);
+        font-weight: 750;
+      }
+
+      .form {
+        display: grid;
+        gap: 1rem;
+        padding: clamp(1.25rem, 4vw, 2.5rem);
+        background: var(--color-surface);
+        border: 1px solid var(--color-line);
+        border-radius: var(--radius-large);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+      }
+
+      .field {
+        display: grid;
+        gap: 0.4rem;
+      }
+
+      .field label {
+        font-size: 0.88rem;
+        font-weight: 750;
+      }
+
+      .field input,
+      .field textarea {
+        width: 100%;
+        border: 1px solid var(--color-line);
+        border-radius: var(--radius-small);
+        background: var(--color-page);
+        color: var(--color-ink);
+        padding: 0.8rem 0.9rem;
+      }
+
+      .field textarea {
+        min-height: 8rem;
+        resize: vertical;
+      }
+
+      .form-status {
+        min-height: 1.5rem;
+        margin: 0;
+        color: var(--color-accent-dark);
+        font-size: 0.92rem;
+        font-weight: 650;
+      }
+
+      /* ================================================================
+         FOOTER
+      ================================================================= */
+      .site-footer {
+        padding-block: 2rem;
+        background: var(--color-ink);
+        color: rgba(255, 255, 255, 0.8);
+      }
+
+      .footer-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+
+      .footer-inner p {
+        margin: 0;
+        font-size: 0.88rem;
+      }
+
+      /* ================================================================
+         RESPONSIVE ADAPTABILITY
+      ================================================================= */
+      @media (max-width: 48rem) {
+        .container {
+          width: min(calc(100% - 2rem), var(--content-width));
+        }
+
+        .header-inner {
+          min-height: 4.7rem;
+        }
+
+        .menu-toggle {
+          display: inline-flex;
+          padding: 0.5rem;
+        }
+
+        .menu-toggle svg {
+          width: 1.5rem;
+          height: 1.5rem;
+        }
+
+        .site-nav {
+          position: fixed;
+          inset: 4.7rem 1rem auto;
+          display: none;
+          padding: 1.2rem;
+          background: var(--color-surface);
+          color: var(--color-ink);
+          border-radius: var(--radius-large);
+          box-shadow: var(--shadow-soft);
+        }
+
+        .site-nav.is-open {
+          display: block;
+        }
+
+        .site-nav ul {
+          align-items: stretch;
+          flex-direction: column;
+          gap: 0;
+        }
+
+        .site-nav a {
+          display: block;
+          padding: 0.8rem 0.5rem;
+          border-bottom: 1px solid var(--color-line);
+        }
+
+        .header-actions .button {
+          display: none;
+        }
+
+        .hero,
+        .hero-inner {
+          min-height: 42rem;
+        }
+
+        .hero-inner {
+          padding-block: 7rem 4rem;
+        }
+
+        .split,
+        .contact-grid {
+          grid-template-columns: 1fr;
+          gap: 2.5rem;
+        }
+
+        .process-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .process-card {
+          min-height: auto;
+        }
+
+        .process-card h3 {
+          margin-top: 2rem;
+        }
+
+        .footer-inner {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+
+      @media (max-width: 34rem) {
+        .form-row {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-actions,
+        .hero-actions .button {
+          width: 100%;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+
+        *,
+        *::before,
+        *::after {
+          transition-duration: 0.01ms !important;
+          animation-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
+    <header class="site-header">
+      <div class="container header-inner">
+        <!-- Replace the mark and name for the client. -->
+        <a class="brand" href="#top" aria-label="Return to top">
+          <span class="brand-mark" aria-hidden="true">C</span>
+          <span>Client Company</span>
+        </a>
+
+        <nav class="site-nav" id="site-nav" aria-label="Main navigation">
+          <ul>
+            <li><a href="#services">Services</a></li>
+            <li><a href="#process">Process</a></li>
+            <li><a href="#about">About</a></li>
+            <li><a href="#contact">Contact</a></li>
+          </ul>
+        </nav>
+
+        <div class="header-actions">
+          <a class="button button--light" href="#contact">Start a project</a>
+          <button
+            class="menu-toggle"
+            type="button"
+            aria-controls="site-nav"
+            aria-expanded="false"
+            aria-label="Open menu"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section class="hero" id="top">
+        <div class="container hero-inner">
+          <div class="hero-copy">
+            <p class="eyebrow" style="color: var(--color-accent-soft)">A simple client-ready foundation</p>
+            <h1>Make good work easier to find.</h1>
+            <p>
+              Replace this text with the client’s clearest promise: who they help,
+              what they do, and why it matters.
+            </p>
+            <div class="hero-actions">
+              <a class="button button--light" href="#contact">Let’s work together</a>
+              <a class="button button--outline" href="#services">Explore services</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section--surface" id="services">
+        <div class="container split">
+          <div>
+            <p class="eyebrow">Services</p>
+            <h2 class="section-heading">A strong structure for a specific client story.</h2>
+            <p class="section-intro">
+              Keep the list short. Each service should connect to a real client
+              problem and a clear next step.
+            </p>
+          </div>
+
+          <ol class="feature-list">
+            <li>
+              <span class="feature-number">01</span>
+              <div>
+                <h3>Primary service</h3>
+                <p>A concise explanation of the service and its practical outcome.</p>
+              </div>
+            </li>
+            <li>
+              <span class="feature-number">02</span>
+              <div>
+                <h3>Secondary service</h3>
+                <p>Show the next useful way this business helps its audience.</p>
+              </div>
+            </li>
+            <li>
+              <span class="feature-number">03</span>
+              <div>
+                <h3>Specialized service</h3>
+                <p>Use this row for the service that differentiates the client.</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="section" id="process">
+        <div class="container">
+          <p class="eyebrow">Process</p>
+          <h2 class="section-heading">Clear steps reduce uncertainty.</h2>
+          <div class="process-grid">
+            <article class="process-card">
+              <span>01 / Discover</span>
+              <h3>Understand the real need.</h3>
+              <p>Replace with the first step in the client’s experience.</p>
+            </article>
+            <article class="process-card">
+              <span>02 / Build</span>
+              <h3>Turn the plan into action.</h3>
+              <p>Explain what happens next in plain language.</p>
+            </article>
+            <article class="process-card">
+              <span>03 / Continue</span>
+              <h3>Make progress sustainable.</h3>
+              <p>End with the result, support, or follow-up the client offers.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section--surface" id="about">
+        <div class="container quote">
+          <p class="eyebrow">About the client</p>
+          <blockquote>“Put a short, memorable statement here that sounds like the client.”</blockquote>
+          <cite>— Client name or guiding principle</cite>
+        </div>
+      </section>
+
+      <section class="section" id="contact">
+        <div class="container contact-grid">
+          <div>
+            <p class="eyebrow">Contact</p>
+            <h2 class="section-heading">Ready to begin?</h2>
+            <p class="section-intro">
+              Invite visitors to take one simple action. Adjust this section for
+              booking, phone calls, email, or a real form service.
+            </p>
+            <div class="contact-details">
+              <a href="mailto:hello@example.com">hello@example.com</a>
+              <span>Boise, Idaho · Serving clients everywhere</span>
+            </div>
+          </div>
+
+          <form class="form" id="contact-form">
+            <div class="form-row">
+              <div class="field">
+                <label for="name">Name</label>
+                <input id="name" name="name" type="text" autocomplete="name" required />
+              </div>
+              <div class="field">
+                <label for="email">Email</label>
+                <input id="email" name="email" type="email" autocomplete="email" required />
+              </div>
+            </div>
+            <div class="field">
+              <label for="message">How can we help?</label>
+              <textarea id="message" name="message" required></textarea>
+            </div>
+            <button class="button" type="submit">Send inquiry</button>
+            <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <a class="brand" href="#top">
+          <span class="brand-mark" aria-hidden="true">C</span>
+          <span>Client Company</span>
+        </a>
+        <p>© <span id="year"></span> Client Company. All rights reserved.</p>
+      </div>
+    </footer>
+
+    <script>
+      // Mobile navigation: opens, closes, and restores the menu after a link click.
+      const menuToggle = document.querySelector('.menu-toggle');
+      const siteNav = document.querySelector('.site-nav');
+
+      function setMenu(open) {
+        siteNav.classList.toggle('is-open', open);
+        document.body.classList.toggle('menu-open', open);
+        menuToggle.setAttribute('aria-expanded', String(open));
+        menuToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+      }
+
+      menuToggle.addEventListener('click', () => {
+        setMenu(!siteNav.classList.contains('is-open'));
+      });
+
+      siteNav.querySelectorAll('a').forEach((link) => {
+        link.addEventListener('click', () => setMenu(false));
+      });
+
+      // Lightweight demo behavior. Replace with Formspree, Netlify Forms,
+      // a server endpoint, or the client's CRM before going live.
+      const contactForm = document.querySelector('#contact-form');
+      const formStatus = document.querySelector('#form-status');
+
+      contactForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const name = new FormData(contactForm).get('name');
+        formStatus.textContent = `Thanks${name ? `, ${name}` : ''}! Your message is ready to connect to a real form service.`;
+        contactForm.reset();
+      });
+
+      document.querySelector('#year').textContent = new Date().getFullYear();
+    </script>
+  </body>
+</html>
