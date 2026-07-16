@@ -271,6 +271,16 @@ test("support contact, form disclosures, and setup documentation are public-safe
   assert.doesNotMatch(read("refund-request.js"), /API_KEY|SUPPORT_EMAIL_API/);
 });
 
+test("client-shareable portfolio and its live demo are published with working showcase links", () => {
+  const portfolio = read("portfolio.html");
+  assert.match(portfolio, /Ezra Westover - Web Builder Portfolio/);
+  assert.match(portfolio, /href="client-site-starter\.html"/);
+  ["ledgerlift/csv-to-iif-converter.html", "pixelport/private-image-converter.html", "contactcraft/vcf-to-csv-converter.html", "calendarflow/ics-to-csv-converter.html", "captionshift/subtitle-format-converter.html"].forEach((href) => assert.match(portfolio, new RegExp(href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))));
+  assert.match(portfolio, /mailto:ezra\.westover1@gmail\.com/);
+  assert.match(portfolio, /\(509\) 792-7052/);
+  assert.match(read("client-site-starter.html"), /<title>/i);
+});
+
 test("SEO foundations are present and sitemap excludes private routes", () => {
   const important = ["index.html", "pricing.html", "terms.html", "privacy.html", "refunds.html", "support.html", "contact.html", "refund-request.html", "checkout-portal/index.html", "ledgerlift/index.html", "pixelport/index.html", "contactcraft/index.html", "calendarflow/index.html", "captionshift/index.html"];
   const titles = new Set(); const descriptions = new Set();
