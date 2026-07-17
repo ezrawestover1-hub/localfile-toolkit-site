@@ -1,0 +1,23 @@
+/* Japan Therapist Finder portfolio entry. */
+.japanfinder-card {
+  background: linear-gradient(145deg, #fff, #f7fbff);
+}
+
+.portfolio-japanfinder-mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 16px;
+  border-radius: 18px;
+  background: #111827;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+}
+
+.portfolio-project-status {
+  margin-top: 18px;
+  font-size: 0.95rem;
+}
