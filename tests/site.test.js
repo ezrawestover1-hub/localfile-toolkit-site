@@ -5,7 +5,7 @@ import path from "node:path";
 
 const root = path.resolve(new URL("..", import.meta.url).pathname);
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
-const requiredRoutes = ["index.html", "pricing.html", "terms.html", "privacy.html", "refunds.html", "support.html", "contact.html", "refund-request.html", "robots.txt", "sitemap.xml", "ledgerlift/index.html", "pixelport/index.html", "contactcraft/index.html", "calendarflow/index.html", "captionshift/index.html", "checkout-portal/index.html", "checkout-portal/purchase-success.html", "license/activate.html", "license/restore.html", "license/manage.html"];
+const requiredRoutes = ["index.html", "portfolio.html", "pricing.html", "terms.html", "privacy.html", "refunds.html", "support.html", "contact.html", "refund-request.html", "robots.txt", "sitemap.xml", "ledgerlift/index.html", "pixelport/index.html", "contactcraft/index.html", "calendarflow/index.html", "captionshift/index.html", "checkout-portal/index.html", "checkout-portal/purchase-success.html", "license/activate.html", "license/restore.html", "license/manage.html"];
 const choices = [
   ["ledgerlift", "standard"], ["ledgerlift", "plus"], ["pixelport", "standard"], ["pixelport", "plus"],
   ["contactcraft", "standard"], ["contactcraft", "plus"], ["calendarflow", "standard"], ["calendarflow", "plus"],
@@ -283,6 +283,13 @@ test("support hub gives customers clear help paths without requesting private fi
 test("client-shareable portfolio and its live demo are published with working showcase links", () => {
   const portfolio = read("portfolio.html");
   assert.match(portfolio, /Ezra Westover - Web Builder Portfolio/);
+  assert.match(portfolio, /Context MRI/);
+  assert.equal(fs.existsSync(path.join(root, "assets/context-mri-icon.svg")), true);
+  assert.match(portfolio, /assets\/context-mri-icon\.svg/);
+  assert.match(portfolio, /context-mri\.ezra-westover1\.chatgpt\.site/);
+  assert.match(portfolio, /github\.com\/ezrawestover1-hub\/context-mri/);
+  assert.match(portfolio, /53 to 100/);
+  assert.match(portfolio, /Original Context Guard blocked; repaired pack passed/);
   assert.match(portfolio, /href="client-site-starter\.html"/);
   assert.match(portfolio, /href="https:\/\/japan-therapist-finder-preview\.ezra-westover1\.workers\.dev\/"/);
   assert.match(portfolio, /Open the Japan Therapist Finder preview in a new tab/);
