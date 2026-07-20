@@ -284,6 +284,8 @@ test("client-shareable portfolio and its live demo are published with working sh
   const portfolio = read("portfolio.html");
   assert.match(portfolio, /Ezra Westover - Web Builder Portfolio/);
   assert.match(portfolio, /href="client-site-starter\.html"/);
+  assert.match(portfolio, /href="https:\/\/japan-therapist-finder-preview\.ezra-westover1\.workers\.dev\/"/);
+  assert.match(portfolio, /Open the Japan Therapist Finder preview in a new tab/);
   ["ledgerlift/csv-to-iif-converter.html", "pixelport/private-image-converter.html", "contactcraft/vcf-to-csv-converter.html", "calendarflow/ics-to-csv-converter.html", "captionshift/subtitle-format-converter.html"].forEach((href) => assert.match(portfolio, new RegExp(href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))));
   assert.match(portfolio, /mailto:ezra\.westover1@gmail\.com/);
   assert.match(portfolio, /\(509\) 792-7052/);
