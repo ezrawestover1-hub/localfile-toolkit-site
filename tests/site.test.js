@@ -282,7 +282,8 @@ test("support hub gives customers clear help paths without requesting private fi
 
 test("client-shareable portfolio and its live demo are published with working showcase links", () => {
   const portfolio = read("portfolio.html");
-  assert.match(portfolio, /Ezra Westover - Web Builder Portfolio/);
+  assert.match(portfolio, /Westover Digital Design \| Ezra Westover/);
+  assert.match(portfolio, /Westover Digital Design · founded by Ezra Westover/);
   assert.match(portfolio, /Context MRI/);
   assert.equal(fs.existsSync(path.join(root, "assets/context-mri-icon.svg")), true);
   assert.match(portfolio, /assets\/context-mri-icon\.svg/);
