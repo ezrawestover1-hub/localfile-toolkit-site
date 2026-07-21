@@ -1,4 +1,56 @@
 /* Japan Therapist Finder portfolio entry. */
+.westover-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  color: #fff;
+}
+
+.westover-monogram,
+.westover-builder-mark {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .82);
+  background: transparent;
+  color: #fff;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+}
+
+.westover-monogram {
+  width: 37px;
+  height: 37px;
+  font-size: 1.52rem;
+  line-height: 1;
+}
+
+.westover-wordmark-copy {
+  display: grid;
+  gap: 1px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  line-height: 1;
+}
+
+.westover-wordmark-copy strong {
+  font-size: .93rem;
+  font-weight: 900;
+}
+
+.westover-wordmark-copy small {
+  color: #d7e4e1;
+  font-size: .54rem;
+  font-weight: 800;
+  letter-spacing: .13em;
+}
+
+.westover-builder-mark {
+  width: 80px;
+  height: 80px;
+  border-radius: 21px;
+  font-size: 2.9rem;
+}
+
 .japanfinder-card {
   background: linear-gradient(145deg, #fff, #f7fbff);
 }
@@ -15,6 +67,10 @@
   font-size: 1.1rem;
   font-weight: 950;
   letter-spacing: 0.04em;
+}
+
+@media (max-width: 620px) {
+  .westover-wordmark-copy strong { font-size: .84rem; }
 }
 
 .portfolio-project-status {
