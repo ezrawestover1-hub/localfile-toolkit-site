@@ -283,7 +283,8 @@ test("support hub gives customers clear help paths without requesting private fi
 test("client-shareable portfolio and its live demo are published with working showcase links", () => {
   const portfolio = read("portfolio.html");
   assert.match(portfolio, /Westover Digital Development \| Ezra Westover/);
-  assert.match(portfolio, /Westover Digital Development · founded by Ezra Westover/);
+  assert.match(portfolio, /class="westover-wordmark" aria-label="Westover Digital Development"/);
+  assert.match(portfolio, /class="westover-monogram" aria-hidden="true">W/);
   assert.match(portfolio, /Context MRI/);
   assert.equal(fs.existsSync(path.join(root, "assets/context-mri-icon.svg")), true);
   assert.match(portfolio, /assets\/context-mri-icon\.svg/);
@@ -662,7 +663,8 @@ test("approved product icon assets and canonical mappings are complete", () => {
   assert.ok(!fs.existsSync(path.join(root, "assets/product-icons/ledgerlift/icon-1024.png")));
   const config = read("assets/product-icons/config.js"); products.forEach((product) => assert.match(config, new RegExp(`assets/product-icons/${product}/icon-512\\.png`)));
   products.forEach((product) => { assert.match(read(`${product}/index.html`), new RegExp(`assets/product-icons/${product}/icon-64\\.png`)); assert.match(read(`${product}/common.js`), /item\.icon/); fs.readdirSync(path.join(root, product)).filter((name) => name.endsWith(".html")).forEach((name) => assert.match(read(`${product}/${name}`), new RegExp(`assets/product-icons/${product}/favicon-16\\.png`))); });
-  products.forEach((product) => { assert.match(read("index.html"), new RegExp(`/assets/product-icons/${product}/icon-128\\.png`)); assert.match(read("pricing.html"), new RegExp(`/assets/product-icons/${product}/icon-128\\.png`)); });
+  products.forEach((product) => { assert.match(read("index.html"), new RegExp(`src="assets/product-icons/${product}/icon-128\\.png"`)); assert.match(read("pricing.html"), new RegExp(`/assets/product-icons/${product}/icon-128\\.png`)); });
+  assert.doesNotMatch(read("index.html"), /src="\/assets\/product-icons\//, "suite homepage icons remain available when opened from the local portfolio file");
   const checkout = read("checkout-portal/checkout.js"); products.forEach((product) => assert.match(checkout, new RegExp(`PRODUCT_ICONS\\.${product}\\.icon`)));
   assert.match(checkout, /Object\.values\(window\.PRODUCT_ICONS\)/);
   assert.match(read("license/manage.js"), /window\.PRODUCT_ICONS/);
