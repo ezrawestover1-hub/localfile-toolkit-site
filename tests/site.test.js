@@ -309,6 +309,12 @@ test("SEO foundations are present and sitemap excludes private routes", () => {
   const sitemap = read("sitemap.xml"); assert.doesNotMatch(sitemap, /\/api\/|checkout-portal|license|purchase-success|tests|migrations/); assert.match(read("robots.txt"), /Sitemap: https:\/\/localfiletoolkit\.com\/sitemap\.xml/);
 });
 
+test("AdSense verification is a homepage-only meta tag without advertising runtime code", () => {
+  const home = read("index.html");
+  assert.match(home, /<meta name="google-adsense-account" content="ca-pub-9923558130339541">/);
+  assert.doesNotMatch(home, /adsbygoogle|pagead2\.googlesyndication\.com|doubleclick/i);
+});
+
 test("every public product and format page has complete SEO metadata", () => {
   const sitemap = read("sitemap.xml");
   const sitemapUrls = [...sitemap.matchAll(/<loc>(https:\/\/localfiletoolkit\.com\/[^<]+)<\/loc>/g)].map((match) => match[1]);
